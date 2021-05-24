@@ -1,0 +1,49 @@
+OUTPUT_ARCH( "riscv" )
+ENTRY( nautilus_entry )
+
+SECTIONS
+{
+  /*
+   * ensure that entry.S / _entry is at 0x80000000,
+   * where qemu's -kernel jumps.
+   */
+  . = 0x80000000;
+
+  .text : {
+    *(.boot)
+    . = ALIGN(0x1000);
+    boot_stack_start = .;
+    . += 2 * 4 * 0x1000;
+    boot_stack_end = .;
+    *(.text*)
+    PROVIDE(etext = .);
+  }
+
+  .rodata : {
+    . = ALIGN(16);
+    *(.srodata .srodata.*) /* do not need to distinguish this from .rodata */
+    . = ALIGN(16);
+    *(.rodata .rodata.*)
+  }
+
+  .data : {
+    . = ALIGN(16);
+    *(.sdata .sdata.*) /* do not need to distinguish this from .data */
+    . = ALIGN(16);
+    *(.data .data.*)
+  }
+
+  _bssStart = .;
+
+  .bss ALIGN(0x1000) : AT(ALIGN(ADDR(.data)+SIZEOF(.data),0x1000))
+  {
+    . = ALIGN(16);
+    *(.sbss .sbss.*) /* do not need to distinguish this from .bss */
+    . = ALIGN(16);
+    *(.bss .bss.*)
+  }
+
+  _bssEnd = .;
+
+  PROVIDE(end = .);
+}

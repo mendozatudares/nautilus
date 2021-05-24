@@ -91,7 +91,11 @@
 	     (bit) < (size);					\
 	     (bit) = find_next_zero_bit((addr), (size), (bit) + 1))
 
+#ifdef NAUT_CONFIG_RISCV_HOST
+#include <arch/riscv/asm/bitops.h>
+#else
 #include <asm/bitops.h>
+#endif
 
 static __inline__ unsigned get_bitmask_order(unsigned int count)
 {

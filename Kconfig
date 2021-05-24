@@ -19,6 +19,9 @@ menu "Platform"
         config GEM5
             bool "GEM5-compatible x86_64 kernel"
 
+        config RISCV_HOST
+            bool "RISC-V 64-bit Host (Gruesome hack)"
+
         config GEM5_FORCE_APIC_TIMER_CALIBRATION
 	    depends on GEM5
 	    bool "Force APIC timer calibration"
