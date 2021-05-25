@@ -73,15 +73,10 @@ void uart (void) {
     WriteReg(FCR, FCR_FIFO_ENABLE | FCR_FIFO_CLEAR);
 }
 
-void main (void)
+void init (void)
 {
     uart();
     __sync_synchronize();
     print("hello\n");
 }
 
-void secondary_entry (int hartid) {
-    __sync_synchronize();
-    print("0" + hartid);
-    print("\n");
-}

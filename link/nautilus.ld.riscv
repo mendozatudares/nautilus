@@ -10,13 +10,15 @@ SECTIONS
   . = 0x80000000;
 
   .text : {
-    *(.boot)
+    *(.text .text.*)
     . = ALIGN(0x1000);
+    PROVIDE(etext = .);
+    . += 0x1000;
     boot_stack_start = .;
-    . += 2 * 4 * 0x1000;
+    . += 0x200000;  /* we start out with a 2M stack */
     boot_stack_end = .;
     *(.text*)
-    PROVIDE(etext = .);
+    *(.gnu.linkonce.t*)
   }
 
   .rodata : {
@@ -35,8 +37,7 @@ SECTIONS
 
   _bssStart = .;
 
-  .bss ALIGN(0x1000) : AT(ALIGN(ADDR(.data)+SIZEOF(.data),0x1000))
-  {
+  .bss ALIGN(0x1000) : AT(ALIGN(ADDR(.data)+SIZEOF(.data),0x1000)) {
     . = ALIGN(16);
     *(.sbss .sbss.*) /* do not need to distinguish this from .bss */
     . = ALIGN(16);

@@ -111,17 +111,12 @@
 
 
 # .option norvc # Disable instruction compression
-.section .data
-
-.section .boot
+.section .text
 
 GLOBAL(nautilus_entry)
 	# Disable linker instruction relaxation for the `la` instruction below.
 	# This disallows the assembler from assuming that `gp` is already initialized.
 	# This causes the value stored in `gp` to be calculated from `pc`.
-.option push
-.option norelax
-.option pop
 
 	csrr    a0, mhartid
 
@@ -133,7 +128,6 @@ GLOBAL(nautilus_entry)
 	mul     t0, t0, t1 # t1 = SIZE * (mhartid + 1)
 	add     sp, sp, t0 # sp = stack_start + (SIZE * (mhartid + 1))
 
-#if 0
 	# zero out bss
 	lla     t0, _bssStart
 	lla     t1, _bssEnd
@@ -142,11 +136,7 @@ GLOBAL(nautilus_entry)
 	REG_S   zero, (t0)
 	add     t0, t0, SZREG
 	blt     t1, t0, 0b  # if t1 is less than t0 
-#endif
 1:
-
-
-
 	# allocate space for the scratch pad
 	addi    sp, sp, -32 * SZREG
 
@@ -168,7 +158,6 @@ GLOBAL(nautilus_entry)
 
 	li      t3, VM_BIGGEST_PAGE           # t3: physical memory stride
 0:
-
 	# store the PTE at the location pointed to by t1
 	REG_S   t0, 0(t1)
 	REG_S   t0, 0(t4)
@@ -180,8 +169,6 @@ GLOBAL(nautilus_entry)
 	# ensure it's written out
 	fence   w,w
 	bne     t1, t2, 0b                    # jump back if we aren't done
-
-
 
 	# now, load the kernel page table into satp 
 	la      t0, kernel_page_table
@@ -197,8 +184,6 @@ GLOBAL(nautilus_entry)
 	# flush tlb and whatnot
 	sfence.vma  zero, zero
 
-
-
 	#	enable supervisor interrupts
 	li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
 	csrs    sie, t0
@@ -209,10 +194,8 @@ GLOBAL(nautilus_entry)
 	REG_L   t0, 0(t0)
 	add     sp, sp, t0
 
-
 	la      t0, main_ptr
 	REG_L   t0, 0(t0)
-
 
 	# set M-mode trap handler
 	la      t0, timervec
@@ -229,7 +212,6 @@ GLOBAL(nautilus_entry)
 	li      t0, MSTATUS_MPP_S
 	csrs    mstatus, t0 # mstatus.MPP = S
 
-
 	# set mepc so we can return to the right place
 	la      t0, main_ptr
 	REG_L   t0, 0(t0)
@@ -245,7 +227,6 @@ GLOBAL(nautilus_entry)
 	li      t0, MSTATUS_MIE
 	csrs    mstatus, t0
 
-
 	# enable machine mode timer interrupts
 	li      t0, MIE_MTIE
 	csrs    mie, t0
@@ -254,47 +235,7 @@ GLOBAL(nautilus_entry)
 
 	jr      t0
 
-
-.global secondary_core_stack
-secondary_core_stack:
-	.quad 0
-
-.global secondary_core_startup_sbi
-secondary_core_startup_sbi:
-	ld sp, secondary_core_stack
-
-
-
-	# now, load the kernel page table into satp 
-	la      t0, kernel_page_table
-	srai    t0, t0, 12 # shift the page table to be just the PPN
-
-	# t1 is the eventual value of SATP
-	li      t1, SATP_FLAG      # t1 = SATP_FLAG
-	slli    t1, t1, SATP_SHIFT # t1 = t1 << SATP_SHIFT
-	add     t1, t1, t0         # t1 = t1 + kernel_page_table
-
-	csrw    satp, t1           # satp = t1
-
-	# flush tlb and whatnot
-	sfence.vma  zero, zero
-
-	#	enable supervisor interrupts
-	li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
-	csrs    sie, t0
-
-	la      t0, second_entry_ptr
-	REG_L   t0, 0(t0)
-	jr      t0
-
-second_entry_ptr:
-	.quad secondary_entry
-
-
-
-
-.global timervec
-timervec:
+GLOBAL(timervec)
 	csrrw a0, mscratch, a0
 	sd a1, 0(a0)
 	sd a2, 8(a0)
@@ -319,17 +260,12 @@ timervec:
 
 	mret
 
-
-
-.section .boot.data
 .balign 8
 main_ptr:
-.quad main
-# place the kernel virtual base here, so we don't have to manage calculation in assembly
+        .quad init
 virt_mask:
-.quad 0xffff800000000000
-
-.section .text
+        # place the kernel virtual base here, so we don't have to manage calculation in assembly
+        .quad 0xffff800000000000
 
 # When the processor gets an interrupt or traps, it jumps here and sets some CSRs
 # like sstatus, sbadaddr, stval etc... The only problem is that we don't switch
@@ -498,8 +434,6 @@ restore_all:
 
 	# finally return the userspace
 	sret
-
-
 END(kernelvec)
 
 
@@ -558,8 +492,6 @@ ENTRY(context_switch)
 END(context_switch)
 #endif
 
-
-
 /* _setjmp functions */
 ENTRY (_setjmp)
   li	a1, 0
@@ -585,12 +517,9 @@ ENTRY (__sigsetjmp)
 	REG_S s11,12*SZREG(a0)
 	REG_S sp, 13*SZREG(a0)
 
-
 /* TODO: save signal mask? */
-  li a0, 0
-  ret
-
-
+        li a0, 0
+        ret
 END (__sigsetjmp)
 
 ENTRY (longjmp)
@@ -612,11 +541,7 @@ ENTRY (longjmp)
 	seqz a0, a1
 	add  a0, a0, a1   # a0 = (a1 == 0) ? 1 : a1
 	ret
-
 END (longjmp)
-
-
-
 
 ENTRY(__rv_save_fpu)
 	fsd f0,  8 * 0(a0)
@@ -688,5 +613,4 @@ ENTRY(__rv_load_fpu)
 	fld f30, 8 * 30(a0)
 	fld f31, 8 * 31(a0)
 	ret
-
 END(__rv_load_fpu)
