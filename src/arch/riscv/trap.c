@@ -69,8 +69,6 @@ devintr()
 
         if(irq == UART0_IRQ){
             uart_intr();
-        } else if(irq == VIRTIO0_IRQ){
-            printk("virtio intr\n");
         } else if(irq){
             printk("unexpected interrupt irq=%d\n", irq);
         }
@@ -85,8 +83,6 @@ devintr()
     } else if (scause == 0x8000000000000001L){
         // software interrupt from a machine-mode timer interrupt,
         // forwarded by timervec in kernelvec.S.
-
-        printk("timer interrupt\n");
 
         // acknowledge the software interrupt by clearing
         // the SSIP bit in sip.
@@ -118,8 +114,7 @@ irq_handler()
     }
 
     // give up the CPU if this is a timer interrupt.
-    if(which_dev == 2)
-
+    if(which_dev == 2);
 
     // the yield() may have caused some traps to occur,
     // so restore trap registers for use by kernelvec.S's sepc instruction.

@@ -113,7 +113,7 @@
 # .option norvc # Disable instruction compression
 .section .boot
 
-GLOBAL(nautilus_entry_main)
+GLOBAL(nautilus_entry)
 
 	# set up a stack for C.
         # stack0 is declared in start.c,
@@ -130,7 +130,7 @@ GLOBAL(nautilus_entry_main)
 spin:
         j spin
 
-GLOBAL(nautilus_entry)
+GLOBAL(nautilus_entry_main)
 	# Disable linker instruction relaxation for the `la` instruction below.
 	# This disallows the assembler from assuming that `gp` is already initialized.
 	# This causes the value stored in `gp` to be calculated from `pc`.
@@ -217,6 +217,7 @@ GLOBAL(nautilus_entry)
 	# set M-mode trap handler
 	la      t0, timervec
 	csrw    mtvec, t0
+        wfi
 
 	# setup trap delegation
 	li      t0, 0xffff

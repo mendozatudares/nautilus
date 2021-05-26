@@ -113,13 +113,9 @@ uart_putchar(int c)
 void
 uart_putchar_sync(int c)
 {
-    intr_off();
-
     // wait for Transmit Holding Empty to be set in LSR.
     while((ReadReg(LSR) & LSR_TX_IDLE) == 0);
     WriteReg(THR, c);
-
-    intr_on();
 }
 
 void uart_puts(char *b) {
@@ -180,8 +176,9 @@ uart_intr(void)
     // read and process incoming characters.
     while(1){
         int c = uart_getchar();
-        if(c == -1)
-            break;
+        if(c == -1) break;
+        c = (c == '\r') ? '\n' : c;
+        uart_putchar_sync(c);
     }
 
     // send buffered characters.

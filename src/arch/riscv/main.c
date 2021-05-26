@@ -25,7 +25,9 @@
 #include <arch/riscv/init.h>
 #include <nautilus/naut_types.h>
 #include "riscv.h"
+#include "memlayout.h"
 
+void timer_init();
 
 /*
  * 2nd two parameters are 
@@ -52,7 +54,10 @@ main (unsigned long mbd,
     // delegate all interrupts and exceptions to supervisor mode.
     w_medeleg(0xffff);
     w_mideleg(0xffff);
-    w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+    w_sie(r_sie() | SIE_SEIE | SIE_SSIE);
+
+    // ask for clock interrupts.
+    timer_init();
 
     // keep each CPU's hartid in its tp register.
     int id = r_mhartid();
@@ -60,4 +65,34 @@ main (unsigned long mbd,
 
     // switch to supervisor mode and jump to main().
     asm volatile("mret");
+}
+
+// assembly code in lowlevel.S for machine-mode timer interrupt.
+extern void timervec();
+uint64_t timer_scratch[5];
+
+void
+timer_init()
+{
+  // ask the CLINT for a timer interrupt.
+  int interval = 1000000; // cycles; about 1/10th second in qemu.
+  *(uint64_t*)CLINT_MTIMECMP(0) = *(uint64_t*)CLINT_MTIME + interval;
+
+  // prepare information in scratch[] for timervec.
+  // scratch[0..2] : space for timervec to save registers.
+  // scratch[3] : address of CLINT MTIMECMP register.
+  // scratch[4] : desired interval (in cycles) between timer interrupts.
+  uint64_t *scratch = &timer_scratch[0];
+  scratch[3] = CLINT_MTIMECMP(0);
+  scratch[4] = interval;
+  w_mscratch((uint64_t)scratch);
+
+  // set the machine-mode trap handler.
+  w_mtvec((uint64_t)timervec);
+
+  // enable machine-mode interrupts.
+  w_mstatus(r_mstatus() | MSTATUS_MIE);
+
+  // enable machine-mode timer interrupts.
+  w_mie(r_mie() | MIE_MTIE);
 }
