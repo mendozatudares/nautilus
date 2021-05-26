@@ -1,5 +1,12 @@
 #!/bin/bash
-ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
+make clean
 
-echo 'Starting QEMU'
-qemu-system-riscv64 -nographic -machine virt -bios none -kernel nautilus.bin -gdb tcp::1234
+if [ "$1" != "clean" ] ; then
+  ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
+
+  if [ "$1" == "qemu" ] ; then
+    echo 'Starting QEMU'
+    qemu-system-riscv64 -nographic -machine virt -bios none -kernel nautilus.bin -gdb tcp::1234
+    make clean
+  fi
+fi

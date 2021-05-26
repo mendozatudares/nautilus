@@ -594,7 +594,7 @@ void nk_thread_exit (void * retval)
     me->status      = NK_THR_EXITED;
 
     // force arch and compiler to do above writes now
-    __asm__ __volatile__ ("mfence" : : : "memory"); 
+    mbarrier();
 
     THREAD_DEBUG("State update complete\n");
 
@@ -1026,7 +1026,11 @@ __thread_fork (void)
     void         *child_stack;
     uint64_t     rsp;
 
+#ifdef NAUT_CONFIG_RISCV_HOST
+    __asm__ __volatile__ ( "lw %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
+#else
     __asm__ __volatile__ ( "movq %%rsp, %0" : "=r"(rsp) : : "memory");
+#endif
 
 #ifdef NAUT_CONFIG_ENABLE_STACK_CHECK
     // now check again after update to see if we didn't overrun/underrun the stack in the parent... 

@@ -6,12 +6,26 @@
 #include "memlayout.h"
 
 
+void irq_common();
 void panic(char *s);
 void printk(char *fmt, ...);
 void uart_intr(void);
 
 void
-plicinit(void)
+trap_init(void)
+{
+
+}
+
+// set up to take exceptions and traps while in the kernel.
+void
+trap_init_hart(void)
+{
+    w_stvec((uint64_t)irq_common);
+}
+
+void
+plic_init(void)
 {
     // set desired IRQ priorities non-zero (otherwise disabled).
     *(uint32_t*)(PLIC + UART0_IRQ*4) = 1;
@@ -19,7 +33,7 @@ plicinit(void)
 }
 
 void
-plicinithart(void)
+plic_init_hart(void)
 {
     // set uart's enable bit for this hart's S-mode.
     *(uint32_t*)PLIC_SENABLE(0)= (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ);
@@ -54,7 +68,6 @@ devintr()
         int irq = plic_claim();
 
         if(irq == UART0_IRQ){
-            printk("uart intr\n");
             uart_intr();
         } else if(irq == VIRTIO0_IRQ){
             printk("virtio intr\n");
@@ -86,7 +99,7 @@ devintr()
 }
 
 void 
-kerneltrap()
+irq_handler()
 {
     int which_dev = 0;
     uint64_t sepc = r_sepc();

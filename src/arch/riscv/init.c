@@ -25,6 +25,8 @@
 #include <nautilus/nautilus.h>
 #include <nautilus/spinlock.h>
 #include <nautilus/mb_utils.h>
+#include <nautilus/cpu.h>
+#include <nautilus/percpu.h>
 #include <nautilus/errno.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
@@ -91,7 +93,8 @@ static struct multiboot_info riscv_fake_multiboot_info = {
 };
 
 void printk_init(void);
-int printk(const char *fmt, ...);
+int  printk(const char *fmt, ...);
+void uart_init(void);
 
 void
 init ()
@@ -101,10 +104,22 @@ init ()
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
     // setup_idt();
+    
+    trap_init();
+
+    trap_init_hart();
+
+    plic_init();
+
+    plic_init_hart();
+
+    uart_init();
 
     printk_init();
 
     printk(NAUT_WELCOME);
+
+    sti();
 
     while(1);
 }

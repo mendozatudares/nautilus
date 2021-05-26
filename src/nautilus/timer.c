@@ -285,11 +285,7 @@ int nk_timer_wait(nk_timer_t *t)
            DEBUG("going to sleep on wait queue timer %p %s waitqueue %p %s \n", t, t->name, t->waitq, t->waitq->name);
 	    nk_wait_queue_sleep_extended(t->waitq, check, t);
 	} else {
-#ifdef NAUT_CONFIG_RISCV_HOST
-	    asm volatile ("nop");
-#else
-	    asm volatile ("pause");
-#endif
+           pause();
 	}
 	//DEBUG("try again\n");
     }

@@ -41,8 +41,11 @@ extern "C" {
 struct nk_regs;
 void __do_backtrace(void **, unsigned);
 void nk_dump_mem(void *, ulong_t);
-void nk_stack_dump(ulong_t);
-void nk_print_regs(struct nk_regs * r);
+#ifdef NAUT_CONFIG_RISCV_HOST
+#include <arch/riscv/backtrace.h>
+#else
+#include <arch/x64/backtrace.h>
+#endif
 
 // backtrace facility using compiler builtins
 #define IS_CANONICAL(x) ((((uint64_t)(x))<0x0000800000000000ULL) || (((uint64_t)(x))>=0xffff800000000000ULL))

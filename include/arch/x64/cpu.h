@@ -96,9 +96,11 @@ struct nk_regs {
 };
 
 
+#define pause()       asm volatile("pause");
+
 #define PAUSE_WHILE(x) \
     while ((x)) { \
-        asm volatile("pause"); \
+        pause(); \
     } 
 
 #ifndef NAUT_CONFIG_XEON_PHI

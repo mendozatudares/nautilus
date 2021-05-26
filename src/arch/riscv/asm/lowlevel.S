@@ -113,6 +113,23 @@
 # .option norvc # Disable instruction compression
 .section .boot
 
+GLOBAL(nautilus_entry_main)
+
+	# set up a stack for C.
+        # stack0 is declared in start.c,
+        # with a 4096-byte stack per CPU.
+        # sp = stack0 + (hartid * 4096)
+        la sp, boot_stack_start
+        li a0, 1024*4
+	csrr a1, mhartid
+        addi a1, a1, 1
+        mul a0, a0, a1
+        add sp, sp, a0
+
+        call main
+spin:
+        j spin
+
 GLOBAL(nautilus_entry)
 	# Disable linker instruction relaxation for the `la` instruction below.
 	# This disallows the assembler from assuming that `gp` is already initialized.
@@ -202,7 +219,7 @@ GLOBAL(nautilus_entry)
 	csrw    mtvec, t0
 
 	# setup trap delegation
-	li      t0, 0xffffffff
+	li      t0, 0xffff
 	csrw    medeleg, t0
 	csrw    mideleg, t0
 
@@ -286,7 +303,7 @@ virt_mask:
 #define TP_USER_SP 6
 #define TF_SIZE_ON_STACK (36 * SZREG)
 
-ENTRY(kernelvec)
+GLOBAL(irq_common)
 
         // make room to save registers.
         addi sp, sp, -256
@@ -325,7 +342,7 @@ ENTRY(kernelvec)
         sd t6, 240(sp)
 
 	// call the C trap handler in trap.c
-        call kerneltrap
+        call irq_handler
 
         // restore registers.
         ld ra, 0(sp)
@@ -365,7 +382,7 @@ ENTRY(kernelvec)
         // return to whatever we were doing in the kernel.
         sret
 
-END(kernelvec)
+END(irq_common)
 
 # TODO: 32 vs 64bit :)
 ENTRY(context_switch)

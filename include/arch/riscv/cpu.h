@@ -57,17 +57,14 @@ struct nk_regs {
   /* 248 */ ulong_t t6;
 };
 
+#define pause()       asm volatile("nop");
 
 #define PAUSE_WHILE(x) \
     while ((x)) { \
-        asm volatile("nop"); \
+        pause(); \
     } 
 
-#ifndef NAUT_CONFIG_XEON_PHI
-#define mbarrier()    asm volatile("mfence":::"memory")
-#else
-#define mbarrier()
-#endif
+#define mbarrier()    asm volatile("fence.i":::"memory")
 
 #define BARRIER_WHILE(x) \
     while ((x)) { \
