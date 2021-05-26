@@ -1,4 +1,4 @@
-obj-y += apic.o \
+obj-$(!NAUT_CONFIG_RISCV_HOST) += apic.o \
 	 ioapic.o \
 	 i8254.o \
 	 ps2.o \

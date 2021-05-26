@@ -44,9 +44,18 @@
 #include <nautilus/math.h>
 #include <nautilus/vc.h>
 
+#ifndef NAUT_CONFIG_RISCV_HOST
 // All output is handled via the virtual console
 #define do_putchar(x) do { nk_vc_putchar(x);} while (0)
 #define do_puts(x)    do { nk_vc_puts(x); } while (0)
+#else
+// All output is handled via UART
+#define do_putchar(x) do { uart_putchar(x);} while (0)
+#define do_puts(x)    do { uart_puts(x); } while (0)
+
+extern void uart_putchar(uchar_t c);
+extern void uart_puts(char * b);
+#endif
 
 spinlock_t printk_lock;
 
@@ -139,7 +148,7 @@ panic (const char * fmt, ...)
     vprintk(fmt, arg);
     va_end(arg);
 
-   __asm__ __volatile__ ("cli");
+   cli();
 
    while(1);
 }

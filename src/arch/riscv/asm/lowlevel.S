@@ -111,7 +111,7 @@
 
 
 # .option norvc # Disable instruction compression
-.section .text
+.section .boot
 
 GLOBAL(nautilus_entry)
 	# Disable linker instruction relaxation for the `la` instruction below.
@@ -235,30 +235,36 @@ GLOBAL(nautilus_entry)
 
 	jr      t0
 
+.section .text
+
 GLOBAL(timervec)
-	csrrw a0, mscratch, a0
-	sd a1, 0(a0)
-	sd a2, 8(a0)
-	sd a3, 16(a0)
+        # scratch[0,8,16] : register save area.
+        # scratch[24] : address of CLINT's MTIMECMP register.
+        # scratch[32] : desired interval between interrupts.
 
-	# schedule the next timer interrupt
-	# by adding interval to mtimecmp.
-	ld a1, 24(a0) # CLINT_MTIMECMP(hart)
-	ld a2, 32(a0) # interval
-	ld a3, 0(a1)
-	add a3, a3, a2
-	sd a3, 0(a1)
+        csrrw a0, mscratch, a0
+        sd a1, 0(a0)
+        sd a2, 8(a0)
+        sd a3, 16(a0)
 
-	# raise a supervisor software interrupt.
+        # schedule the next timer interrupt
+        # by adding interval to mtimecmp.
+        ld a1, 24(a0) # CLINT_MTIMECMP(hart)
+        ld a2, 32(a0) # interval
+        ld a3, 0(a1)
+        add a3, a3, a2
+        sd a3, 0(a1)
+
+        # raise a supervisor software interrupt.
 	li a1, 2
-	csrw sip, a1
+        csrw sip, a1
 
-	ld a3, 16(a0)
-	ld a2, 8(a0)
-	ld a1, 0(a0)
-	csrrw a0, mscratch, a0
+        ld a3, 16(a0)
+        ld a2, 8(a0)
+        ld a1, 0(a0)
+        csrrw a0, mscratch, a0
 
-	mret
+        mret
 
 .balign 8
 main_ptr:
@@ -280,169 +286,86 @@ virt_mask:
 #define TP_USER_SP 6
 #define TF_SIZE_ON_STACK (36 * SZREG)
 
-#if 0
 ENTRY(kernelvec)
 
-	/*
-	 * When coming from userspace, sscratch's value will be that of the hart_state for this
-	 * hart. If it is zero, the we are coming from kernelspace. 
-	 */
+        // make room to save registers.
+        addi sp, sp, -256
 
-	csrrw tp, sscratch, tp
-	bnez tp, _save_context
+        // save the registers.
+        sd ra, 0(sp)
+        sd sp, 8(sp)
+        sd gp, 16(sp)
+        sd tp, 24(sp)
+        sd t0, 32(sp)
+        sd t1, 40(sp)
+        sd t2, 48(sp)
+        sd s0, 56(sp)
+        sd s1, 64(sp)
+        sd a0, 72(sp)
+        sd a1, 80(sp)
+        sd a2, 88(sp)
+        sd a3, 96(sp)
+        sd a4, 104(sp)
+        sd a5, 112(sp)
+        sd a6, 120(sp)
+        sd a7, 128(sp)
+        sd s2, 136(sp)
+        sd s3, 144(sp)
+        sd s4, 152(sp)
+        sd s5, 160(sp)
+        sd s6, 168(sp)
+        sd s7, 176(sp)
+        sd s8, 184(sp)
+        sd s9, 192(sp)
+        sd s10, 200(sp)
+        sd s11, 208(sp)
+        sd t3, 216(sp)
+        sd t4, 224(sp)
+        sd t5, 232(sp)
+        sd t6, 240(sp)
 
-_restore_kernel_tpsp: # sscratch != 0
-	csrr tp, sscratch # tp <- sscratch
-	REG_S sp, ROFF(TP_KERNEL_SP, tp) # sp <- tp.kernel_sp
-_save_context:
-	REG_S sp, ROFF(TP_USER_SP, tp)
-	REG_L sp, ROFF(TP_KERNEL_SP, tp)
-	addi sp, sp, -(TF_SIZE_ON_STACK)
+	// call the C trap handler in trap.c
+        call kerneltrap
 
-	# save the registers.
-	REG_S ra, ROFF(0, sp)
-	# not sp
-	REG_S gp, ROFF(2, sp)
-	# not tp
-	REG_S t0, ROFF(4, sp)
-	REG_S t1, ROFF(5, sp)
-	REG_S t2, ROFF(6, sp)
-	REG_S s0, ROFF(7, sp)
-	REG_S s1, ROFF(8, sp)
-	REG_S a0, ROFF(9, sp)
-	REG_S a1, ROFF(10,sp)
-	REG_S a2, ROFF(11, sp)
-	REG_S a3, ROFF(12, sp)
-	REG_S a4, ROFF(13, sp)
-	REG_S a5, ROFF(14, sp)
-	REG_S a6, ROFF(15, sp)
-	REG_S a7, ROFF(16, sp)
-	REG_S s2, ROFF(17, sp)
-	REG_S s3, ROFF(18, sp)
-	REG_S s4, ROFF(19, sp)
-	REG_S s5, ROFF(20, sp)
-	REG_S s6, ROFF(21, sp)
-	REG_S s7, ROFF(22, sp)
-	REG_S s8, ROFF(23, sp)
-	REG_S s9, ROFF(24, sp)
-	REG_S s10, ROFF(25, sp)
-	REG_S s11, ROFF(26, sp)
-	REG_S t3, ROFF(27, sp)
-	REG_S t4, ROFF(28, sp)
-	REG_S t5, ROFF(29, sp)
-	REG_S t6, ROFF(30, sp)
+        // restore registers.
+        ld ra, 0(sp)
+        ld sp, 8(sp)
+        ld gp, 16(sp)
+        // not this, in case we moved CPUs: ld tp, 24(sp)
+        ld t0, 32(sp)
+        ld t1, 40(sp)
+        ld t2, 48(sp)
+        ld s0, 56(sp)
+        ld s1, 64(sp)
+        ld a0, 72(sp)
+        ld a1, 80(sp)
+        ld a2, 88(sp)
+        ld a3, 96(sp)
+        ld a4, 104(sp)
+        ld a5, 112(sp)
+        ld a6, 120(sp)
+        ld a7, 128(sp)
+        ld s2, 136(sp)
+        ld s3, 144(sp)
+        ld s4, 152(sp)
+        ld s5, 160(sp)
+        ld s6, 168(sp)
+        ld s7, 176(sp)
+        ld s8, 184(sp)
+        ld s9, 192(sp)
+        ld s10, 200(sp)
+        ld s11, 208(sp)
+        ld t3, 216(sp)
+        ld t4, 224(sp)
+        ld t5, 232(sp)
+        ld t6, 240(sp)
 
+        addi sp, sp, 256
 
-	# TODO: disable floating point in the kernel
-	li t0, 0 # TODO: these flags :)
+        // return to whatever we were doing in the kernel.
+        sret
 
-	REG_L s0, ROFF(TP_USER_SP, tp)
-	csrrc s1, sstatus, t0
-	csrr s2, sepc
-	csrr s3, stval
-	csrr s4, scause
-	csrr s5, sscratch # sscratch is currently the old tp value
-
-	REG_S s0, ROFF(1, sp) # store previous sp in the trapframe
-	REG_S s1, ROFF(32, sp) # store sstatus in the trapframe
-	REG_S s2, ROFF(31, sp) # store sepc in the trapframe
-	REG_S s3, ROFF(33, sp)
-	REG_S s4, ROFF(34, sp)
-	REG_S s5, ROFF(3, sp) # store previous tp value in the trapframe
-
-
-	/*
-	 * Set the scratch register to 0, so that if a recursive exception
-	 * occurs, the exception vector knows it came from the kernel
-	 */
-	csrw sscratch, zero
-
-	# TODO: directly handle syscalls to save some cycles? idk :)
-
-	/* Return  */
-	la ra, ret_from_exception
-
-	/* Handle interrupts */
-	move a0, sp /* arg0 <- trapframe */
-	j kernel_trap
-
-
-ret_from_exception:
-
-	REG_L s0, ROFF(32, sp) # s0 <- tf.status
-	csrc sstatus, SR_SIE
-
-	# check if we were previously in supervisor mode
-	andi s0, s0, SR_SPP
-	bnez s0, restore_all # skip "resume_userspace" if we were in the kernel
-
-resume_userspace:
-	/* Save unwound kernel stack pointer in thread_info */
-	addi s0, sp, TF_SIZE_ON_STACK
-	REG_S s0, ROFF(TP_KERNEL_SP, tp) # tf.kernel_sp <- sp
-
-	/*
-	 * Save TP into the scratch register , so we can find the kernel data
-	 * structures again.
-	 */
-	csrw sscratch, tp
-
-restore_all:
-	
-	REG_L a0, ROFF(32, sp) # a0 <- tf.status
-	REG_L  a2, ROFF(31, sp) # a2 <- tf.sepc
-	# REG_SC x0, a2, ROFF(31, sp) # ngl, idk what REG_SC does...
-	
-	csrw sstatus, a0
-	csrw sepc, a2
-
-	# restore registers
-	REG_L ra, ROFF(0, sp)
-  # skip sp for now...
-	REG_L gp, ROFF(2, sp)
-	REG_S tp, ROFF(3, sp)
-	REG_L t0, ROFF(4, sp)
-	REG_L t1, ROFF(5, sp)
-	REG_L t2, ROFF(6, sp)
-	REG_L s0, ROFF(7, sp)
-	REG_L s1, ROFF(8, sp)
-	REG_L a0, ROFF(9, sp)
-	REG_L a1, ROFF(10,sp)
-	REG_L a2, ROFF(11, sp)
-	REG_L a3, ROFF(12, sp)
-	REG_L a4, ROFF(13, sp)
-	REG_L a5, ROFF(14, sp)
-	REG_L a6, ROFF(15, sp)
-	REG_L a7, ROFF(16, sp)
-	REG_L s2, ROFF(17, sp)
-	REG_L s3, ROFF(18, sp)
-	REG_L s4, ROFF(19, sp)
-	REG_L s5, ROFF(20, sp)
-	REG_L s6, ROFF(21, sp)
-	REG_L s7, ROFF(22, sp)
-	REG_L s8, ROFF(23, sp)
-	REG_L s9, ROFF(24, sp)
-	REG_L s10, ROFF(25, sp)
-	REG_L s11, ROFF(26, sp)
-	REG_L t3, ROFF(27, sp)
-	REG_L t4, ROFF(28, sp)
-	REG_L t5, ROFF(29, sp)
-	REG_L t6, ROFF(30, sp)
-
-	# NOW we load sp
-	REG_L sp, ROFF(1, sp)
-
-	# finally return the userspace
-	sret
 END(kernelvec)
-
-
-ENTRY(rv_enter_userspace)
-	# simply change sp <- a0 and jump to ret_from_exception
-	move sp, a0
-	j ret_from_exception
-
-END(rv_enter_userspace)
 
 # TODO: 32 vs 64bit :)
 ENTRY(context_switch)
@@ -470,7 +393,6 @@ ENTRY(context_switch)
 	REG_S sp, (a0)
 	mv sp, a1
 
-
 	REG_L ra,  ROFF(0,  sp)
 	REG_L s0,  ROFF(1,  sp)
 	REG_L s1,  ROFF(2,  sp)
@@ -488,9 +410,7 @@ ENTRY(context_switch)
 	addi sp, sp, CTX_SIZE
 
 	ret
-
 END(context_switch)
-#endif
 
 /* _setjmp functions */
 ENTRY (_setjmp)
@@ -614,3 +534,209 @@ ENTRY(__rv_load_fpu)
 	fld f31, 8 * 31(a0)
 	ret
 END(__rv_load_fpu)
+
+/*
+	rax = nk_lowlevel_memset(rdi=dest, rsi=src, rdx=count)
+*/
+/* void *memset(void *, int, size_t) */
+.global nk_low_level_memset
+nk_low_level_memset:
+	move t0, a0  /* Preserve return value */
+
+	/* Defer to byte-oriented fill for small sizes */
+	sltiu a3, a2, 16
+	bnez a3, 4f
+
+	/*
+	 * Round to nearest XLEN-aligned address
+	 * greater than or equal to start address
+	 */
+	addi a3, t0, SZREG-1
+	andi a3, a3, ~(SZREG-1)
+	beq a3, t0, 2f  /* Skip if already aligned */
+	/* Handle initial misalignment */
+	sub a4, a3, t0
+1:
+	sb a1, 0(t0)
+	addi t0, t0, 1
+	bltu t0, a3, 1b
+	sub a2, a2, a4  /* Update count */
+
+2: /* Duff's device with 32 XLEN stores per iteration */
+	/* Broadcast value into all bytes */
+	andi a1, a1, 0xff
+	slli a3, a1, 8
+	or a1, a3, a1
+	slli a3, a1, 16
+	or a1, a3, a1
+	slli a3, a1, 32
+	or a1, a3, a1
+
+	/* Calculate end address */
+	andi a4, a2, ~(SZREG-1)
+	add a3, t0, a4
+
+	andi a4, a4, 31*SZREG  /* Calculate remainder */
+	beqz a4, 3f            /* Shortcut if no remainder */
+	neg a4, a4
+	addi a4, a4, 32*SZREG  /* Calculate initial offset */
+
+	/* Adjust start address with offset */
+	sub t0, t0, a4
+
+	/* Jump into loop body */
+	/* Assumes 32-bit instruction lengths */
+	la a5, 3f
+	srli a4, a4, 1
+	add a5, a5, a4
+	jr a5
+3:
+	REG_S a1,        0(t0)
+	REG_S a1,    SZREG(t0)
+	REG_S a1,  2*SZREG(t0)
+	REG_S a1,  3*SZREG(t0)
+	REG_S a1,  4*SZREG(t0)
+	REG_S a1,  5*SZREG(t0)
+	REG_S a1,  6*SZREG(t0)
+	REG_S a1,  7*SZREG(t0)
+	REG_S a1,  8*SZREG(t0)
+	REG_S a1,  9*SZREG(t0)
+	REG_S a1, 10*SZREG(t0)
+	REG_S a1, 11*SZREG(t0)
+	REG_S a1, 12*SZREG(t0)
+	REG_S a1, 13*SZREG(t0)
+	REG_S a1, 14*SZREG(t0)
+	REG_S a1, 15*SZREG(t0)
+	REG_S a1, 16*SZREG(t0)
+	REG_S a1, 17*SZREG(t0)
+	REG_S a1, 18*SZREG(t0)
+	REG_S a1, 19*SZREG(t0)
+	REG_S a1, 20*SZREG(t0)
+	REG_S a1, 21*SZREG(t0)
+	REG_S a1, 22*SZREG(t0)
+	REG_S a1, 23*SZREG(t0)
+	REG_S a1, 24*SZREG(t0)
+	REG_S a1, 25*SZREG(t0)
+	REG_S a1, 26*SZREG(t0)
+	REG_S a1, 27*SZREG(t0)
+	REG_S a1, 28*SZREG(t0)
+	REG_S a1, 29*SZREG(t0)
+	REG_S a1, 30*SZREG(t0)
+	REG_S a1, 31*SZREG(t0)
+	addi t0, t0, 32*SZREG
+	bltu t0, a3, 3b
+	andi a2, a2, SZREG-1  /* Update count */
+
+4:
+	/* Handle trailing misalignment */
+	beqz a2, 6f
+	add a3, t0, a2
+5:
+	sb a1, 0(t0)
+	addi t0, t0, 1
+	bltu t0, a3, 5b
+6:
+	ret
+
+/*
+	rax = nk_low_level_memcpy(rdi=dest, rsi=src, rdx=count)
+*/
+/* void *memcpy(void *, const void *, size_t) */
+.global nk_low_level_memcpy
+nk_low_level_memcpy:
+	move t6, a0  /* Preserve return value */
+
+	/* Defer to byte-oriented copy for small sizes */
+	sltiu a3, a2, 128
+	bnez a3, 4f
+	/* Use word-oriented copy only if low-order bits match */
+	andi a3, t6, SZREG-1
+	andi a4, a1, SZREG-1
+	bne a3, a4, 4f
+
+	beqz a3, 2f  /* Skip if already aligned */
+	/*
+	 * Round to nearest double word-aligned address
+	 * greater than or equal to start address
+	 */
+	andi a3, a1, ~(SZREG-1)
+	addi a3, a3, SZREG
+	/* Handle initial misalignment */
+	sub a4, a3, a1
+1:
+	lb a5, 0(a1)
+	addi a1, a1, 1
+	sb a5, 0(t6)
+	addi t6, t6, 1
+	bltu a1, a3, 1b
+	sub a2, a2, a4  /* Update count */
+
+2:
+	andi a4, a2, ~((16*SZREG)-1)
+	beqz a4, 4f
+	add a3, a1, a4
+3:
+	REG_L a4,       0(a1)
+	REG_L a5,   SZREG(a1)
+	REG_L a6, 2*SZREG(a1)
+	REG_L a7, 3*SZREG(a1)
+	REG_L t0, 4*SZREG(a1)
+	REG_L t1, 5*SZREG(a1)
+	REG_L t2, 6*SZREG(a1)
+	REG_L t3, 7*SZREG(a1)
+	REG_L t4, 8*SZREG(a1)
+	REG_L t5, 9*SZREG(a1)
+	REG_S a4,       0(t6)
+	REG_S a5,   SZREG(t6)
+	REG_S a6, 2*SZREG(t6)
+	REG_S a7, 3*SZREG(t6)
+	REG_S t0, 4*SZREG(t6)
+	REG_S t1, 5*SZREG(t6)
+	REG_S t2, 6*SZREG(t6)
+	REG_S t3, 7*SZREG(t6)
+	REG_S t4, 8*SZREG(t6)
+	REG_S t5, 9*SZREG(t6)
+	REG_L a4, 10*SZREG(a1)
+	REG_L a5, 11*SZREG(a1)
+	REG_L a6, 12*SZREG(a1)
+	REG_L a7, 13*SZREG(a1)
+	REG_L t0, 14*SZREG(a1)
+	REG_L t1, 15*SZREG(a1)
+	addi a1, a1, 16*SZREG
+	REG_S a4, 10*SZREG(t6)
+	REG_S a5, 11*SZREG(t6)
+	REG_S a6, 12*SZREG(t6)
+	REG_S a7, 13*SZREG(t6)
+	REG_S t0, 14*SZREG(t6)
+	REG_S t1, 15*SZREG(t6)
+	addi t6, t6, 16*SZREG
+	bltu a1, a3, 3b
+	andi a2, a2, (16*SZREG)-1  /* Update count */
+
+4:
+	/* Handle trailing misalignment */
+	beqz a2, 6f
+	add a3, a1, a2
+
+	/* Use word-oriented copy if co-aligned to word boundary */
+	or a5, a1, t6
+	or a5, a5, a3
+	andi a5, a5, 3
+	bnez a5, 5f
+7:
+	lw a4, 0(a1)
+	addi a1, a1, 4
+	sw a4, 0(t6)
+	addi t6, t6, 4
+	bltu a1, a3, 7b
+
+	ret
+
+5:
+	lb a4, 0(a1)
+	addi a1, a1, 1
+	sb a4, 0(t6)
+	addi t6, t6, 1
+	bltu a1, a3, 5b
+6:
+	ret

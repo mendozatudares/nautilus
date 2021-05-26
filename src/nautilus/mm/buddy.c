@@ -69,21 +69,28 @@ struct block {
 static inline void 
 __set_bit (ulong_t nr, volatile void * addr)
 {
-    
+#ifdef NAUT_CONFIG_RISCV_HOST
+    set_bit(nr, addr);
+#else
     __asm__ __volatile__ (
         "btsq %1,%0"
         :"+m" (*(volatile long*)addr)
         :"r" (nr) : "memory");
+#endif
 }
 
 
 static inline void 
 __clear_bit (ulong_t nr, volatile void * addr)
 {
+#ifdef NAUT_CONFIG_RISCV_HOST
+    clear_bit(nr, addr);
+#else
     __asm__ __volatile__ (
         "btrq %1,%0"
         :"+m" (*(volatile long*)addr)
         :"r" (nr));
+#endif
 }
 
 static inline void setb(ulong_t nr, volatile char *addr)

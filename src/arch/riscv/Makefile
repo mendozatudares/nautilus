@@ -1,2 +1,5 @@
 obj-y += asm/ \
-	 main.o \
+	 init.o \
+	 uart.o \
+	 printf.o \
+	 trap.o \

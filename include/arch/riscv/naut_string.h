@@ -20,25 +20,21 @@
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
-#ifndef __PER_CPU_H__
-#define __PER_CPU_H__
+#ifdef __STRING_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define OP_T_THRES 8
+#define OPSIZ sizeof(unsigned long int)
 
-#include <stddef.h>
+#define WORD_COPY_BWD(dst_ep, src_ep, nbytes_left, nbytes)        \
+  do                                          \
+    {                                         \
+                                              \
+    } while (0)
 
-struct cpu;
+#define BYTE_COPY_BWD(dst_ep, src_ep, nbytes)                     \
+  do                                          \
+    {                                         \
+                                              \
+    } while (0)
 
-#ifdef NAUT_CONFIG_RISCV_HOST
-#include <arch/riscv/percpu.h>
-#else
-#include <arch/x64/percpu.h>
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* !__PER_CPU_H__ */
+#endif 

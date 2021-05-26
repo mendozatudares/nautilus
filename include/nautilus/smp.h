@@ -75,10 +75,10 @@ struct cpu {
     struct nk_thread * cur_thread;             /* +0  KCH: this must be first! */
     // track whether we are in an interrupt, nested or otherwise
     // this is intended for use by the scheduler (any scheduler)
-    uint16_t interrupt_nesting_level;          /* +8  PAD: DO NOT MOVE */
+    uint32_t interrupt_nesting_level;          /* +8  PAD: DO NOT MOVE */
     // track whether the scheduler (any scheduler) should be able to preempt
     // the current thread (whether cooperatively or via any
-    uint16_t preempt_disable_level;            /* +10 PAD: DO NOT MOVE */
+    uint32_t preempt_disable_level;            /* +10 PAD: DO NOT MOVE */
 
     // Track statistics of interrupts and exceptions
     // these counts are updated by the low-level interrupt handling code
@@ -98,8 +98,8 @@ struct cpu {
 
     cpu_id_t id;
     uint32_t lapic_id;   
-    uint8_t enabled;
-    uint8_t is_bsp;
+    uint32_t enabled;
+    uint32_t is_bsp;
     uint32_t cpu_sig;
     uint32_t feat_flags;
 
