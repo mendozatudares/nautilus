@@ -1,5 +1,5 @@
 //
-// formatted console output -- printf, panic.
+// formatted console output -- printk, panic.
 //
 
 #include <stdarg.h>
@@ -7,12 +7,12 @@
 #include <nautilus/naut_types.h>
 #include <nautilus/spinlock.h>
 
-// lock to avoid interleaving concurrent printf's.
-spinlock_t printf_lock;
+// lock to avoid interleaving concurrent printk's.
+spinlock_t printk_lock;
 
-#define PRINTF_LOCK_CONF uint8_t _printf_lock_flags
-#define PRINTF_LOCK() _printf_lock_flags = spin_lock_irq_save(&printf_lock)
-#define PRINTF_UNLOCK() spin_unlock_irq_restore(&printf_lock, _printf_lock_flags);
+#define PRINTK_LOCK_CONF uint8_t _printk_lock_flags
+#define PRINTK_LOCK() _printk_lock_flags = spin_lock_irq_save(&printk_lock)
+#define PRINTK_UNLOCK() spin_unlock_irq_restore(&printk_lock, _printk_lock_flags);
 
 static char digits[] = "0123456789abcdef";
 
@@ -56,14 +56,14 @@ print_ptr(uint64_t x)
 void panic(char *s);
 
 // Print to the console. only understands %d, %x, %p, %s.
-void printf(char *fmt, ...)
+void printk(char *fmt, ...)
 {
-    PRINTF_LOCK_CONF;
+    PRINTK_LOCK_CONF;
     va_list ap;
     int i, c;
     char *s;
 
-    PRINTF_LOCK();
+    PRINTK_LOCK();
 
     if (fmt == 0)
         panic("null fmt");
@@ -104,20 +104,20 @@ void printf(char *fmt, ...)
         }
     }
 
-    PRINTF_UNLOCK();
+    PRINTK_UNLOCK();
 }
 
 void
 panic(char *s)
 {
-    printf("panic: ");
-    printf(s);
-    printf("\n");
+    printk("panic: ");
+    printk(s);
+    printk("\n");
     for(;;);
 }
 
 void
-printf_init(void)
+printk_init(void)
 {
-    spinlock_init(&printf_lock);
+    spinlock_init(&printk_lock);
 }

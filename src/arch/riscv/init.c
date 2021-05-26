@@ -90,8 +90,8 @@ static struct multiboot_info riscv_fake_multiboot_info = {
   .hrt_info = 0
 };
 
-void printf_init(void);
-void printf(char *fmt, ...);
+void printk_init(void);
+int printk(const char *fmt, ...);
 
 void
 init ()
@@ -100,9 +100,11 @@ init ()
 
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
-    printf_init();
+    // setup_idt();
 
-    printf(NAUT_WELCOME);
+    printk_init();
+
+    printk(NAUT_WELCOME);
 
     while(1);
 }

@@ -7,7 +7,7 @@
 
 
 void panic(char *s);
-void printf(char *fmt, ...);
+void printk(char *fmt, ...);
 void uart_intr(void);
 
 void
@@ -54,12 +54,12 @@ devintr()
         int irq = plic_claim();
 
         if(irq == UART0_IRQ){
-            printf("uart intr\n");
+            printk("uart intr\n");
             uart_intr();
         } else if(irq == VIRTIO0_IRQ){
-            printf("virtio intr\n");
+            printk("virtio intr\n");
         } else if(irq){
-            printf("unexpected interrupt irq=%d\n", irq);
+            printk("unexpected interrupt irq=%d\n", irq);
         }
 
         // the PLIC allows each device to raise at most one
@@ -73,7 +73,7 @@ devintr()
         // software interrupt from a machine-mode timer interrupt,
         // forwarded by timervec in kernelvec.S.
 
-        printf("timer interrupt\n");
+        printk("timer interrupt\n");
 
         // acknowledge the software interrupt by clearing
         // the SSIP bit in sip.
@@ -99,8 +99,8 @@ kerneltrap()
         panic("kerneltrap: interrupts enabled");
 
     if((which_dev = devintr()) == 0){
-        printf("scause %p\n", scause);
-        printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+        printk("scause %p\n", scause);
+        printk("sepc=%p stval=%p\n", r_sepc(), r_stval());
         panic("kerneltrap");
     }
 
