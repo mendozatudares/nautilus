@@ -56,7 +56,8 @@ print_ptr(uint64_t x)
 void panic(char *s);
 
 // Print to the console. only understands %d, %x, %p, %s.
-void printk(char *fmt, ...)
+void
+printk(char *fmt, ...)
 {
     PRINTK_LOCK_CONF;
     va_list ap;
@@ -110,7 +111,7 @@ void printk(char *fmt, ...)
 void
 panic(char *s)
 {
-    printk("panic: ");
+    printk("PANIC: ");
     printk(s);
     printk("\n");
     for(;;);

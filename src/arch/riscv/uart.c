@@ -52,7 +52,7 @@ uint64_t uart_tx_r; // read next from uart_tx_buf[uar_tx_r % UART_TX_BUF_SIZE]
 void uart_start();
 
 void
-uart_init (void)
+uart_init(void)
 {
     // disable interrupts.
     WriteReg(IER, 0x00);

@@ -113,7 +113,7 @@
 # .option norvc # Disable instruction compression
 .section .boot
 
-GLOBAL(nautilus_entry)
+GLOBAL(nautilus_entry_basic)
 
 	# set up a stack for C.
         # stack0 is declared in start.c,
@@ -130,7 +130,7 @@ GLOBAL(nautilus_entry)
 spin:
         j spin
 
-GLOBAL(nautilus_entry_main)
+GLOBAL(nautilus_entry)
 	# Disable linker instruction relaxation for the `la` instruction below.
 	# This disallows the assembler from assuming that `gp` is already initialized.
 	# This causes the value stored in `gp` to be calculated from `pc`.
@@ -211,11 +211,11 @@ GLOBAL(nautilus_entry_main)
 	REG_L   t0, 0(t0)
 	add     sp, sp, t0
 
-	la      t0, main_ptr
+	la      t0, init_ptr
 	REG_L   t0, 0(t0)
 
 	# set M-mode trap handler
-	la      t0, timervec
+	la      t0, timer_vec
 	csrw    mtvec, t0
         wfi
 
@@ -231,7 +231,7 @@ GLOBAL(nautilus_entry_main)
 	csrs    mstatus, t0 # mstatus.MPP = S
 
 	# set mepc so we can return to the right place
-	la      t0, main_ptr
+	la      t0, init_ptr
 	REG_L   t0, 0(t0)
 	csrw    mepc, t0
 
@@ -255,7 +255,7 @@ GLOBAL(nautilus_entry_main)
 
 .section .text
 
-GLOBAL(timervec)
+GLOBAL(timer_vec)
         # scratch[0,8,16] : register save area.
         # scratch[24] : address of CLINT's MTIMECMP register.
         # scratch[32] : desired interval between interrupts.
@@ -285,7 +285,7 @@ GLOBAL(timervec)
         mret
 
 .balign 8
-main_ptr:
+init_ptr:
         .quad init
 virt_mask:
         # place the kernel virtual base here, so we don't have to manage calculation in assembly
@@ -304,7 +304,7 @@ virt_mask:
 #define TP_USER_SP 6
 #define TF_SIZE_ON_STACK (36 * SZREG)
 
-GLOBAL(irq_common)
+GLOBAL(kernel_vec)
 
         // make room to save registers.
         addi sp, sp, -256
@@ -342,8 +342,8 @@ GLOBAL(irq_common)
         sd t5, 232(sp)
         sd t6, 240(sp)
 
-	// call the C trap handler in trap.c
-        call irq_handler
+	// call the C trap handler in idt.c
+        call kernel_trap
 
         // restore registers.
         ld ra, 0(sp)
@@ -383,7 +383,7 @@ GLOBAL(irq_common)
         // return to whatever we were doing in the kernel.
         sret
 
-END(irq_common)
+END(kernel_vec)
 
 # TODO: 32 vs 64bit :)
 ENTRY(context_switch)

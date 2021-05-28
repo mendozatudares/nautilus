@@ -68,7 +68,7 @@ main (unsigned long mbd,
 }
 
 // assembly code in lowlevel.S for machine-mode timer interrupt.
-extern void timervec();
+extern void timer_vec();
 uint64_t timer_scratch[5];
 
 void
@@ -88,7 +88,7 @@ timer_init()
   w_mscratch((uint64_t)scratch);
 
   // set the machine-mode trap handler.
-  w_mtvec((uint64_t)timervec);
+  w_mtvec((uint64_t)timer_vec);
 
   // enable machine-mode interrupts.
   w_mstatus(r_mstatus() | MSTATUS_MIE);

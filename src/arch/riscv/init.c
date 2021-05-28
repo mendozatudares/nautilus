@@ -33,6 +33,8 @@
 #include <nautilus/gdb-stub.h>
 #endif
 
+#include "init.h"
+
 uint64_t kernel_page_table[4096 / sizeof(uint64_t)] __attribute__((aligned(4096)));
 
 #define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
@@ -92,9 +94,6 @@ static struct multiboot_info riscv_fake_multiboot_info = {
   .hrt_info = 0
 };
 
-void printk_init(void);
-int  printk(const char *fmt, ...);
-void uart_init(void);
 
 void
 init ()
@@ -102,10 +101,6 @@ init ()
     struct naut_info * naut = &nautilus_info;
 
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
-
-    // setup_idt();
-    
-    trap_init();
 
     trap_init_hart();
 
