@@ -59,7 +59,9 @@ obj-(!NAUT_CONFIG_RISCV_HOST) += \
 	cmdline.o
 
 obj-$(NAUT_CONFIG_RISCV_HOST) += \
+	naut_string.o \
 	spinlock.o \
+	backtrace.o \
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o

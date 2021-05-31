@@ -15,7 +15,7 @@
 #include <nautilus/intrinsics.h>
 
 
-#define BIT_64(n)			(U64_C(1) << (n))
+#define BIT_64(n)	(U64_C(1) << (n))
 
 #define __AMO(op)	"amo" #op ".d"
 
@@ -361,6 +361,11 @@ static inline int fls64(uint64_t x)
 	if (!(x & (~0ul << (BITS_PER_LONG-1))))
 		num -= 1;
 	return num;
+}
+
+static inline int __ctzdi2(uint64_t x)
+{
+        return __ffs((uint32_t)x);
 }
 
 #endif /* _ASM_RISCV_BITOPS_H */

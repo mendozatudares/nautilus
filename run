@@ -6,7 +6,7 @@ if [ "$1" != "clean" ] ; then
 
   if [ "$1" == "qemu" ] ; then
     echo 'Starting QEMU'
-    qemu-system-riscv64 -nographic -machine virt -bios none -kernel nautilus.bin -gdb tcp::1234
+    qemu-system-riscv64 -nographic -smp 1 -m 128M -machine virt -bios none -kernel nautilus.bin -gdb tcp::1234
     make clean
   fi
 fi

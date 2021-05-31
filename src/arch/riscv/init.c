@@ -34,6 +34,7 @@
 #endif
 
 #include "init.h"
+#include "riscv.h"
 
 uint64_t kernel_page_table[4096 / sizeof(uint64_t)] __attribute__((aligned(4096)));
 
@@ -96,23 +97,43 @@ static struct multiboot_info riscv_fake_multiboot_info = {
 
 
 void
-init ()
+init (unsigned long mbd,
+      unsigned long magic)
 {
     struct naut_info * naut = &nautilus_info;
 
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
+    // Initialize interrupts
+    // nk_int_init(&(naut->sys));
     trap_init_hart();
-
     plic_init();
-
     plic_init_hart();
 
+    // Bring up UART device and printing so we can have output
     uart_init();
 
     printk_init();
 
     printk(NAUT_WELCOME);
+
+    /* setup the temporary boot-time allocator */
+    /* this will detect memory from an array in memory, not multiboot or e820 */
+    mm_boot_init(mbd);
+
+    naut->sys.mb_info = &riscv_fake_multiboot_info;
+
+    /* initialize boot CPU */
+    arch_early_init(naut);
+
+    /* this will finish up the identity map */
+    // nk_paging_init(&(naut->sys.mem), mbd);
+
+    /* setup the main kernel memory allocator */
+    // nk_kmem_init();
+
+    /* setup per-core area for BSP */
+    w_tp((uint64_t)naut->sys.cpus[0]);
 
     sti();
 

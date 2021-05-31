@@ -25,17 +25,17 @@
 void 
 nk_stack_dump (ulong_t n)
 {
-    void * sp = NULL;
+    void * rsp = NULL;
 
-    asm volatile ("ld %[_r], sp" : [_r] "=r" (sp));
+    asm volatile ("move %[_r], sp" : [_r] "=r" (rsp));
 
-    if (!sp) {
+    if (!rsp) {
         return;
     }
 
     printk("Stack Dump:\n");
 
-    nk_dump_mem(sp, n);
+    nk_dump_mem(rsp, n);
 }
 
 
