@@ -1,4 +1,5 @@
-obj-(!NAUT_CONFIG_RISCV_HOST) += \
+ifndef NAUT_CONFIG_RISCV_HOST
+obj-y += \
 	nautilus/ \
 	arch/ \
 	asm/ \
@@ -9,6 +10,7 @@ obj-(!NAUT_CONFIG_RISCV_HOST) += \
         net/ \
 	acpi/ \
 	test/  
+endif
 
 obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	nautilus/ \

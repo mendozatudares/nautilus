@@ -305,8 +305,6 @@ __mm_boot_alloc (ulong_t size, ulong_t align, ulong_t goal)
     boot_mem_info_t * minfo = &bootmem;
     void * ret = NULL;
 
-    BMM_PRINT("size=%d, align=%d, goal=%d, end_pfn=%d\n", size, align, goal, end_pfn);
-
     if (unlikely(boot_mm_inactive)) {
         panic("Invalid attempt to use boot memory allocator\n");
     }

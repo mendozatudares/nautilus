@@ -217,7 +217,6 @@ GLOBAL(nautilus_entry)
 	# set M-mode trap handler
 	la      t0, timer_vec
 	csrw    mtvec, t0
-        wfi
 
 	# setup trap delegation
 	li      t0, 0xffff

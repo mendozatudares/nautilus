@@ -1,4 +1,5 @@
-obj-(!NAUT_CONFIG_RISCV_HOST) += \
+ifndef NAUT_CONFIG_RISCV_HOST
+obj-y += \
 	fmtout.o \
 	printk.o \
 	doprnt.o \
@@ -57,11 +58,11 @@ obj-(!NAUT_CONFIG_RISCV_HOST) += \
 	prog.o \
 	getopt.o \
 	cmdline.o
+endif
 
 obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	naut_string.o \
 	spinlock.o \
-	backtrace.o \
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o
