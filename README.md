@@ -27,6 +27,7 @@ or address space isolation if this is required for its execution model.
 - [Using BOCHS](#using-bochs)
 - [Using Gem5](#using-gem5)
 - [Rapid Development](#rapid-development)
+- [RISC-V Development](#risc-v-development)
 - [Resources](#resources)
 - [Maintainers](#maintainers)
 - [License](#license)
@@ -260,6 +261,64 @@ another `tmux` pane:
 $> vagrant ssh
 [vagrant@localhost] cd nautilus
 [vagrant@localhost] . ./demo
+```
+
+## RISC-V Development
+
+If you'd like to check out building and running Nautilus in an emulated RISC-V
+environment using QEMU, we've provided some steps below you may follow to get
+started. Note that this is an experimental and incomplete port from x86_64 to
+RISC-V.
+
+The first step would be to install a compatiable version of QEMU to emulate the
+RISC-V machine. We've tested this port on version 5.0.0:
+
+```Shell
+$> git clone https://github.com/qemu/qemu
+$> cd qemu
+$> git checkout v5.0.0
+$> ./configure --target-list=riscv64-softmmu
+$> make -j $(nproc)
+$> sudo make install
+```
+
+This will install a custom version of QEMU that you should then be able to call
+using `qemu-system-riscv64`. Next, you'll need to install the [RISC-V GNU
+Compiler Toolchain](https://github.com/riscv/riscv-gnu-toolchain). We've used
+the Newlib cross-compiler:
+
+```Shell
+$> sudo mkdir -p /opt/riscv
+$> git clone https://github.com/riscv/riscv-gnu-toolchain
+$> cd riscv-gnu-toolchain
+$> ./config --prefix=/opt/riscv
+$> make
+```
+
+This will run for several minutes and build the entire RISC-V Newlib cross-
+compiler. Once complete, add `/opt/riscv/bin` to your `PATH` and you should
+now be able to call `riscv64-unknown-elf-gcc` and its cousins.
+
+Next, you'll need to configure with `make menuconfig`. Under Platform and Target
+Selection, choose `RISC-V 64-bit Host` and under Build, set Toolchain Root to
+`/opt/riscv/riscv64-unknown-elf/bin`. There is also an example config that you
+may use with the following command:
+
+```Shell
+$> cp configs/cs446-s21-riscv-config .config
+```
+
+You should then be able to build and run Nautilus for RISC-V. Try this:
+
+```Shell
+$> ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- make -j
+$> qemu-system-riscv64 -kernel nautilus.bin \
+                       -m 256M \
+                       -smp 1 \
+                       -machine virt \
+                       -bios none \
+                       -nographic \
+                       -gdb tcp::1234 \
 ```
 
 ## Resources
