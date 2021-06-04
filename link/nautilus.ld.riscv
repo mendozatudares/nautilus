@@ -10,17 +10,17 @@ SECTIONS
   . = 0x80000000;
 
   .text ALIGN(0x1000) : {
-    *(.boot)
-    *(.text .text.*)
     _loadStart = .;
+    *(.boot)
     . = ALIGN(0x1000);
-    PROVIDE(etext = .);
+    kernel_page_table = .;
     . += 0x1000;
     boot_stack_start = .;
     . += 0x200000;  /* we start out with a 2M stack */
     boot_stack_end = .;
-    *(.text*)
-    *(.gnu.linkonce.t*)
+    *(.text* .text.*)
+    . = ALIGN(0x1000);
+    etext = .;
   }
 
   .rodata : {

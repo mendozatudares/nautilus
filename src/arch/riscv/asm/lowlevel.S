@@ -13,68 +13,6 @@
 #define REG_SC sc.d
 #define ROFF(N, R) N* SZREG(R)
 
-
-/* Macros for paging */
-#define PGSIZE 4096  // bytes per page
-#define PGSHIFT 12   // bits of offset within a page
-
-#define PGROUNDUP(sz) (((sz) + PGSIZE - 1) & ~(PGSIZE - 1))
-#define PGROUNDDOWN(a) (((a)) & ~(PGSIZE - 1))
-
-/*
- * VM_BITS      - the overall bits (typically XX in SVXX)
- * VM_PART_BITS - how many bits per VPN[x]
- * VM_PART_NUM  - how many parts are there?
- */
-
-#define VM_NORMAL_PAGE (0x1000L)
-#define VM_MEGA_PAGE (VM_NORMAL_PAGE << 9)
-#define VM_GIGA_PAGE (VM_MEGA_PAGE << 9)
-#define VM_TERA_PAGE (VM_GIGA_PAGE << 9)
-
-/* RISC-V Sv48 - 48 bit virtual memory on 64bit */
-#define VM_PART_BITS 9
-#define VM_PART_NUM 4
-
-#define VM_BIGGEST_PAGE (VM_NORMAL_PAGE << ((VM_PART_NUM - 1) * VM_PART_BITS))
-
-#define VM_BITS ((VM_PART_BITS * VM_PART_NUM) + PGSHIFT)
-
-#define PT_V (1 << 0)
-#define PT_R (1 << 1)
-#define PT_W (1 << 2)
-#define PT_X (1 << 3)
-#define PT_U (1 << 4)
-#define PT_G (1 << 5)
-#define PT_A (1 << 6)
-#define PT_D (1 << 7)
-
-// shift a physical address to the right place for a PTE.
-#define PA2PTE(pa) ((((uint64_t)pa) >> 12) << 10)
-
-#define PTE2PA(pte) (((pte) >> 10) << 12)
-
-#define PTE_FLAGS(pte) ((pte)&0x3FF)
-
-#define MAKE_PTE(pa, flags) (PA2PTE(pa) | (flags))
-
-// extract the three N-bit page table indices from a virtual address.
-#define PXMASK ((1llu << VM_PART_BITS) - 1)  // N bits
-#define PXSHIFT(level) (PGSHIFT + (VM_PART_BITS * (level)))
-#define PX(level, va) ((((uint64_t)(va)) >> PXSHIFT(level)) & PXMASK)
-
-// one beyond the highest possible virtual address.
-// MAXVA is actually one bit less than the max allowed by
-// SvXX, to avoid having to sign-extend virtual addresses
-// that have the high bit set.
-#define MAXVA (1L << ((VM_PART_BITS * VM_PART_NUM) + 12 - 1))
-
-#define SATP_FLAG 9
-#define SATP_SHIFT 60
-#define SATP_MODE (9L << 60)
-#define MAKE_SATP(page_table) (SATP_MODE | (((uint64_t)page_table) >> 12))
-
-
 /* Status register flags */
 #define SR_SIE		(0x00000002UL) /* Supervisor Interrupt Enable */
 #define SR_MIE		(0x00000008UL) /* Machine Interrupt Enable */
@@ -113,37 +51,12 @@
 # .option norvc # Disable instruction compression
 .section .boot
 
-GLOBAL(nautilus_entry_basic)
-
-	# set up a stack for C.
-        # stack0 is declared in start.c,
-        # with a 4096-byte stack per CPU.
-        # sp = stack0 + (hartid * 4096)
-        la sp, boot_stack_start
-        li a0, 1024*4
-	csrr a1, mhartid
-        addi a1, a1, 1
-        mul a0, a0, a1
-        add sp, sp, a0
-
-        call main
-spin:
-        j spin
-
 GLOBAL(nautilus_entry)
-	# Disable linker instruction relaxation for the `la` instruction below.
-	# This disallows the assembler from assuming that `gp` is already initialized.
-	# This causes the value stored in `gp` to be calculated from `pc`.
 
 	csrr    a0, mhartid
 
-	# we calculate the starting stack by boot_stack_start + (2*4096 * (mhartid + 1))
-	# so each HART gets 2 pages of stack
+	# starting stack at boot_stack_start
 	la      sp, boot_stack_start
-	li      t0, 2 * 4096
-	addi    t1, a0, 1 # t1 = mhartid + 1
-	mul     t0, t0, t1 # t1 = SIZE * (mhartid + 1)
-	add     sp, sp, t0 # sp = stack_start + (SIZE * (mhartid + 1))
 
 	# zero out bss
 	lla     t0, _bssStart
@@ -157,62 +70,9 @@ GLOBAL(nautilus_entry)
 	# allocate space for the scratch pad
 	addi    sp, sp, -32 * SZREG
 
-
-	# supervisor mode expects 
-
-	# setup the base high-half identity mapping
-	li      t0, PT_R | PT_W | PT_X | PT_V # t0: current physical address (PTE)
-	la      t1, kernel_page_table         # t1: current location in the page table
-
-	li      t3, 0x1000
-	add     t2, t1, t3                    # t2: address after the page table (the end)
-
-
-	# shift the current pointer to the halfway point
-	srai    t3, t3, 1                     # t3 /= 2
-	move    t4, t1                        # t4 is the pointer to the lower half
-	add     t1, t1, t3                    # t1 += 4096 / 2
-
-	li      t3, VM_BIGGEST_PAGE           # t3: physical memory stride
-0:
-	# store the PTE at the location pointed to by t1
-	REG_S   t0, 0(t1)
-	REG_S   t0, 0(t4)
-	# move the PTE (t0) forward by the stride (t3)
-	add     t0, t0, t3
-	# step the pointer(s) forward
-	addi    t1, t1, SZREG
-	addi    t4, t4, SZREG
-	# ensure it's written out
-	fence   w,w
-	bne     t1, t2, 0b                    # jump back if we aren't done
-
-	# now, load the kernel page table into satp 
-	la      t0, kernel_page_table
-	srai    t0, t0, 12 # shift the page table to be just the PPN
-
-	# t1 is the eventual value of SATP
-	li      t1, SATP_FLAG      # t1 = SATP_FLAG
-	slli    t1, t1, SATP_SHIFT # t1 = t1 << SATP_SHIFT
-	add     t1, t1, t0         # t1 = t1 + kernel_page_table
-
-	csrw    satp, t1           # satp = t1
-
-	# flush tlb and whatnot
-	sfence.vma  zero, zero
-
-	#	enable supervisor interrupts
+        # enable supervisor interrupts
 	li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
 	csrs    sie, t0
-
-	# Load the virtual address for the stack pointer
-	mv      tp, sp
-	la      t0, virt_mask
-	REG_L   t0, 0(t0)
-	add     sp, sp, t0
-
-	la      t0, init_ptr
-	REG_L   t0, 0(t0)
 
 	# set M-mode trap handler
 	la      t0, timer_vec
@@ -235,7 +95,6 @@ GLOBAL(nautilus_entry)
 	csrw    mepc, t0
 
 	csrw    mscratch, sp
-	# ask C code to setup the local hart state, cause it's annoying to work with structs in asm
 	move    a2, sp # a0 = hartid, a1 = device tree, a2 = hart id
 	# a1 is still the pointer to the device tree binary
 	# call    setup_mhart_state
@@ -284,11 +143,7 @@ GLOBAL(timer_vec)
         mret
 
 .balign 8
-init_ptr:
-        .quad init
-virt_mask:
-        # place the kernel virtual base here, so we don't have to manage calculation in assembly
-        .quad 0xffff800000000000
+init_ptr: .quad init
 
 # When the processor gets an interrupt or traps, it jumps here and sets some CSRs
 # like sstatus, sbadaddr, stval etc... The only problem is that we don't switch

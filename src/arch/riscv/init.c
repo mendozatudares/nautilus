@@ -36,8 +36,6 @@
 #include "init.h"
 #include "riscv.h"
 
-uint64_t kernel_page_table[4096 / sizeof(uint64_t)] __attribute__((aligned(4096)));
-
 #define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
 
 struct nk_sched_config sched_cfg = {
@@ -127,7 +125,7 @@ init (unsigned long mbd,
     arch_early_init(naut);
 
     /* this will finish up the identity map */
-    // nk_paging_init(&(naut->sys.mem), mbd);
+    nk_paging_init(&(naut->sys.mem), mbd);
 
     /* setup the main kernel memory allocator */
     // nk_kmem_init();

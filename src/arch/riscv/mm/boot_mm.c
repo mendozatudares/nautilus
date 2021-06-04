@@ -36,7 +36,7 @@
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
-#define BMM_DEBUG(fmt, args...) DEBUG_PRINT("BOOTMEM: " fmt, ##args)
+#define BMM_DEBUG(fmt, args...) 
 #define BMM_PRINT(fmt, args...) printk("BOOTMEM: " fmt, ##args)
 #define BMM_WARN(fmt, args...)  WARN_PRINT("BOOTMEM: " fmt, ##args)
 
@@ -401,7 +401,7 @@ found:
             panic("bit %u not set!\n", i);
     }
 
-    BMM_PRINT("Allocated %d bytes, alignment %d (%d pages) at %p\n", size, align, areasize, ret);
+    BMM_DEBUG("Allocated %d bytes, alignment %d (%d pages) at %p\n", size, align, areasize, ret);
 
     /* NOTE: we do NOT zero the memory! */
     addr_t addr = pa_to_va((ulong_t)ret);

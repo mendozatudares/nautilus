@@ -7,3 +7,4 @@ obj-y += asm/ \
 	 printk.o \
 	 trap.o \
 	 mm/ \
+	 paging.o \
