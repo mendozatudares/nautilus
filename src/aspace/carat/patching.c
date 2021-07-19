@@ -1221,19 +1221,25 @@ static void _controlled_movement_test(uint64_t time_between_movements, uint64_t 
   node *region2_head = (node *) (region2 + (count-1)*allocation_size);
 
   uint8_t curr_region = 1;
+  if(!number_allocations){
+      nk_vc_printf("Running test with no allocations\n");
+  }
   for (uint64_t i = 0; i < num_moves; i++) {
     /*
      * Create an entry and add the mapping to the allocation_map
      */ 
     if(number_allocations == 0){
+
       if (!(nk_sched_stop_world())) 
       {
         nk_vc_printf("CARAT: nk_sched_stop_world failed\n");
         continue;
       }
+      nk_sched_start_world();
       uint64_t cycles_to_wait1 = time_between_movements*1300; // 1000 * 1.3
       uint64_t end_time1 = rdtsc() + cycles_to_wait1;
       while(rdtsc() < end_time1) { }
+      
       continue;
     }
 
