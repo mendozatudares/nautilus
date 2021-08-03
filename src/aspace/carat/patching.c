@@ -1236,6 +1236,7 @@ static void _controlled_movement_test(uint64_t time_between_movements, uint64_t 
         continue;
       }
       nk_sched_start_world();
+    	// Converts time_between_movements (microseconds) to cycles on a phi machine (1.3 GHz clock rate)
       uint64_t cycles_to_wait1 = time_between_movements*1300; // 1000 * 1.3
       uint64_t end_time1 = rdtsc() + cycles_to_wait1;
       while(rdtsc() < end_time1) { }
@@ -1266,6 +1267,7 @@ static void _controlled_movement_test(uint64_t time_between_movements, uint64_t 
     //nk_vc_printf("Waiting for %lu microseconds. \n\n\n", time_between_movements);
     //nk_delay(time_between_movements*1000);
     // Note - time_between_movements is in microseconds
+    // Converts time_between_movements (microseconds) to cycles on a phi machine (1.3 GHz clock rate)
     uint64_t cycles_to_wait = time_between_movements*1300; // 1000 * 1.3
     uint64_t end_time = rdtsc() + cycles_to_wait;
     while(rdtsc() < end_time) { }
@@ -1285,11 +1287,14 @@ struct movement_args {
   uint64_t frequency_of_moves, number_allocations, region_size, length_of_run;
 };
 
+#define ONE_BILLION 1000000000
+
 static void _controlled_movement_on_thread(void * input, void ** output) {
   get_cur_thread()->vc = get_cur_thread()->parent->vc;
   struct movement_args *args = (struct movement_args *) input;
 
-  uint64_t time_between_movements = 1000000 / args->frequency_of_moves;
+  //This will convert rate (given in milli-hertz to a period in microseconds)
+  uint64_t time_between_movements = ONE_BILLION / args->frequency_of_moves;
   uint64_t num_moves = (args->frequency_of_moves)*(args->length_of_run);
 
   nk_vc_printf("_controlled_movement_on_thread, time_between_movements: %lu, \n", time_between_movements);
@@ -1306,7 +1311,7 @@ static void _controlled_movement_on_thread(void * input, void ** output) {
  * Shell command handler
  */
 // arguments:
-// uint64_t frequency_of_moves
+// uint64_t frequency_of_moves in (milli-hertz)
 // uint64_t number_allocations
 // uint64_t region_size
 // uint64_t length_of_run
