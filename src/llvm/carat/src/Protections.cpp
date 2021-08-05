@@ -83,6 +83,8 @@ void ProtectionsHandler::Protect(void)
         /*
          * Inject guards
          */
+        errs() << F << "\n";
+
         ProtectionsInjector *PI = new ProtectionsInjector(
             &F,
             PD->FetchResult(),

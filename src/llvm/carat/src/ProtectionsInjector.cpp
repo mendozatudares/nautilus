@@ -45,8 +45,10 @@ ProtectionsInjector::ProtectionsInjector(
     /*
      * Set new state from NOELLE
      */ 
-    auto ProgramLoops = noelle->getLoops();
-    this->BasicBlockToLoopMap = noelle->getInnermostLoopsThatContains(*ProgramLoops);
+    this->AllLoops = noelle->getLoops();
+    auto LoopStructuresOfFunction = noelle->getLoopStructures(F);
+    this->LoopForestOfFunction = noelle->organizeLoopsInTheirNestingForest(*LoopStructuresOfFunction); 
+    this->BasicBlockToLoopMap = noelle->getInnermostLoopsThatContains(*(this->AllLoops));
     this->FDG = noelle->getFunctionDependenceGraph(F);
 
 
@@ -370,10 +372,72 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
 )
 {
     /*
+     * Debugging
+     */
+    errs() << "_optimizeForLoopInvariance\n";
+    errs() << "\t" << *PointerOfMemoryInstruction << "\n";
+
+
+    /*
      * If @NestedLoop is not valid, we cannot optimize for loop invariance
      */
     if (!NestedLoop) { 
+        errs() << "\tNestedLoop not valid!\n";
         return false;
+    }
+
+
+    /*
+     * Fetch @PointerOfMemoryInstruction as an instruction
+     */
+    Instruction *PointerAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
+
+
+    /*
+     * If @PointerOfMemoryInstruction is an argument of @this->F, it's 
+     * able to be hoisted to the outermost loop of the loop nest
+     */
+    if (false
+        || isa<Argument>(PointerOfMemoryInstruction)
+        || !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst))) 
+    {
+        /*
+         * For this instance, the injection location will be the preheader of the
+         * outermost loop of the loop nest to which @I belongs. Fetch this basic block
+         * using the StayConnectedNestedLoopForest
+         */
+        LoopStructure *NestedLoopStructure = NestedLoop->getLoopStructure();
+        StayConnectedNestedLoopForestNode *Iterator = LoopForestOfFunction->getNode(NestedLoopStructure);
+        StayConnectedNestedLoopForestNode *PrevIterator = nullptr;
+        while (Iterator) {
+            PrevIterator = Iterator;
+            Iterator = Iterator->getParent();
+        }
+
+        assert(PrevIterator != nullptr); /* Sanity check */
+
+        LoopStructure *OutermostLS = PrevIterator->getLoop();
+        BasicBlock *PreHeader = OutermostLS->getPreHeader();
+        Instruction *InjectionLocation = PreHeader->getTerminator();
+
+        
+        /*
+         * Set up the guard
+         */
+        errs() << "Hoisted with invariants!\n";
+        InjectionLocations[I] = 
+            new GuardInfo(
+                InjectionLocation,
+                PointerOfMemoryInstruction, 
+                IsWrite,
+                CARATNamesToMethods[CARAT_PROTECT],
+                "protect", /* Metadata type */
+                "loop.ivt.guard" /* Metadata attached to injection */
+            );
+
+        loopInvariantGuard++;
+
+        return true;
     }
 
 
@@ -387,18 +451,15 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
 
 
     /*
-     * Fetch @PointerOfMemoryInstruction as an instruction
-     */
-    Instruction *PointerAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
-
-
-    /*
      * Walk up the loop nest until @PointerOfMemoryInstruction to determine 
      * the outermost loop of which PointerOfMemoryInstruction is a loop 
      * invariant. 
      */
     while (NextLoop) 
     {
+        errs() << "\t\tThe loop: " << "\n"; 
+        NextLoopStructure->print(errs());
+
         /*
          * If @PointerOfMemoryInstruction is defined within the 
          * next loop, it can't be hoisted out of the loop without
@@ -408,10 +469,12 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
          */
         bool IsInLoop = false;
         if (PointerAsInst) {
+            errs() << *(PointerAsInst->getParent()) << "\n";
             if (NextLoopStructure->isIncluded(PointerAsInst)) {
                 IsInLoop = true;
             }
         }
+
 
 
         /*
@@ -430,6 +493,10 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
         if (false
             || !(Manager->isLoopInvariant(PointerOfMemoryInstruction))
             || (IsInLoop)) {
+            errs() << "\t\tPointerOfMemoryInstruction not a loop invariant of NextLoop!\n";
+            errs() << "\t\t\t!(Manager->isLoopInvariant(PointerOfMemoryInstruction): " 
+                   << std::to_string(!(Manager->isLoopInvariant(PointerOfMemoryInstruction))) << "\n";
+            errs() << "\t\t\tIsInLoop: " << IsInLoop << "\n";
             break;
         }
 
@@ -465,6 +532,7 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
      */
     if (Hoistable)
     {
+        errs() << "Hoisted with invariants!\n";
         InjectionLocations[I] = 
             new GuardInfo(
                 InjectionLocation,
@@ -524,7 +592,11 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     if (!(IVManager->doesContributeToComputeAnInductionVariable(PointerOfMemoryInstructionAsInst))) {
         errs() << "\tPointerOfMemoryInstructionAsInst does not contribute to IV computation!\n";
         return false;
-    }
+    } /* We want to check if PointerOfMemoryInstructionAsInst = base [op] IV 
+    the op can be a binary operator or a getElementPtr
+    - the two ops (at least for bops) should be a loop invariant (the base) and one that contributes to the IV (the actual IV)
+    - print out how often the condition is satisfied or not (for kicks, and to see if we should handle GEP)
+    */
 
 
     /*
@@ -541,15 +613,27 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     InductionVariable *IV = 
         IVManager->getInductionVariable(
             *NestedLoopStructure,
-            PointerOfMemoryInstructionAsInst
+            PointerOfMemoryInstructionAsInst /* This 
+            actually needs to be IV as follows: POMIAI = 
+            base [op] iv. we need that IV, not POMIAI 
+            to fetch the Noelle IV pointer. NOTE base has to be loop invariant */
         );
-    assert(IV && "_optimizeForInductionVariableAnalysis: Invalid induction variable object!");
+    
+    if (!IV) {
+        /*
+         * This is conservative, but it's possible to optimize more here based on outer loops --- FIX
+         */
+        errs() << "\tInvalid induction variable object for the current loop!";
+        return false;
+    }
 
 
     /*
      * Check that the step value of this IV is loop invariant
      */
-    if (!(IV->isStepValueLoopInvariant())) {
+    if (!(IV->isStepValueLoopInvariant())) { /* Still accurate b/c we only consider basic IVs, not derived IVs.
+        this makes the computation easy b/c step value is constant, you can extend the computation as follows:
+        base + start value of IV + (total number of iterations * (constant) step) = end address. with this type of IV. */
         errs() << "\tIV related to PointerOfMemoryInstructionAsInst does not have a loop invariant step value!\n";
         return false; 
     }
@@ -559,30 +643,36 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      * Now switch to analyzing the loop governing IV
      *
      * Fetch the loop governing IV attribution and check its validity
+     * 
+     * this is needed for the IV utility and "total number of iterations"
      */
     LoopGoverningIVAttribution *LGIVAttr = IVManager->getLoopGoverningIVAttribution(*NestedLoopStructure);
     if (!LGIVAttr) { 
         errs() << "\tLoop Governing IV attribution is invalid!\n";
         return false; 
     }
-    assert(LGIVAttr->isSCCContainingIVWellFormed());
     
     
     /*
      * Fetch the loop governing induction variable (LGIV) and 
      * ensure that its step value is loop invariant
+     * 
+     * need this (perhaps) because in order to get the total number of
+     * iterations, but GIVUtility covers this
      */
     InductionVariable *LGIV = &(LGIVAttr->getInductionVariable());
+#if 0
     if (!(LGIV->isStepValueLoopInvariant())) {
         errs() << "\tLoop Governing IV does not have a loop invariant step value!\n";
         return false;
     }
+#endif
 
 
     /*
      * Fetch the loop governing IV utility
      */
-    LoopGoverningIVUtility GIVUtility(*LGIVAttr);
+    LoopGoverningIVUtility GIVUtility(*LGIVAttr); /* UPDATE NOELLE ---, now takes an LS * and IVManager of the LS. */
 
 
     /*
@@ -608,7 +698,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      * Fetch the start address and step value from the IV
      * related to the pointer, check its validity
      */
-    Value *StartAddress = IV->getStartValue(),
+    Value *StartAddress = IV->getStartValue(), /* Should be the actual pointer + IV->getStartValue() */
           *StepValue = IV->getSingleComputedStepValue();
 
     if (false
@@ -629,7 +719,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      * IS ESSENTIALLY (LGIVAttr->getIntermediateValueUsedInCompare()) 
      * IS LOOP INVARIANT? 
      */
-    Value *BoundsValue = LGIVAttr->getIntermediateValueUsedInCompare();
+    Value *BoundsValue = LGIVAttr->getIntermediateValueUsedInCompare(); /* WE ACTUALLY WANT LGIVAttr->getExitConditionValue() */
     InvariantManager *InvManager = NestedLoop->getInvariantManager();
     if (!(InvManager->isLoopInvariant(BoundsValue))) {
         return false;
@@ -1028,7 +1118,9 @@ std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool i
          * potential loop nest that @inst belongs to
          */
         bool Guarded = false;
+        errs() << "Trying loop optimization ...\n";
         LoopDependenceInfo *NestedLoop = BasicBlockToLoopMap[inst->getParent()];
+
 
         /*
          * <Step 2a.>
@@ -1056,12 +1148,16 @@ std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool i
                 );
         }
 
+        if (Guarded) 
+            errs() << "Success!\n";
+
 
         /*
          * <Step 3>
          */
         if (!Guarded) 
         {
+            errs() << "Step 3 Guard\n";
             InjectionLocations[inst] = 
                 new GuardInfo(
                     inst,

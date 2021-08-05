@@ -30,8 +30,8 @@ include(AddLLVM)
 message(STATUS "LLVM_DIR IS ${LLVM_CMAKE_DIR}.")
 
 include_directories(${LLVM_INCLUDE_DIRS} 
-    ../../../../noelle/install/include
-    ../../../../noelle/install/include/svf
+    /home/extra/noelle/install/include
+    /home/extra/noelle/install/include/svf
     ../../../../include
   )
 

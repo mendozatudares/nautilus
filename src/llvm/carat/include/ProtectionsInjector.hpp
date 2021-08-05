@@ -122,6 +122,10 @@ private:
 
     Noelle *noelle;
 
+    std::vector<LoopDependenceInfo *> *AllLoops;
+
+    StayConnectedNestedLoopForest *LoopForestOfFunction;
+
     PDG *FDG;
 
 
