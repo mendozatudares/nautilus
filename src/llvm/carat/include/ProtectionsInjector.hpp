@@ -205,6 +205,17 @@ private:
     );
 
     void _printGuards(void);
+
+    Value *_fetchInvariantFromBinaryOperator (
+        BinaryOperator *I,
+        InvariantManager *InvManager
+    ) ;
+
+    Instruction *_fetchIVFromBinaryOperator (
+        BinaryOperator *I,
+        InductionVariableManager *IVManager
+    ) ;
+
 };
 
 #endif

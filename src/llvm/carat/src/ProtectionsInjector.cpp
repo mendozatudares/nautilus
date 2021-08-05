@@ -27,7 +27,8 @@
 
 #include "autoconf.h"
 
-#if NAUT_CONFIG_USE_NOELLE
+// #if NAUT_CONFIG_USE_NOELLE
+#if 1
 
 #include "../include/ProtectionsInjector.hpp"
 
@@ -586,9 +587,58 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
 
     /*
      * Fetch the induction variable manager and check if @PointerOfMemoryInstruction 
-     * contributes to an induction variable --- if not, there's no optimization we can do
+     * is defined by the following pattern: [IV/Inv] [bin op] [Inv/IV] --- if not, 
+     * there's no optimization we can do
      */
+    BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
+    if (!PointerOfMemoryInstructionAsBinOp) {
+        errs() << "\tPointerOfMemoryInstruction is not defined as a binary operation!\n";
+        return false;
+    }
+
+    
+    /*
+     * Determine which, if any, of the operands contribute to an IV and which are invariants
+     */    
     InductionVariableManager *IVManager = NestedLoop->getInductionVariableManager();
+    InvariantManager *InvManager = NestedLoop->getInvariantManager();
+
+    Value *InvariantOperand = 
+        _fetchInvariantFromBinaryOperator(
+            PointerOfMemoryInstructionAsBinOp,
+            InvManager
+        );
+
+    Instruction *IVOperand = 
+        _fetchIVFromBinaryOperator(
+            PointerOfMemoryInstructionAsBinOp,
+            IVManager
+        ); /* Flaky, InvariantOperand is a Value *, IVOperand is an Instruction * */
+    
+    if (false
+        || !InvariantOperand
+        || !IVOperand) {
+        
+        errs() << "\tPointerOfMemoryInstructionAsBinOp is not defined by the pattern [IV/Inv] [bin op] [Inv/IV]!\n";
+        
+        if (InvariantOperand) {
+            errs() << "\t\tInvariantOperand is valid: " << *InvariantOperand << "\n";
+        } else {
+            errs() << "\t\tInvariantOperand is invalid\n";
+        }
+
+        if (IVOperand) {
+            errs() << "\t\tIVOperand is valid: " << *IVOperand << "\n";
+        } else {
+            errs() << "\t\tIVOperand is invalid\n";
+        }
+
+        return false;
+    }
+
+    assert(InvariantOperand != IVOperand); /* Can we make this guarantee */
+
+#if 0
     if (!(IVManager->doesContributeToComputeAnInductionVariable(PointerOfMemoryInstructionAsInst))) {
         errs() << "\tPointerOfMemoryInstructionAsInst does not contribute to IV computation!\n";
         return false;
@@ -597,7 +647,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     - the two ops (at least for bops) should be a loop invariant (the base) and one that contributes to the IV (the actual IV)
     - print out how often the condition is satisfied or not (for kicks, and to see if we should handle GEP)
     */
-
+#endif
 
     /*
      * At this point, we know that the computation of @PointerOfMemoryInstruction
@@ -613,8 +663,9 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     InductionVariable *IV = 
         IVManager->getInductionVariable(
             *NestedLoopStructure,
-            PointerOfMemoryInstructionAsInst /* This 
-            actually needs to be IV as follows: POMIAI = 
+            IVOperand
+            // PointerOfMemoryInstructionAsInst 
+            /* This actually needs to be IV as follows: POMIAI = 
             base [op] iv. we need that IV, not POMIAI 
             to fetch the Noelle IV pointer. NOTE base has to be loop invariant */
         );
@@ -698,18 +749,18 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      * Fetch the start address and step value from the IV
      * related to the pointer, check its validity
      */
-    Value *StartAddress = IV->getStartValue(), /* Should be the actual pointer + IV->getStartValue() */
-          *StepValue = IV->getSingleComputedStepValue();
+    Value *IVStart = IV->getStartValue(), 
+          *IVStep = IV->getSingleComputedStepValue();
 
     if (false
-        || !StartAddress
-        || !StepValue) {
-        errs() << "\tStartAddress or StepValue is invalid!\n";
+        || !IVStart
+        || !IVStep) {
+        errs() << "\tIVStart or IVStep is invalid!\n";
         return false;
     }
 
-    errs() << "StartAddress: " << *StartAddress << "\n";
-    errs() << "StepValue: " << *StepValue << "\n";
+    errs() << "IVStart: " << *IVStart << "\n";
+    errs() << "IVStep: " << *IVStep << "\n";
 
 
 
@@ -741,13 +792,23 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
             InjectionLocation
         );
 
+
+    /*
+     * Compute StartAddress = IVStart + @PointerOfMemoryInstruction (ACTUAL)
+     */
+    Value *StartAddress = 
+        Builder.CreateAdd(
+            IVStart,
+            PointerOfMemoryInstruction
+        );
+
     
     /*
      * Compute Offset = Step * NumIterations
      */
     Value *Offset = 
         Builder.CreateMul(
-            StepValue,
+            IVStep,
             NumIterations
         );
 
@@ -807,6 +868,75 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
 
     return Hoisted;
 }
+
+
+Value *ProtectionsInjector::_fetchInvariantFromBinaryOperator (
+    BinaryOperator *I,
+    InvariantManager *InvManager
+)
+{
+    /*
+     * TOP --- Based on @I and @InvManager, find if either operands of 
+     * @I is a loop invariant. Otherwise, return nullptr
+     */
+
+    /*
+     * Setup
+     */
+    Value *InvariantOperand = nullptr;
+    Value *FirstOp = I->getOperand(0);
+    Value *SecondOp = I->getOperand(1);
+
+
+    /*
+     * Check for loop invariance
+     */
+    if (InvManager->isLoopInvariant(FirstOp)) InvariantOperand = FirstOp;
+    else if (InvManager->isLoopInvariant(SecondOp)) InvariantOperand = SecondOp;
+
+
+    return InvariantOperand;
+}
+
+
+Instruction *ProtectionsInjector::_fetchIVFromBinaryOperator (
+    BinaryOperator *I,
+    InductionVariableManager *IVManager
+)
+{
+    /*
+     * TOP --- Based on @I and @IVManager, find if either operands of 
+     * @I contributes to an induction variable. Otherwise, return nullptr
+     */
+
+    /*
+     * Setup
+     */
+    Instruction *IVOperand = nullptr;
+    Instruction *FirstOpAsInst = dyn_cast<Instruction>(I->getOperand(0));
+    Instruction *SecondOpAsInst = dyn_cast<Instruction>(I->getOperand(1));
+
+
+    /*
+     * Check for IV contribution
+     */
+    if (true
+        && FirstOpAsInst
+        && IVManager->doesContributeToComputeAnInductionVariable(FirstOpAsInst)) {
+        IVOperand = FirstOpAsInst;
+    }
+    else if (
+        true
+        && SecondOpAsInst
+        && IVManager->doesContributeToComputeAnInductionVariable(SecondOpAsInst)) {
+        IVOperand = SecondOpAsInst;
+    }
+
+
+    return IVOperand;
+}
+
+
 
 
 bool ProtectionsInjector::_isAPointerReturnedByAllocator(Value *V)
