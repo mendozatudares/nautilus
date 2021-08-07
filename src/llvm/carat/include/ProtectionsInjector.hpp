@@ -206,13 +206,13 @@ private:
 
     void _printGuards(void);
 
-    Value *_fetchInvariantFromBinaryOperator (
-        BinaryOperator *I,
+    Value *_fetchInvariantFromInstruction (
+        Instruction *I,
         InvariantManager *InvManager
     ) ;
 
-    Instruction *_fetchIVFromBinaryOperator (
-        BinaryOperator *I,
+    Instruction *_fetchIVFromInstruction (
+        Instruction *I,
         InductionVariableManager *IVManager
     ) ;
 

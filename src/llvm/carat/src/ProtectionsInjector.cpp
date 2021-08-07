@@ -83,6 +83,16 @@ void ProtectionsInjector::Inject(void)
     _doTheInject();
 
 
+    /*
+     * Verify the transformations
+     */
+    // assert(verifyFunction(*F) != true);
+    if (verifyFunction(*F, &errs())) errs() << "VERIFICATION FAILED\n";
+    else errs() << "VERIFICATION WORKED\n";
+
+    errs() << *F << "\n";
+
+
     return;
 }
 
@@ -298,6 +308,8 @@ std::vector<Value *> ProtectionsInjector::_buildGenericProtectionArgs(GuardInfo 
             Builder.getInt8PtrTy()
         );
 
+    errs () << "THE INJECTION: " << *VoidPointerToGuard << "\n";
+
 
     /*
      * Build the call args
@@ -383,7 +395,7 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
      * If @NestedLoop is not valid, we cannot optimize for loop invariance
      */
     if (!NestedLoop) { 
-        errs() << "\tNestedLoop not valid!\n";
+        errs() << "\tliCondition 0: NestedLoop not valid!\n";
         return false;
     }
 
@@ -425,7 +437,7 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
         /*
          * Set up the guard
          */
-        errs() << "Hoisted with invariants!\n";
+        errs() << "\tHoisted with invariants using arg/li optimization!\n";
         InjectionLocations[I] = 
             new GuardInfo(
                 InjectionLocation,
@@ -439,6 +451,11 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
         loopInvariantGuard++;
 
         return true;
+
+    } else {
+        errs() << "\tCannot use arg/li optimization\n";
+        errs() << "\t\tisa<Argument>(PointerOfMemoryInstruction): " << isa<Argument>(PointerOfMemoryInstruction) << "\n";
+        errs() << "\t\t!(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst)): " << !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst)) << "\n";
     }
 
 
@@ -559,28 +576,37 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     bool IsWrite
 )
 {
+    // return false;
     /*
      * Debugging
      */
     errs() << "_optimizeForInductionVariableAnalysis\n";
-    errs() << "\t" << *PointerOfMemoryInstruction << "\n";
+    errs() << "\tI: " << *I << "\n";
+    errs() << "\tPointerOfMemoryInstruction: " << *PointerOfMemoryInstruction << "\n";
 
 
     /*
      * If @NestedLoop is not valid, we cannot optimize for loop invariance
      */
     if (!NestedLoop) { 
-        errs() << "\tNestedLoop not valid!\n";
+        errs() << "\tivCondition 0: NestedLoop not valid!\n";
         return false; 
     }
 
+    for (auto EB : NestedLoop->getLoopStructure()->getLoopExitBasicBlocks()) {
+        errs() << "EB: " << *EB << "\n";
+    }
+
+    for (auto LBB : NestedLoop->getLoopStructure()->getBasicBlocks()) {
+        errs() << "LBB: " << *LBB << "\n";
+    }
 
     /*
      * Fetch @PointerOfMemoryInstruction as an instruction, sanity check
      */
     Instruction *PointerOfMemoryInstructionAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
     if (!PointerOfMemoryInstructionAsInst) { 
-        errs() << "\tPointerOfMemoryInstructionAsInst not valid!\n";
+        errs() << "\tivCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
         return false; 
     }
 
@@ -591,8 +617,12 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      * there's no optimization we can do
      */
     BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
-    if (!PointerOfMemoryInstructionAsBinOp) {
-        errs() << "\tPointerOfMemoryInstruction is not defined as a binary operation!\n";
+    GetElementPtrInst *PointerOfMemoryInstructionAsGEP = dyn_cast<GetElementPtrInst>(PointerOfMemoryInstructionAsInst);
+    if (true
+        && !PointerOfMemoryInstructionAsBinOp
+        && !PointerOfMemoryInstructionAsGEP) {
+        errs() << "\tivCondition 2: PointerOfMemoryInstruction is not defined as a binary operation or GEP!\n";
+        errs() << "\t\tThe instruction is instead: " << *PointerOfMemoryInstructionAsInst << "\n";
         return false;
     }
 
@@ -604,14 +634,14 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     InvariantManager *InvManager = NestedLoop->getInvariantManager();
 
     Value *InvariantOperand = 
-        _fetchInvariantFromBinaryOperator(
-            PointerOfMemoryInstructionAsBinOp,
+        _fetchInvariantFromInstruction(
+            PointerOfMemoryInstructionAsInst,
             InvManager
         );
 
     Instruction *IVOperand = 
-        _fetchIVFromBinaryOperator(
-            PointerOfMemoryInstructionAsBinOp,
+        _fetchIVFromInstruction(
+            PointerOfMemoryInstructionAsInst,
             IVManager
         ); /* Flaky, InvariantOperand is a Value *, IVOperand is an Instruction * */
     
@@ -619,7 +649,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
         || !InvariantOperand
         || !IVOperand) {
         
-        errs() << "\tPointerOfMemoryInstructionAsBinOp is not defined by the pattern [IV/Inv] [bin op] [Inv/IV]!\n";
+        errs() << "\tivCondition 2: PointerOfMemoryInstructionAsInst is not defined by the pattern [IV/Inv] [bin op] [Inv/IV] or GEP!\n";
         
         if (InvariantOperand) {
             errs() << "\t\tInvariantOperand is valid: " << *InvariantOperand << "\n";
@@ -636,7 +666,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
         return false;
     }
 
-    assert(InvariantOperand != IVOperand); /* Can we make this guarantee */
+    // assert(InvariantOperand != IVOperand); /* Can we make this guarantee --- NO, change */
 
 #if 0
     if (!(IVManager->doesContributeToComputeAnInductionVariable(PointerOfMemoryInstructionAsInst))) {
@@ -674,7 +704,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
         /*
          * This is conservative, but it's possible to optimize more here based on outer loops --- FIX
          */
-        errs() << "\tInvalid induction variable object for the current loop!";
+        errs() << "\tivCondition 3: Invalid induction variable object for the current loop and IVOperand!";
         return false;
     }
 
@@ -685,7 +715,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     if (!(IV->isStepValueLoopInvariant())) { /* Still accurate b/c we only consider basic IVs, not derived IVs.
         this makes the computation easy b/c step value is constant, you can extend the computation as follows:
         base + start value of IV + (total number of iterations * (constant) step) = end address. with this type of IV. */
-        errs() << "\tIV related to PointerOfMemoryInstructionAsInst does not have a loop invariant step value!\n";
+        errs() << "\tivCondition 4: IV related to PointerOfMemoryInstructionAsInst's def does not have a loop invariant step value!\n";
         return false; 
     }
 
@@ -699,7 +729,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      */
     LoopGoverningIVAttribution *LGIVAttr = IVManager->getLoopGoverningIVAttribution(*NestedLoopStructure);
     if (!LGIVAttr) { 
-        errs() << "\tLoop Governing IV attribution is invalid!\n";
+        errs() << "\tivCondition 5: Loop Governing IV attribution is invalid!\n";
         return false; 
     }
     
@@ -723,7 +753,11 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     /*
      * Fetch the loop governing IV utility
      */
-    LoopGoverningIVUtility GIVUtility(*LGIVAttr); /* UPDATE NOELLE ---, now takes an LS * and IVManager of the LS. */
+    LoopGoverningIVUtility GIVUtility(
+        NestedLoopStructure,
+        *IVManager,
+        *LGIVAttr
+    ); /* UPDATE NOELLE ---, now takes an LS * and IVManager of the LS. */
 
 
     /*
@@ -739,7 +773,7 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
 
     Value *NumIterations = GIVUtility.generateCodeToComputeTheTripCount(NumIterationsBuilder);
     if (!NumIterations) {
-        errs() << "\tCan't generate code to compute total number of iterations!\n";
+        errs() << "\tivCondition 6: Can't generate code to compute total number of iterations!\n";
         return false;
     }
     errs() << "\tNumIterations: " << *NumIterations << "\n";
@@ -755,7 +789,17 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     if (false
         || !IVStart
         || !IVStep) {
-        errs() << "\tIVStart or IVStep is invalid!\n";
+        errs() << "\tivCondition 7: IVStart or IVStep is invalid!\n";
+        if (IVStart) {
+            errs() << "\t\tIVStart is valid: " << *IVStart << "\n";
+        } else {
+            errs() << "\t\tIVStart is invalid!\n";
+        }
+        if (IVStep) {
+            errs() << "\t\tIVStep is valid: " << *IVStep << "\n";
+        } else {
+            errs() << "\t\tIVStep is invalid!\n";
+        }
         return false;
     }
 
@@ -784,7 +828,10 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
      * 
      * First, set up injection locations and builders
      */
+
     BasicBlock *PreHeader = NestedLoopStructure->getPreHeader();
+    errs() << "PREHEADER BEFORE: " << *PreHeader << "\n";
+
     Instruction *InjectionLocation = PreHeader->getTerminator();
     llvm::IRBuilder<> Builder = 
         Utils::GetBuilder(
@@ -794,12 +841,23 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
 
 
     /*
-     * Compute StartAddress = IVStart + @PointerOfMemoryInstruction (ACTUAL)
+     * Compute StartAddress = IVStart + @PointerOfMemoryInstruction's base (IV Operand) (ACTUAL)
+     * FIX THIS DAMN CODE
      */
     Value *StartAddress = 
         Builder.CreateAdd(
-            IVStart,
-            PointerOfMemoryInstruction
+            Builder.CreateMul(
+                IVStart,
+                Builder.getInt64(
+                    Utils::GetPrimitiveSizeInBytes(
+                        cast<PointerType>(InvariantOperand->getType())->getElementType()
+                    )
+                )
+            ),
+            Builder.CreatePtrToInt(
+                InvariantOperand,
+                Builder.getInt64Ty()
+            )
         );
 
     
@@ -820,20 +878,20 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     Value *EndAddressVal = 
         Builder.CreateAdd(
             Offset,
-            Builder.CreatePtrToInt(
-                StartAddress,
-                Builder.getInt64Ty()
-            )
+            StartAddress
         );
 
     Value *EndAddress =
         Builder.CreateIntToPtr(
             EndAddressVal,
-            StartAddress->getType()
+            InvariantOperand->getType()
         );
 
+    errs() << "\tStartAddress: " << *StartAddress << "\n";
     errs() << "\tOffset: " << *Offset << "\n";
     errs() << "\tEndAddress: " << *EndAddress << "\n";
+
+    errs() << "PREHEADER AFTER: " << *PreHeader << "\n";
 
 
     /*
@@ -870,8 +928,8 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
 }
 
 
-Value *ProtectionsInjector::_fetchInvariantFromBinaryOperator (
-    BinaryOperator *I,
+Value *ProtectionsInjector::_fetchInvariantFromInstruction (
+    Instruction *I,
     InvariantManager *InvManager
 )
 {
@@ -883,6 +941,11 @@ Value *ProtectionsInjector::_fetchInvariantFromBinaryOperator (
     /*
      * Setup
      */
+    // assert(I->getNumOperands() == 2);
+    if (I->getNumOperands() != 2) {
+        return nullptr;
+    }
+
     Value *InvariantOperand = nullptr;
     Value *FirstOp = I->getOperand(0);
     Value *SecondOp = I->getOperand(1);
@@ -891,16 +954,22 @@ Value *ProtectionsInjector::_fetchInvariantFromBinaryOperator (
     /*
      * Check for loop invariance
      */
-    if (InvManager->isLoopInvariant(FirstOp)) InvariantOperand = FirstOp;
-    else if (InvManager->isLoopInvariant(SecondOp)) InvariantOperand = SecondOp;
+    if (InvManager->isLoopInvariant(FirstOp)) {
+        errs() << "\t\t_fetchInvariantFromBinaryOperator: FirstOp is loop invariant: " << *FirstOp << "\n";
+        InvariantOperand = FirstOp;
+    }
+    else if (InvManager->isLoopInvariant(SecondOp)) {
+        errs() << "\t\t_fetchInvariantFromBinaryOperator: SecondOp is loop invariant: " << *SecondOp << "\n";
+        InvariantOperand = SecondOp;
+    }
 
 
     return InvariantOperand;
 }
 
 
-Instruction *ProtectionsInjector::_fetchIVFromBinaryOperator (
-    BinaryOperator *I,
+Instruction *ProtectionsInjector::_fetchIVFromInstruction (
+    Instruction *I,
     InductionVariableManager *IVManager
 )
 {
@@ -912,6 +981,11 @@ Instruction *ProtectionsInjector::_fetchIVFromBinaryOperator (
     /*
      * Setup
      */
+    // assert(I->getNumOperands() == 2);
+    if (I->getNumOperands() != 2) {
+        return nullptr;
+    }
+
     Instruction *IVOperand = nullptr;
     Instruction *FirstOpAsInst = dyn_cast<Instruction>(I->getOperand(0));
     Instruction *SecondOpAsInst = dyn_cast<Instruction>(I->getOperand(1));
@@ -923,12 +997,14 @@ Instruction *ProtectionsInjector::_fetchIVFromBinaryOperator (
     if (true
         && FirstOpAsInst
         && IVManager->doesContributeToComputeAnInductionVariable(FirstOpAsInst)) {
+        errs() << "\t\t_fetchIVFromBinaryOperator: FirstOp contributes to an IV: " << *FirstOpAsInst << "\n";
         IVOperand = FirstOpAsInst;
     }
     else if (
         true
         && SecondOpAsInst
         && IVManager->doesContributeToComputeAnInductionVariable(SecondOpAsInst)) {
+        errs() << "\t\t_fetchIVFromBinaryOperator: SecondOp contributes to an IV: " << *SecondOpAsInst << "\n";
         IVOperand = SecondOpAsInst;
     }
 

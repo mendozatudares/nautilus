@@ -305,6 +305,7 @@ uint64_t Utils::GetPrimitiveSizeInBytes(Type *ObjectType)
     /*
      * Fetch the size in bytes, check for non-zero values
      */ 
+    errs() << "ObjectType: " << *ObjectType << "\n";
     uint64_t PrimitiveSize = ObjectType->getPrimitiveSizeInBits();
     assert(PrimitiveSize && "Utils::GetPrimitiveSizeInBytes: Primitive size is 0!");
 
