@@ -1307,6 +1307,72 @@ static void _controlled_movement_on_thread(void * input, void ** output) {
   free(args);
   nk_vc_printf("_controlled_movement_on_thread, done \n");
 }
+
+//This test will stop the world and fetch the CARAT context of the shell (which shares with idle)
+//The test then will iterate through every allocation present in the allocation map and sum them into totalAllocationSize.
+//It then will increment escapes for each valid escape in the allocation map.
+//After doing this, it will report the following:
+//1) Total number of escapes
+//2) Sum of the size of all allocations (in bytes)
+//3) (2) / (1) = Pointer Density (How many bytes exist per pointer present)
+static int handle_get_pointer_density(char *buf, void *priv)
+{
+	uint64_t escapes = 0;
+	uint64_t totalAllocationSize = 0;
+  nk_carat_context *the_context = FETCH_CARAT_CONTEXT;
+  CARAT_READY_OFF(the_context);
+  _carat_cleanup(the_context); 
+//BRIAN RETURN HERE	
+      if (!(nk_sched_stop_world())){
+      	return -1;	
+      } 
+ 
+      CARAT_ALLOCATION_MAP_ITERATE(the_context)
+  {        
+    allocation_entry *the_entry = FETCH_ALLOCATION_ENTRY_FROM_ITERATOR;
+    totalAllocationSize += the_entry->size;
+    if (the_entry->escapes_set != NULL) {
+
+CARAT_ESCAPES_SET_ITERATE((the_entry->escapes_set))
+  {
+    /*
+     * Set up the escape
+     */ 
+    void **curr_escape = FETCH_ESCAPE_FROM_ITERATOR;
+    void *curr_escape_value = *curr_escape;
+
+
+    /*
+     * Calculate the offset, if possible, of the escape within the entry
+     */
+    sint64_t offset = _carat_get_query_offset (
+        curr_escape_value,
+        the_entry->pointer,
+        the_entry->size
+        );
+
+
+    /*
+     * Sanity check the offset
+     */ 
+    if (offset < 0) 
+    { 
+      CARAT_PRINT("_carat_patch_escapes: cannot find offset for %p\n", curr_escape);
+      continue;
+    }
+	    escapes += 1;
+  }
+    }
+  } 
+      
+      nk_sched_start_world();
+	
+
+      CARAT_READY_ON(the_context);
+      return 0;
+}
+	
+	
 /* 
  * Shell command handler
  */
@@ -1357,6 +1423,14 @@ static int handle_controlled_movement_test(char *buf, void *priv)
 
   return 0;
 }
+
+static struct shell_cmd_impl get_pointer_density_impl = {
+  .cmd = "get_pointer_density",
+  .help_str = "This will provide the number of escapes per megabyte of allocated data in the kernel",
+  .handler = handle_get_pointer_density,
+};
+
+nk_register_shell_cmd(get_pointer_density_impl);
 
 
 static struct shell_cmd_impl carat_test_impl = {
