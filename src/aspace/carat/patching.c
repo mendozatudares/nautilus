@@ -1320,6 +1320,7 @@ static int handle_get_pointer_density(char *buf, void *priv)
 {
 	uint64_t escapes = 0;
 	uint64_t totalAllocationSize = 0;
+  uint64_t totalAllocations = 0;
   nk_carat_context *the_context = FETCH_CARAT_CONTEXT;
   CARAT_READY_OFF(the_context);
   _carat_cleanup(the_context); 
@@ -1332,6 +1333,7 @@ static int handle_get_pointer_density(char *buf, void *priv)
   {        
     allocation_entry *the_entry = FETCH_ALLOCATION_ENTRY_FROM_ITERATOR;
     totalAllocationSize += the_entry->size;
+    totalAllocations++;
     if (the_entry->escapes_set != NULL) {
 
 CARAT_ESCAPES_SET_ITERATE((the_entry->escapes_set))
@@ -1368,6 +1370,7 @@ CARAT_ESCAPES_SET_ITERATE((the_entry->escapes_set))
       
       nk_sched_start_world();
 	
+      nk_vc_printf("Density Info:\nAllocs: %lu\n Allocs Bytes: %lu\n Escapes: %lu\n Ratio: %ld\n", escapes, totalAllocations, totalAllocationSize, ((double)totalAllocationSize/(double)escapes));
 
       CARAT_READY_ON(the_context);
       return 0;
