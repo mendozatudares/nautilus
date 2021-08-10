@@ -1295,7 +1295,8 @@ static void _controlled_movement_on_thread(void * input, void ** output) {
 
   //This will convert rate (given in milli-hertz to a period in microseconds)
   uint64_t time_between_movements = ONE_BILLION / args->frequency_of_moves;
-  uint64_t num_moves = (args->frequency_of_moves)*(args->length_of_run);
+  double freqOfMovesInSec = ((double)(args->frequency_of_moves)) / 1000.0;
+  uint64_t num_moves = (uint64_t)((freqOfMovesInSec)*((double)(args->length_of_run)));
 
   nk_vc_printf("_controlled_movement_on_thread, time_between_movements: %lu, \n", time_between_movements);
   nk_vc_printf("_controlled_movement_on_thread, number_allocations: %lu, \n", args->number_allocations);
