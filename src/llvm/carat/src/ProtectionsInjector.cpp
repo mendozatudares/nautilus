@@ -616,12 +616,18 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     }
 
 
+    errs() << "\tRecursing the PointerOfMemoryInstructionAsInst\n";
+    //Check iof we are dealing with a bitcast, if we are we will use that value
     if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerOfMemoryInstructionAsInst)) {
+        errs() << "\tFound a bitcast, grabbing ptr\n";
         Value *TheOperand = BC->getOperand(0);
+        errs() << "\tptr is: "<< *TheOperand <<"\n";
         if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
             PointerOfMemoryInstructionAsInst = TheOperandAsInst;
         }
     }
+        
+    
 
     // BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
     GetElementPtrInst *PointerOfMemoryInstructionAsGEP = dyn_cast<GetElementPtrInst>(PointerOfMemoryInstructionAsInst);
@@ -677,6 +683,29 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     LoopStructure *NextLoopStructure = NestedLoop->getLoopStructure();
     BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
     Instruction *InjectionLocation = PreHeader->getTerminator();
+    
+    while(1){
+        Instruction* newStart = dyn_cast<Instruction>(StartAddress);
+        //Check if we are an inst, if not we are done
+        if(!newStart){
+            break;
+        }
+        //If we are out of the loop, we can be done
+        if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
+            StartAddress = newStart;
+            break;
+        }
+        if (BitCastInst *BC = dyn_cast<BitCastInst>(newStart)) {
+            errs() << "\tFound a bitcast, grabbing ptr\n";
+            StartAddress = BC->getOperand(0); 
+        }
+        
+        if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
+            errs() << "\tFound a load, grabbing ptr\n";
+            StartAddress = BC->getOperand(0);
+        }
+    }
+
 
     InjectionLocations[I] = 
         new GuardInfo(
@@ -1458,8 +1487,11 @@ std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool i
          * potential loop nest that @inst belongs to
          */
         bool Guarded = false;
-        errs() << "Trying loop optimization ...\n";
         LoopDependenceInfo *NestedLoop = BasicBlockToLoopMap[inst->getParent()];
+        if (!NestedLoop) { 
+            goto No_Loop;
+        }
+        errs() << "Trying loop optimization ...\n";
 
 
         /*
@@ -1496,7 +1528,7 @@ std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool i
             }
         }
             
-
+No_Loop:
 
         /*
          * <Step 3>
