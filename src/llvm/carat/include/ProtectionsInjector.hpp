@@ -87,6 +87,7 @@ public:
      */ 
     ProtectionsInjector(
         Function *F, 
+        std::function<ScalarEvolution * (Function *F)> FetchSELambda,
         DataFlowResult *DFR, 
         Value *NonCanonical,
         Noelle *noelle,
@@ -115,6 +116,8 @@ private:
      * Passed state
      */ 
     Function *F, *ProtectionsMethod;
+
+    std::function<ScalarEvolution * (Function *F)> FetchSELambda;
 
     DataFlowResult *DFR;
 
@@ -177,6 +180,13 @@ private:
     );
 
     bool _optimizeForInductionVariableAnalysis(
+        LoopDependenceInfo *NestedLoop,
+        Instruction *I, 
+        Value *PointerOfMemoryInstruction, 
+        bool IsWrite
+    );
+
+    bool _optimizeForSCEVAnalysis(
         LoopDependenceInfo *NestedLoop,
         Instruction *I, 
         Value *PointerOfMemoryInstruction, 

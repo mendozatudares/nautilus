@@ -36,8 +36,9 @@
  */ 
 ProtectionsHandler::ProtectionsHandler(
     Module *M,
-    Noelle *N
-) : M(M), N(N) 
+    Noelle *N,
+    std::function<ScalarEvolution * (Function *F)> FetchSELambda
+) : M{M}, N{N}, FetchSELambda{FetchSELambda}
 {
     /*
      * Perform initial processing
@@ -87,6 +88,7 @@ void ProtectionsHandler::Protect(void)
 
         ProtectionsInjector *PI = new ProtectionsInjector(
             &F,
+            FetchSELambda,
             PD->FetchResult(),
             NonCanonical,
             N /* Noelle */,

@@ -45,7 +45,8 @@ public:
      */ 
     ProtectionsHandler(
         Module *M,
-        Noelle *N
+        Noelle *N,
+        std::function<ScalarEvolution * (Function *F)> FetchSELambda
     );
 
 
@@ -62,6 +63,7 @@ private:
      */ 
     Module *M;
     Noelle *N;
+    std::function<ScalarEvolution * (Function *F)> FetchSELambda;
     
 
     /*

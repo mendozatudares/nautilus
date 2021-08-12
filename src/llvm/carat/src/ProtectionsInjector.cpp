@@ -37,12 +37,14 @@
  */
 ProtectionsInjector::ProtectionsInjector(
     Function *F, 
+    std::function<ScalarEvolution * (Function *F)> FetchSELambda,
     DataFlowResult *DFR, 
     Value *NonCanonical,
     Noelle *noelle,
     Function *ProtectionsMethod
-) : F(F), DFR(DFR), NonCanonical(NonCanonical), ProtectionsMethod(ProtectionsMethod), noelle(noelle) 
+) : F(F), FetchSELambda(FetchSELambda), DFR(DFR), NonCanonical(NonCanonical), ProtectionsMethod(ProtectionsMethod), noelle(noelle) 
 {
+
     /*
      * Set new state from NOELLE
      */ 
@@ -404,6 +406,15 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
      * Fetch @PointerOfMemoryInstruction as an instruction
      */
     Instruction *PointerAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
+    // Instruction *JustInCasePointerAsInst = nullptr;
+    // Value *JustInCasePointer = nullptr;
+    // if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerAsInst)) {
+    //     Value *TheOperand = BC->getOperand(0);
+    //     JustInCasePointer = TheOperand;
+    //     if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
+    //         JustInCasePointerAsInst = TheOperandAsInst;
+    //     }
+    // }
 
 
     /*
@@ -412,7 +423,9 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
      */
     if (false
         || isa<Argument>(PointerOfMemoryInstruction)
+        // || (JustInCasePointer && isa<Argument>(JustInCasePointer))
         || !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst))) 
+        // || !(noelle->getInnermostLoopThatContains(*AllLoops, JustInCasePointerAsInst)))
     {
         /*
          * For this instance, the injection location will be the preheader of the
@@ -551,6 +564,9 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
     if (Hoistable)
     {
         errs() << "Hoisted with invariants!\n";
+        errs() << "PointerOfMemoryInstruction again: " << *PointerOfMemoryInstruction << "\n";
+        errs() << "InjectionLocation again: " << *InjectionLocation << "\n";
+        errs() << "I again: " << *I << "\n";
         InjectionLocations[I] = 
             new GuardInfo(
                 InjectionLocation,
@@ -568,6 +584,116 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
     return Hoistable;
 }
 
+
+bool ProtectionsInjector::_optimizeForSCEVAnalysis(
+    LoopDependenceInfo *NestedLoop,
+    Instruction *I, 
+    Value *PointerOfMemoryInstruction, 
+    bool IsWrite
+)
+{
+    // return false;
+    errs() << "_optimizeForSCEVAnalysis\n";
+    errs() << "\tI: " << *I << "\n";
+    errs() << "\tPointerOfMemoryInstruction: " << *PointerOfMemoryInstruction << "\n";
+
+
+    /*
+     * If @NestedLoop is not valid, we cannot optimize for loop invariance
+     */
+    if (!NestedLoop) { 
+        errs() << "\tscevCondition 0: NestedLoop not valid!\n";
+        return false; 
+    }
+
+    /*
+     * Fetch @PointerOfMemoryInstruction as an instruction, sanity check
+     */
+    Instruction *PointerOfMemoryInstructionAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
+    if (!PointerOfMemoryInstructionAsInst) { 
+        errs() << "\tscevCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
+        return false; 
+    }
+
+
+    if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerOfMemoryInstructionAsInst)) {
+        Value *TheOperand = BC->getOperand(0);
+        if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
+            PointerOfMemoryInstructionAsInst = TheOperandAsInst;
+        }
+    }
+
+    // BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
+    GetElementPtrInst *PointerOfMemoryInstructionAsGEP = dyn_cast<GetElementPtrInst>(PointerOfMemoryInstructionAsInst);
+    if (true
+        // && !PointerOfMemoryInstructionAsBinOp
+        && !PointerOfMemoryInstructionAsGEP) {
+        errs() << "\tscevCondition: PointerOfMemoryInstruction is not defined as a binary operation or GEP!\n";
+        errs() << "\t\tThe instruction is instead: " << *PointerOfMemoryInstructionAsInst << "\n";
+        return false;
+    }
+
+
+    /*
+     * Compute start address and check if all other operands are invariant or SCEV recursive
+     */
+    InductionVariableManager *IVManager = NestedLoop->getInductionVariableManager();
+    InvariantManager *InvManager = NestedLoop->getInvariantManager();
+
+    Value *StartAddress = PointerOfMemoryInstructionAsGEP->getPointerOperand();
+    if (!(InvManager->isLoopInvariant(StartAddress))) {
+        errs() << "\tscevCondition: Start address not li\n";
+        return false;
+    }
+
+    bool Hoistable = true; 
+    auto SE = FetchSELambda(F);
+    errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
+    for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
+        
+        Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
+        if (Operand == StartAddress) continue;
+
+        if (InvManager->isLoopInvariant(Operand)) {
+            continue; 
+        }
+        
+        auto scevPtrComputation = SE->getSCEV(Operand);
+        if (scevPtrComputation) errs() << *scevPtrComputation << "\n";
+        if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
+            continue;
+        }
+
+        Hoistable = false;
+        errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
+        break;
+        
+    }
+
+    if (!Hoistable) {
+        return false;
+    }
+
+    LoopStructure *NextLoopStructure = NestedLoop->getLoopStructure();
+    BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
+    Instruction *InjectionLocation = PreHeader->getTerminator();
+
+    InjectionLocations[I] = 
+        new GuardInfo(
+            InjectionLocation,
+            StartAddress,
+            IsWrite,
+            CARATNamesToMethods[CARAT_PROTECT],
+            "protect", /* Metadata type */
+            "iv.scev.guard.start", /* Metadata attached to injection */
+            1
+        );
+    
+
+
+    return true;
+
+}
 
 bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     LoopDependenceInfo *NestedLoop,
@@ -608,6 +734,14 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
     if (!PointerOfMemoryInstructionAsInst) { 
         errs() << "\tivCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
         return false; 
+    }
+
+
+    if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerOfMemoryInstructionAsInst)) {
+        Value *TheOperand = BC->getOperand(0);
+        if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
+            PointerOfMemoryInstructionAsInst = TheOperandAsInst;
+        }
     }
 
 
@@ -1339,6 +1473,9 @@ std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool i
                 isWrite
             );
 
+        if (Guarded) {
+            errs() << "Success LI! " << F->getName() << "\n";
+        }
 
         /*
          * <Step 2b.>
@@ -1346,16 +1483,19 @@ std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool i
         if (!Guarded)
         {
             Guarded |= 
-                _optimizeForInductionVariableAnalysis(                
+                // _optimizeForInductionVariableAnalysis(
+                _optimizeForSCEVAnalysis(                
                     NestedLoop,
                     inst,
                     PointerOfMemoryInstruction,
                     isWrite
                 );
-        }
 
-        if (Guarded) 
-            errs() << "Success!\n";
+            if (Guarded) {
+                errs() << "Success SCEV! " << F->getName() << "\n";
+            }
+        }
+            
 
 
         /*

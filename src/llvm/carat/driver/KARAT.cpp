@@ -148,15 +148,40 @@ struct CAT : public ModulePass
         if (!NoProtections)
         {
             /*  
-             * Fetch Noelle
+             * Fetch Noelle and SCEV (HACK)
+             * make a lambda that takes a function * and returns a scev *
+             * the lambda invokes getAnalysis
+             * pass the lambda to the protections pass -- just invoke the function
              */
-            Noelle &NoelleAnalysis = getAnalysis<Noelle>();
+            auto FetchSE = 
+            [this](Function *F) -> ScalarEvolution * {
+                ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(*F).getSE();
+                return SE;
+            } ;
 
+            // std::unordered_map<Function *, ScalarEvolution *> SCEVs;
+            // ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+            // for (auto &F : M)
+            // {
+            //     ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
+            //     Protections P = Protections(SE);
+            // }       
+
+
+            // for (auto &F : M)
+            // {
+            //     ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
+            //     errs() << "VERIFYING SE FOR " << F.getName() << "...\n";
+            //     SE->verify();
+            //     SCEVs[&F] = SE;
+            // }         
+
+            Noelle &NoelleAnalysis = getAnalysis<Noelle>();
 
             /*
              * Protections
              */ 
-            ProtectionsHandler PH = ProtectionsHandler(&M, &NoelleAnalysis);
+            ProtectionsHandler PH = ProtectionsHandler(&M, &NoelleAnalysis, FetchSE);
             PH.Protect();
         }
 #endif
@@ -210,6 +235,7 @@ struct CAT : public ModulePass
 
     void getAnalysisUsage(AnalysisUsage &AU) const override
     {   
+        AU.addRequired<ScalarEvolutionWrapperPass>();
 
 #if NAUT_CONFIG_USE_NOELLE
         /*
