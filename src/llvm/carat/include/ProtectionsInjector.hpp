@@ -141,6 +141,8 @@ private:
 
     bool AllocaOutsideEntry=false;
 
+    bool InjectedCallGuardAtFirst=false;
+
     std::unordered_map<Function *, bool> InstrumentedFunctions;
 
     std::unordered_map<

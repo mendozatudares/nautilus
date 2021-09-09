@@ -199,15 +199,22 @@ void ProtectionsInjector::visitCallInst(CallInst &I)
     }
     else
     {
-        InjectionLocations[&I] = 
-            new GuardInfo(
-                First,
-                NonCanonical, // TODO: change to the stack pointer location during the function call
-                true, /* IsWrite */ 
-                CARATNamesToMethods[CARAT_STACK_GUARD],
-                "protect", /* Metadata type */
-                "opt.call.guard" /* Metadata attached to injection */
-            );
+        if (!InjectedCallGuardAtFirst) {
+
+            InjectionLocations[&I] = 
+                new GuardInfo(
+                    First,
+                    NonCanonical, // TODO: change to the stack pointer location during the function call
+                    true, /* IsWrite */ 
+                    CARATNamesToMethods[CARAT_STACK_GUARD],
+                    "protect", /* Metadata type */
+                    "opt.call.guard" /* Metadata attached to injection */
+                );
+
+            InjectedCallGuardAtFirst |= true;
+
+        }
+
 
         callGuardOpt++;
     }
@@ -606,6 +613,81 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
         return false; 
     }
 
+
+
+    auto SE = FetchSELambda(F);
+    LoopStructure *NextLoopStructure = nullptr;
+    BasicBlock *PreHeader = nullptr;
+    Instruction *InjectionLocation = nullptr;
+    auto scevPtrComputationOfI = SE->getSCEV(PointerOfMemoryInstruction);
+    if (scevPtrComputationOfI) errs() << "THE SCEV: " << *scevPtrComputationOfI << "\n";
+    auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputationOfI);
+    if (!AR) return false;
+
+    auto NextLoop = NestedLoop;
+    while (NextLoop)
+    {
+        NextLoopStructure = NextLoop->getLoopStructure();
+        PreHeader = NextLoopStructure->getPreHeader();
+        InjectionLocation = PreHeader->getTerminator();
+
+        LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
+        assert (ParentLoop != NextLoop);
+
+        NextLoop = ParentLoop;
+    }
+
+
+    Value *StartAddress = PointerOfMemoryInstruction;
+    while(1){
+        Instruction* newStart = dyn_cast<Instruction>(StartAddress);
+        //Check if we are an inst, if not we are done
+        if(!newStart){
+            break;
+        }
+        //If we are out of the loop, we can be done, TODO improve this once we recursively pull out of loop
+        if (!(NextLoopStructure->isIncluded(newStart))) {
+        // if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
+            StartAddress = newStart;
+            break;
+        }
+
+        if (CastInst *BC = dyn_cast<CastInst>(newStart)) {
+            errs() << "\tFound a cast, grabbing ptr\n";
+            StartAddress = BC->getOperand(0); 
+        }
+        
+        else if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
+            errs() << "\tFound a load, grabbing ptr\n";
+            StartAddress = BC->getOperand(0);
+        }
+        else if(GetElementPtrInst* BC = dyn_cast<GetElementPtrInst>(newStart)){
+            errs() << "\tFound a GEP, grabbing pointer\n";
+            StartAddress = BC->getPointerOperand();
+        }
+        else{
+            errs() << "Can't handle it right now... abort: " << *newStart << "\n";
+            return false;
+        }
+    }
+
+
+    InjectionLocations[I] = 
+        new GuardInfo(
+            InjectionLocation,
+            StartAddress,
+            IsWrite,
+            CARATNamesToMethods[CARAT_PROTECT],
+            "protect", /* Metadata type */
+            "iv.scev.guard.start", /* Metadata attached to injection */
+            1
+        );
+
+    return true;
+
+#if 0
+
+
     /*
      * Fetch @PointerOfMemoryInstruction as an instruction, sanity check
      */
@@ -614,6 +696,8 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
         errs() << "\tscevCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
         return false; 
     }
+
+
 
 
     errs() << "\tRecursing the PointerOfMemoryInstructionAsInst\n";
@@ -642,47 +726,161 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
 
     /*
      * Compute start address and check if all other operands are invariant or SCEV recursive
-     */
-    InductionVariableManager *IVManager = NestedLoop->getInductionVariableManager();
-    InvariantManager *InvManager = NestedLoop->getInvariantManager();
+     */    
+    // InductionVariableManager *IVManager = NestedLoop->getInductionVariableManager();
+    // InvariantManager *InvManager = NestedLoop->getInvariantManager();
 
     Value *StartAddress = PointerOfMemoryInstructionAsGEP->getPointerOperand();
-    if (!(InvManager->isLoopInvariant(StartAddress))) {
-        errs() << "\tscevCondition: Start address not li\n";
-        return false;
-    }
+    //TODO: We need to change this to not just check if it is invariant to the given loop
+    //      We need to recursively go out from the nest to see if it is invariant up to the outermost loop.
+    //      This might mean we should make a while loop starting here until it is no longer hoistable.
+    //      Perhaps we should start with the outermost loop and work in?
+    
+    auto FetchTheDamnThang = [](Value *V) -> Value * {
+        Value *TheDamnThang = V;
+        if (auto *Cast = dyn_cast<CastInst>(V)) {
+            TheDamnThang = Cast->getOperand(0);
+        }
+        return TheDamnThang;
+    };
 
-    bool Hoistable = true; 
+
+    auto NextLoop = NestedLoop;
     auto SE = FetchSELambda(F);
-    errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
+    LoopStructure *NextLoopStructure = nullptr;
+    BasicBlock *PreHeader = nullptr;
+    Instruction *InjectionLocation = nullptr;
+
+
+    std::vector<Value *> OperandsToAnalyze;
     for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
-        
+
         Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
+
         if (Operand == StartAddress) continue;
 
-        if (InvManager->isLoopInvariant(Operand)) {
-            continue; 
-        }
-        
-        auto scevPtrComputation = SE->getSCEV(Operand);
-        if (scevPtrComputation) errs() << *scevPtrComputation << "\n";
-        if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
+        if (auto *BO = dyn_cast<BinaryOperator>(Operand)) {
+            OperandsToAnalyze.push_back(FetchTheDamnThang(BO->getOperand(0)));
+            OperandsToAnalyze.push_back(FetchTheDamnThang(BO->getOperand(1)));
             continue;
         }
 
-        Hoistable = false;
-        errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
-        break;
+        if (isa<CastInst>(Operand)) {
+            OperandsToAnalyze.push_back(FetchTheDamnThang(Operand));
+            continue;
+        }
+
+        if (LoadInst *Load = dyn_cast<LoadInst>(Operand)) {
+            OperandsToAnalyze.push_back(FetchTheDamnThang(Load->getPointerOperand()));
+            continue;
+        }
+
+        if (auto *PHI = dyn_cast<PHINode>(Operand)) {
+            for (auto j = 0 ; j < PHI->getNumIncomingValues() ; j++) {
+                OperandsToAnalyze.push_back(FetchTheDamnThang(PHI->getIncomingValue(j)));
+            }
+            continue;  
+        }
+
+        OperandsToAnalyze.push_back(Operand);
         
     }
 
-    if (!Hoistable) {
-        return false;
+
+    while (NextLoop)
+    {
+        InvariantManager *Manager = NextLoop->getInvariantManager();
+
+        if (!(Manager->isLoopInvariant(StartAddress))) {
+            errs() << "\tscevCondition: Start address not li\n";
+            break;
+        }
+
+
+
+        bool Hoistable = true; 
+        errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
+
+
+        // for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
+        for (auto Operand : OperandsToAnalyze) {
+            // Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
+            // if (Operand == StartAddress) continue;
+
+            // if (isa<CastInst>(Operand)) {
+            //     errs() << "Whoops! The operand is actually a cast ... converting: " << *Operand;
+            //     Operand = cast<CastInst>(Operand)->getOperand(0);
+            //     errs() << " to " << *Operand << "\n";
+            // }
+
+            if (Manager->isLoopInvariant(Operand)) {
+                continue; 
+            }
+            
+            auto scevPtrComputation = SE->getSCEV(Operand);
+            if (scevPtrComputation) errs() << "THE SCEV: " << *scevPtrComputation << "\n";
+            if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
+                continue;
+            }
+
+            Hoistable = false;
+            errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
+            break;
+            
+        }
+
+        if (!Hoistable) {
+            break;
+        }
+
+        NextLoopStructure = NextLoop->getLoopStructure();
+        PreHeader = NextLoopStructure->getPreHeader();
+        InjectionLocation = PreHeader->getTerminator();
+
+        LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
+        assert (ParentLoop != NextLoop);
+
+        NextLoop = ParentLoop;
     }
 
-    LoopStructure *NextLoopStructure = NestedLoop->getLoopStructure();
-    BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
-    Instruction *InjectionLocation = PreHeader->getTerminator();
+    if (NextLoopStructure == nullptr) return false;
+
+    // if (!(InvManager->isLoopInvariant(StartAddress))) {
+    //     errs() << "\tscevCondition: Start address not li\n";
+    //     return false;
+    // }
+
+    // bool Hoistable = true; 
+    // auto SE = FetchSELambda(F);
+    // errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
+    // for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
+        
+    //     Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
+    //     if (Operand == StartAddress) continue;
+
+    //     if (InvManager->isLoopInvariant(Operand)) {
+    //         continue; 
+    //     }
+        
+    //     auto scevPtrComputation = SE->getSCEV(Operand);
+    //     if (scevPtrComputation) errs() << *scevPtrComputation << "\n";
+    //     if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
+    //         continue;
+    //     }
+
+    //     Hoistable = false;
+    //     errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
+    //     break;
+        
+    // }
+
+    // if (!Hoistable) {
+    //     return false;
+    // }
+
+    // LoopStructure *NextLoopStructure = NestedLoop->getLoopStructure();
+    // BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
+    // Instruction *InjectionLocation = PreHeader->getTerminator();
     
     while(1){
         Instruction* newStart = dyn_cast<Instruction>(StartAddress);
@@ -690,19 +888,29 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
         if(!newStart){
             break;
         }
-        //If we are out of the loop, we can be done
-        if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
+        //If we are out of the loop, we can be done, TODO improve this once we recursively pull out of loop
+        if (!(NextLoopStructure->isIncluded(newStart))) {
+        // if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
             StartAddress = newStart;
             break;
         }
+
         if (BitCastInst *BC = dyn_cast<BitCastInst>(newStart)) {
             errs() << "\tFound a bitcast, grabbing ptr\n";
             StartAddress = BC->getOperand(0); 
         }
         
-        if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
+        else if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
             errs() << "\tFound a load, grabbing ptr\n";
             StartAddress = BC->getOperand(0);
+        }
+        else if(GetElementPtrInst* BC = dyn_cast<GetElementPtrInst>(newStart)){
+            errs() << "\tFound a GEP, grabbing pointer\n";
+            StartAddress = BC->getPointerOperand();
+        }
+        else{
+            errs() << "Can't handle it right now... abort: " << *newStart << "\n";
+            return false;
         }
     }
 
@@ -721,7 +929,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
 
 
     return true;
-
+#endif
 }
 
 bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
