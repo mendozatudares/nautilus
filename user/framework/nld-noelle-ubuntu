@@ -15,9 +15,8 @@ fi
 REALPATH=$(realpath $0)
 DIRNAME=$(dirname $REALPATH)
 
-CRTGEN_DIR=/usr/lib64/x86_64-linux-gnu
-CRTBE_DIR=/usr/lib/gcc/x86_64-linux-gnu/8
-
+CRTGEN_DIR=/usr/lib64
+CRTBE_DIR=/usr/lib/gcc/x86_64-redhat-linux/8
 OUT_FLAG=$(echo "$@" | grep -Poe "-o\ .*?(\ |$)")
 echo $OUT_FLAG
 

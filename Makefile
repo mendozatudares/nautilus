@@ -797,7 +797,8 @@ ifdef NAUT_CONFIG_USE_WLLVM
 
 bitcode: $(BIN_NAME)
 	# Set up whole kernel bitcode via WLLVM
-	extract-bc $(BIN_NAME) -o $(BC_NAME)
+	extract-bc $(BIN_NAME) 
+	mv $(BIN_NAME).bc $(BC_NAME) 
 	llvm-dis $(BC_NAME) -o $(LL_NAME)
 
 # KARAT

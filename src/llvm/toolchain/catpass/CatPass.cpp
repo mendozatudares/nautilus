@@ -26,12 +26,24 @@
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
 
-#include "./include/Escapes.hpp"
 #include "autoconf.h"
+#include "./include/Restrictions.hpp"
 
 #if NAUT_CONFIG_USE_NOELLE
-#include "Noelle.hpp"
+#include "./include/Protections.hpp"
+#else
+#include "./include/Escapes.hpp"
 #endif
+
+
+#define FetchAllocMethods(type) \
+    for (auto const &[ID, Name] : IDsTo##type##AllocMethods) \
+    { \
+        Function *AllocMethod = Utils::GetMethod(&M, Name); \
+        type##AllocNamesToMethods[Name] = AllocMethod; \
+        type##AllocMethodsToIDs[AllocMethod] = ID; \
+    } \
+
 
 namespace
 {
@@ -48,7 +60,7 @@ struct CAT : public ModulePass
          */  
         Utils::ExitOnInit();
 
-        
+
         /*
          * Fetch the "nocarat" annotation attribute --- necessary
          * to find user-marked functions in kernel code
@@ -97,12 +109,8 @@ struct CAT : public ModulePass
         /*
          * Now fetch all kernel allocation methods, stash them
          */
-        for (auto const &[ID, Name] : IDsToKernelAllocMethods)
-        {
-            Function *KAMethod = Utils::GetMethod(&M, Name);
-            KernelAllocNamesToMethods[Name] = KAMethod;
-            KernelAllocMethodsToIDs[KAMethod] = ID;
-        }
+        if (InstrumentingUserCode) FetchAllocMethods(User)
+        else FetchAllocMethods(Kernel)
 
 
         return false;
@@ -111,6 +119,12 @@ struct CAT : public ModulePass
 
     bool runOnModule(Module &M) override
     {
+        /*
+         * Debugging
+         */  
+        Utils::ExitOnInit();
+
+
         if (Debug || true)
         {
             /*
@@ -121,71 +135,113 @@ struct CAT : public ModulePass
 
 
             /*
-             * Vet the kernel allocation methods --- check if kmem
-             * invocations are vanilla or not (i.e. invocations via
-             * indirect call, etc.)
+             * Vet allocation methods (of kernel OR userspace)
              */ 
-            Utils::VetKernelAllocMethods();
+            Utils::VetAllocMethods();
         }
 
 
         /*
-         * Perform all CARAT instrumentation on the kernel
+         * --- Perform all CARAT instrumentation on the code ---
          */ 
+#if NAUT_CONFIG_USE_NOELLE
+        if (!NoProtections)
+        {
+            /*  
+             * Fetch Noelle and SCEV (HACK)
+             * make a lambda that takes a function * and returns a scev *
+             * the lambda invokes getAnalysis
+             * pass the lambda to the protections pass -- just invoke the function
+             */
+            auto FetchSE = 
+            [this](Function *F) -> ScalarEvolution * {
+                ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(*F).getSE();
+                return SE;
+            } ;
+
+            // std::unordered_map<Function *, ScalarEvolution *> SCEVs;
+            // ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+            // for (auto &F : M)
+            // {
+            //     ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
+            //     Protections P = Protections(SE);
+            // }       
+
+
+            // for (auto &F : M)
+            // {
+            //     ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(F).getSE();
+            //     errs() << "VERIFYING SE FOR " << F.getName() << "...\n";
+            //     SE->verify();
+            //     SCEVs[&F] = SE;
+            // }         
+
+            Noelle &NoelleAnalysis = getAnalysis<Noelle>();
+
+            /*
+             * Protections
+             */ 
+            ProtectionsHandler PH = ProtectionsHandler(&M, &NoelleAnalysis, FetchSE);
+            PH.Protect();
+        }
+#endif
+
 
         /*
          * Allocation tracking
          */ 
-        AllocationHandler *AH = new AllocationHandler(&M);
-        AH->Inject();
+        AllocationHandler AH = AllocationHandler(&M);
+        AH.Inject();
 
 
         /*
          * Escapes tracking
          */ 
-        EscapesHandler *EH = new EscapesHandler(&M);
-        EH->Inject(); // Only memory uses
+        EscapesHandler EH = EscapesHandler(&M);
+        EH.Inject();
 
 
         /*
-         * Protections
-         */ 
-#if 0
-        ProtectionsHandler *PH = new ProtectionsHandler(&M, &FunctionMap);
-        PH->Inject();
-#endif
-
-#if NAUT_CONFIG_USE_NOELLE
-        /*  
-         * Fetch Noelle --- DEMONSTRATION
+         * Analysis/transformation on prototype restrictions,
+         * note that this functionality is per function
          */
-        Noelle &NoelleAnalysis = getAnalysis<Noelle>();
+        for (auto &F : M) 
+        {
+            if (Utils::IsInstrumentable(F))
+            {
+                RestrictionsHandler RH = RestrictionsHandler(&F);
+                RH.AnalyzeAllCalls();
+                RH.PinAllEscapingPointers();
+                RH.PrintAnalysis();
+            }
+        }
 
 
-        /*  
-         * Fetch the dependence graph of the entry function.
+        /*
+         * Run verifier on each function instrumented
          */
-        Function *MainFromNoelle = NoelleAnalysis.getEntryFunction();
-        PDG *FDG = NoelleAnalysis.getFunctionDependenceGraph(MainFromNoelle);
+        Utils::Verify(M);
 
 
-        /* 
-         * Output PDG statistics
-         */ 
-        errs() << "getNumberOfInstructionsIncluded: " << FDG->getNumberOfInstructionsIncluded() << "\n"
-               << "getNumberOfDependencesBetweenInstructions: " << FDG->getNumberOfDependencesBetweenInstructions() << "\n";
-#endif
+        /*
+         * Add statistics call to the end of main() for user programs
+         */
+        if (InstrumentingUserCode) Utils::InjectStats(M);
 
 
-        return false;
+        return true;
     }
 
 
     void getAnalysisUsage(AnalysisUsage &AU) const override
     {   
+        AU.addRequired<ScalarEvolutionWrapperPass>();
 
 #if NAUT_CONFIG_USE_NOELLE
-        AU.addRequired<Noelle>();
+        /*
+         * Use NOELLE IFF we need protections only
+         */
+        if (!NoProtections) AU.addRequired<Noelle>();
 #endif
 
         return;
