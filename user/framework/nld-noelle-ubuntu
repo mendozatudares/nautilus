@@ -55,7 +55,7 @@ if [[ $* != *-nokarat* ]]; then
   # Run LICM, normalize code for Noelle + pass (NOTE --- noelle-enable normalizes automatically)
   opt -O1 ${BLOB_BC} -o ${BLOB_BC}
   ${NORM} ${BLOB_BC} -o ${BLOB_SIMPLIFY_BC}
-  noelle-enable ${BLOB_SIMPLIFY_BC} ${BLOB_SIMPLIFY_BC} -noelle-disable-inliner -noelle-disable-scev-simplification -noelle-disable-loop-distribution
+  noelle-enable ${BLOB_SIMPLIFY_BC} ${BLOB_SIMPLIFY_BC} -noelle-disable-inliner -noelle-disable-scev-simplification -noelle-disable-loop-distribution -noelle-disable-whilifier
 
   # Link framework bitcode 
 if [[ ${CMD} == "-flinux" ]]
