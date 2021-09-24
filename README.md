@@ -291,12 +291,12 @@ the Newlib cross-compiler:
 $> sudo mkdir -p /opt/riscv
 $> git clone https://github.com/riscv/riscv-gnu-toolchain
 $> cd riscv-gnu-toolchain
-$> ./config --prefix=/opt/riscv
+$> ./configure --prefix=/opt/riscv
 $> make
 ```
 
-This will run for several minutes and build the entire RISC-V Newlib cross-
-compiler. Once complete, add `/opt/riscv/bin` to your `PATH` and you should
+This will run for several minutes and build the entire RISC-V Newlib cross-compiler.
+Once complete, add `/opt/riscv/bin` to your `PATH` and you should
 now be able to call `riscv64-unknown-elf-gcc` and its cousins.
 
 Next, you'll need to configure with `make menuconfig`. Under Platform and Target
