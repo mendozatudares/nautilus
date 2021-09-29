@@ -27,7 +27,7 @@
 #include <nautilus/macros.h>
 #include <nautilus/multiboot2.h>
 
-#include "memlayout.h"
+#include <arch/riscv/memlayout.h>
 
 extern char * mem_region_types[6];
 
@@ -54,7 +54,6 @@ typedef struct {
 } __packed virt_mmap_entry_t;
 
 /* From qemu's virt machine */
-#include "memlayout.h"
 #define VIRT_MMAP_SIZE 13
 virt_mmap_entry_t virt_mmap[VIRT_MMAP_SIZE] = {
 /*  [VIRT_DEBUG] =  */    {        0x0,            0x100,    MULTIBOOT_MEMORY_RESERVED },

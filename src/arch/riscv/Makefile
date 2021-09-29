@@ -8,3 +8,5 @@ obj-y += asm/ \
 	 trap.o \
 	 mm/ \
 	 paging.o \
+	 sbi.o \
+	 plic.o

@@ -1,13 +1,8 @@
-//
-// low-level driver routines for 16550a UART.
-//
-
-
 #include <nautilus/naut_types.h>
 #include <nautilus/spinlock.h>
-
-#include "riscv.h"
-#include "memlayout.h"
+#include <arch/riscv/sbi.h>
+#include <arch/riscv/riscv.h>
+#include <arch/riscv/memlayout.h>
 
 // the UART control registers are memory-mapped
 // at address UART0. this macro returns the
@@ -88,6 +83,8 @@ uart_init(void)
 void
 uart_putchar(int c)
 {
+    sbi_call(SBI_CONSOLE_PUTCHAR, c);
+    /*
     UART_LOCK_CONF;
 
     while(1){
@@ -104,6 +101,7 @@ uart_putchar(int c)
             return;
         }
     }
+    */
 }
 
 // alternate version of uartputc() that doesn't 

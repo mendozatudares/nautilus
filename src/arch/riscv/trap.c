@@ -1,50 +1,17 @@
 
 #include <nautilus/naut_types.h>
 #include <nautilus/spinlock.h>
-
-#include "riscv.h"
-#include "memlayout.h"
-
+#include <arch/riscv/riscv.h>
+#include <arch/riscv/memlayout.h>
+#include <arch/riscv/plic.h>
 
 void kernel_vec();
 
 // set up to take exceptions and traps while in the kernel.
 void
-trap_init_hart(void)
+trap_init(void)
 {
     w_stvec((uint64_t)kernel_vec);
-}
-
-void
-plic_init(void)
-{
-    // set desired IRQ priorities non-zero (otherwise disabled).
-    *(uint32_t*)(PLIC + UART0_IRQ*4) = 1;
-    *(uint32_t*)(PLIC + VIRTIO0_IRQ*4) = 1;
-}
-
-void
-plic_init_hart(void)
-{
-    // set uart's enable bit for this hart's S-mode.
-    *(uint32_t*)PLIC_SENABLE(0)= (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ);
-
-    // set this hart's S-mode priority threshold to 0.
-    *(uint32_t*)PLIC_SPRIORITY(0) = 0;
-}
-
-// ask the PLIC what interrupt we should serve.
-int
-plic_claim(void)
-{
-    return *(uint32_t*)PLIC_SCLAIM(0);
-}
-
-// tell the PLIC we've served this IRQ.
-void
-plic_complete(int irq)
-{
-    *(uint32_t*)PLIC_SCLAIM(0) = irq;
 }
 
 void printk(char *fmt, ...);

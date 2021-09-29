@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xstack.sandia.gov/hobbes
  *
  * Copyright (c) 2015, Kyle C. Hale <kh@u.northwestern.edu>
- * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org> 
+ * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
@@ -53,8 +53,8 @@
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
-#include "riscv.h"
-#include "memlayout.h"
+#include <arch/riscv/riscv.h>
+#include <arch/riscv/memlayout.h>
 
 extern uint8_t boot_mm_inactive;
 
@@ -81,10 +81,10 @@ extern uint8_t cpu_info_ready;
  * @align: power of 2 to align to
  *
  * returns the aligned address
- * 
+ *
  */
 static inline ulong_t
-align_addr (ulong_t addr, ulong_t align) 
+align_addr (ulong_t addr, ulong_t align)
 {
     ASSERT(!(align & (align-1)));
     return (~(align - 1)) & (addr + align);
@@ -189,7 +189,7 @@ nk_pf_handler (excp_entry_t * excp,
 
     cpu_id_t id = cpu_info_ready ? my_cpu_id() : 0xffffffff;
     uint64_t fault_addr = read_cr2();
-    
+
 #ifdef NAUT_CONFIG_HVM_HRT
     if (excp->error_code == UPCALL_MAGIC_ERROR) {
         return nautilus_hrt_upcall_handler(NULL, 0);
@@ -212,10 +212,10 @@ nk_pf_handler (excp_entry_t * excp,
 
     printk("\n+++ Page Fault +++\n"
             "RIP: %p    Fault Address: 0x%llx \n"
-            "Error Code: 0x%x    (core=%u)\n", 
-            (void*)excp->rip, 
-            fault_addr, 
-            excp->error_code, 
+            "Error Code: 0x%x    (core=%u)\n",
+            (void*)excp->rip,
+            fault_addr,
+            excp->error_code,
             id);
 
     struct nk_regs * r = (struct nk_regs*)((char*)excp - 128);
@@ -255,7 +255,7 @@ nk_gpf_handler (excp_entry_t * excp,
 
 static uint64_t default_satp;
 
-/* 
+/*
  * Identity map all of physical memory using
  * the largest pages possible
  */
@@ -275,9 +275,9 @@ kern_ident_map (struct nk_mem_info * mem, ulong_t mbd)
     }
     memset(pml, 0, PAGE_SIZE_4KB);
 
-    printk("Remapping phys mem [%p - %p] with %s pages\n", 
-            (void*)0, 
-            (void*)(last_pfn<<PAGE_SHIFT), 
+    printk("Remapping phys mem [%p - %p] with %s pages\n",
+            (void*)0,
+            (void*)(last_pfn<<PAGE_SHIFT),
             ps2str[lps]);
 
     construct_ident_map(pml, last_pfn<<PAGE_SHIFT);

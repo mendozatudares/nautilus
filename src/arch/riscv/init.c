@@ -33,18 +33,12 @@
 #include <nautilus/gdb-stub.h>
 #endif
 
-#include "init.h"
-#include "riscv.h"
+#include <arch/riscv/riscv.h>
+#include <arch/riscv/sbi.h>
+#include <arch/riscv/plic.h>
+#include <arch/riscv/memlayout.h>
 
-#define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
 
-struct nk_sched_config sched_cfg = {
-    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT*10000ULL, // convert percent to 10^-6 units
-    .sporadic_reservation =  NAUT_CONFIG_SPORADIC_RESERVATION*10000ULL, // ..
-    .aperiodic_reservation = NAUT_CONFIG_APERIODIC_RESERVATION*10000ULL, // ..
-    .aperiodic_quantum = QUANTUM_IN_NS,
-    .aperiodic_default_priority = QUANTUM_IN_NS,
-};
 
 static int
 sysinfo_init (struct sys_info * sys)
@@ -86,25 +80,25 @@ nk_get_num_cpus (void)
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-static struct multiboot_info riscv_fake_multiboot_info = {
-  .boot_loader = "RISCV with fakery",
-  .boot_cmd_line = "nautilus.bin",
-  .sec_hdr_start = 0,
-  .hrt_info = 0
-};
+void printk_init(void);
+void trap_init(void);
+void uart_init(void);
 
+void init (int hartid, void* fdt) {
 
-void
-init (unsigned long mbd,
-      unsigned long magic)
-{
+    // Get necessary information from SBI
+    sbi_early_init();
+
+    // M-Mode passes scratch struct through tp. Move it to sscratch
+    w_sscratch(r_tp());
+
     struct naut_info * naut = &nautilus_info;
-
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
-    // Initialize interrupts
-    // nk_int_init(&(naut->sys));
-    trap_init_hart();
+    // Write supervisor trap vector location
+    trap_init();
+
+    // Initialize platform level interrupt controller for this HART
     plic_init();
     plic_init_hart();
 
@@ -115,25 +109,25 @@ init (unsigned long mbd,
 
     printk(NAUT_WELCOME);
 
-    /* setup the temporary boot-time allocator */
-    /* this will detect memory from an array in memory, not multiboot or e820 */
-    mm_boot_init(mbd);
+    // /* setup the temporary boot-time allocator */
+    // /* this will detect memory from an array in memory, not multiboot or e820 */
+    // mm_boot_init(mbd);
 
-    naut->sys.mb_info = &riscv_fake_multiboot_info;
+    // naut->sys.mb_info = &riscv_fake_multiboot_info;
 
-    /* initialize boot CPU */
-    arch_early_init(naut);
+    // /* initialize boot CPU */
+    // arch_early_init(naut);
 
-    /* this will finish up the identity map */
-    nk_paging_init(&(naut->sys.mem), mbd);
+    // /* this will finish up the identity map */
+    // nk_paging_init(&(naut->sys.mem), mbd);
 
-    /* setup the main kernel memory allocator */
-    // nk_kmem_init();
+    // /* setup the main kernel memory allocator */
+    // // nk_kmem_init();
 
-    /* setup per-core area for BSP */
-    w_tp((uint64_t)naut->sys.cpus[0]);
+    // /* setup per-core area for BSP */
+    // w_tp((uint64_t)naut->sys.cpus[0]);
 
-    sti();
+    // sti();
 
     while(1);
 }

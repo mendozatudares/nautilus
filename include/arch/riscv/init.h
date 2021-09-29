@@ -2,6 +2,6 @@
 #define __INIT_H_
 
 
-void init(unsigned long mbd, unsigned long magic);
+void init(int hartid, void *fdt);
 
 #endif

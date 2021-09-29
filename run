@@ -1,11 +1,14 @@
 #!/bin/bash
-make clean
-
-if [ "$1" != "clean" ] ; then
-  ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
-
-  if [ "$1" == "qemu" ] ; then
-    echo 'Starting QEMU'
-    qemu-system-riscv64 -nographic -smp 1 -m 256M -machine virt -bios none -kernel nautilus.bin -gdb tcp::1234
-  fi
+if [[ "$*" == *"clean"* ]]; then
+  make clean
 fi
+
+
+ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
+
+if [[ "$*" == *"qemu"* ]]; then
+  echo 'Starting QEMU...'
+  printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' -
+  qemu-system-riscv64 -nographic -smp 1 -m 256M -machine virt -bios default -kernel nautilus.bin -gdb tcp::1234
+fi
+

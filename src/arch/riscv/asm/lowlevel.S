@@ -2,7 +2,6 @@
 # riscv64 bootloader for ChariotOS
 # Nick Wanninger
 # 29 December, 2020
-
 #include <asm/lowlevel.h>
 
 /* Macros for pointer/register sizes */
@@ -53,10 +52,14 @@
 
 GLOBAL(nautilus_entry)
 
-	csrr    a0, mhartid
+    # OpenSBI passes us the hartid through a0.
 
 	# starting stack at boot_stack_start
 	la      sp, boot_stack_start
+    li      t0, 2 * 4096 # 2 page stack
+    addi    t1, a0, 1 # t1 = mhartid + 1
+    mul     t0, t0, t1 # t1 = SIZE * (mhartid + 1)
+    add     sp, sp, t0 # sp = boot_stack_start + (SIZE * (mhartid + 1))
 
 	# zero out bss
 	lla     t0, _bssStart
@@ -65,82 +68,26 @@ GLOBAL(nautilus_entry)
 0:
 	REG_S   zero, (t0)
 	add     t0, t0, SZREG
-	blt     t1, t0, 0b  # if t1 is less than t0 
+	blt     t1, t0, 0b  # if t1 is less than t0
 1:
 	# allocate space for the scratch pad
 	addi    sp, sp, -32 * SZREG
+
+	# disable supervisor address translation and protection, since we identity map anyways
+    csrw    satp, 0
+    # flush tlb and whatnot
+    sfence.vma zero, zero
 
         # enable supervisor interrupts
 	li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
 	csrs    sie, t0
 
-	# set M-mode trap handler
-	la      t0, timer_vec
-	csrw    mtvec, t0
-
-	# setup trap delegation
-	li      t0, 0xffff
-	csrw    medeleg, t0
-	csrw    mideleg, t0
-
-	# set M-mode previous priv mode to S-mode for mret
-	li      t0, MSTATUS_MPP_MASK
-	csrc    mstatus, t0 # mstatus.MPP = 0
-	li      t0, MSTATUS_MPP_S
-	csrs    mstatus, t0 # mstatus.MPP = S
-
-	# set mepc so we can return to the right place
-	la      t0, init_ptr
-	REG_L   t0, 0(t0)
-	csrw    mepc, t0
-
-	csrw    mscratch, sp
-	move    a2, sp # a0 = hartid, a1 = device tree, a2 = hart id
-	# a1 is still the pointer to the device tree binary
-	# call    setup_mhart_state
-
-	# enable machine mode interrupts
-	li      t0, MSTATUS_MIE
-	csrs    mstatus, t0
-
-	# enable machine mode timer interrupts
-	li      t0, MIE_MTIE
-	csrs    mie, t0
-
-	mret
+    la      t0, init_ptr
+    REG_L   t0, 0(t0)
 
 	jr      t0
 
 .section .text
-
-GLOBAL(timer_vec)
-        # scratch[0,8,16] : register save area.
-        # scratch[24] : address of CLINT's MTIMECMP register.
-        # scratch[32] : desired interval between interrupts.
-
-        csrrw a0, mscratch, a0
-        sd a1, 0(a0)
-        sd a2, 8(a0)
-        sd a3, 16(a0)
-
-        # schedule the next timer interrupt
-        # by adding interval to mtimecmp.
-        ld a1, 24(a0) # CLINT_MTIMECMP(hart)
-        ld a2, 32(a0) # interval
-        ld a3, 0(a1)
-        add a3, a3, a2
-        sd a3, 0(a1)
-
-        # raise a supervisor software interrupt.
-	li a1, 2
-        csrw sip, a1
-
-        ld a3, 16(a0)
-        ld a2, 8(a0)
-        ld a1, 0(a0)
-        csrrw a0, mscratch, a0
-
-        mret
 
 .balign 8
 init_ptr: .quad init
@@ -246,7 +193,7 @@ ENTRY(context_switch)
 	# a0: address to place stack pointer
 	# a1: new stack pointer
 
-	addi sp, sp, -CTX_SIZE # 128 is a round up, as we only need 104. TODO: 
+	addi sp, sp, -CTX_SIZE # 128 is a round up, as we only need 104. TODO:
 
 	REG_S ra,  ROFF(0,  sp)
 	REG_S s0,  ROFF(1,  sp)

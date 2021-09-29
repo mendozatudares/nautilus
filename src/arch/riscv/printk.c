@@ -53,11 +53,10 @@ print_ptr(uint64_t x)
     uart_putchar(digits[x >> (sizeof(uint64_t) * 8 - 4)]);
 }
 
-void panic(char *s);
+void panic(const char *fmt, ...);
 
 // Print to the console. only understands %d, %x, %p, %s.
-void
-printk(char *fmt, ...)
+int printk(const char *fmt, ...)
 {
     PRINTK_LOCK_CONF;
     va_list ap;
@@ -106,13 +105,17 @@ printk(char *fmt, ...)
     }
 
     PRINTK_UNLOCK();
+    return 0;
 }
 
 void
-panic(char *s)
+panic(const char *fmt, ...)
 {
+    va_list args;
     printk("PANIC: ");
-    printk(s);
+    va_start(args, fmt);
+    printk(fmt, args);
+    va_end(args);
     printk("\n");
     for(;;);
 }
