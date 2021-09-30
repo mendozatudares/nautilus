@@ -42,29 +42,29 @@ ProtectionsInjector::ProtectionsInjector(
     Value *NonCanonical,
     Noelle *noelle,
     Function *ProtectionsMethod
-) : F(F), FetchSELambda(FetchSELambda), DFR(DFR), NonCanonical(NonCanonical), ProtectionsMethod(ProtectionsMethod), noelle(noelle) 
+    ) : F(F), FetchSELambda(FetchSELambda), DFR(DFR), NonCanonical(NonCanonical), ProtectionsMethod(ProtectionsMethod), noelle(noelle) 
 {
 
-    /*
-     * Set new state from NOELLE
-     */ 
-    this->AllLoops = noelle->getLoops();
-    auto LoopStructuresOfFunction = noelle->getLoopStructures(F);
-    this->LoopForestOfFunction = noelle->organizeLoopsInTheirNestingForest(*LoopStructuresOfFunction); 
-    this->BasicBlockToLoopMap = noelle->getInnermostLoopsThatContains(*(this->AllLoops));
-    this->FDG = noelle->getFunctionDependenceGraph(F);
+  /*
+   * Set new state from NOELLE
+   */ 
+  this->AllLoops = noelle->getLoops();
+  auto LoopStructuresOfFunction = noelle->getLoopStructures(F);
+  this->LoopForestOfFunction = noelle->organizeLoopsInTheirNestingForest(*LoopStructuresOfFunction); 
+  this->BasicBlockToLoopMap = noelle->getInnermostLoopsThatContains(*(this->AllLoops));
+  this->FDG = noelle->getFunctionDependenceGraph(F);
 
 
-    /*
-     * Perform initial analysis
-     */ 
-    _allocaOutsideFirstBBChecker();
+  /*
+   * Perform initial analysis
+   */ 
+  _allocaOutsideFirstBBChecker();
 
 
-    /*
-     * Fetch the first instruction of the entry basic block
-     */ 
-    First = F->getEntryBlock().getFirstNonPHI();
+  /*
+   * Fetch the first instruction of the entry basic block
+   */ 
+  First = F->getEntryBlock().getFirstNonPHI();
 }
 
 
@@ -73,29 +73,29 @@ ProtectionsInjector::ProtectionsInjector(
  */
 void ProtectionsInjector::Inject(void)
 {
-    /*
-     * Find all locations that guards need to be injected
-     */
-    _findInjectionLocations();
+  /*
+   * Find all locations that guards need to be injected
+   */
+  _findInjectionLocations();
 
 
-    /*
-     * Now do the inject
-     */ 
-    _doTheInject();
+  /*
+   * Now do the inject
+   */ 
+  _doTheInject();
 
 
-    /*
-     * Verify the transformations
-     */
-    // assert(verifyFunction(*F) != true);
-    if (verifyFunction(*F, &errs())) errs() << "VERIFICATION FAILED\n";
-    else errs() << "VERIFICATION WORKED\n";
+  /*
+   * Verify the transformations
+   */
+  // assert(verifyFunction(*F) != true);
+  if (verifyFunction(*F, &errs())) errs() << "VERIFICATION FAILED\n";
+  else errs() << "VERIFICATION WORKED\n";
 
-    errs() << *F << "\n";
+  errs() << *F << "\n";
 
 
-    return;
+  return;
 }
 
 
@@ -105,144 +105,144 @@ void ProtectionsInjector::Inject(void)
  */
 void ProtectionsInjector::visitInvokeInst(InvokeInst &I)
 {
-    /*
-     * Assumption for Nautilus --- no handling of invokes
-     */  
-    errs() << "Found a invoke instruction in function " << F->getName() << "\n"
-           << I << "\n";
+  /*
+   * Assumption for Nautilus --- no handling of invokes
+   */  
+  errs() << "Found a invoke instruction in function " << F->getName() << "\n"
+    << I << "\n";
 
-    abort();
+  abort();
 }
 
 
 void ProtectionsInjector::visitCallInst(CallInst &I)
 {
-    /*
-     * Fetch the callee of @I
-     */ 
-    Function *Callee = I.getCalledFunction();
+  /*
+   * Fetch the callee of @I
+   */ 
+  Function *Callee = I.getCalledFunction();
 
 
-    /*
-     * Debugging --- FIX 
-     * 
-     * NOTE --- We are instrumenting all indirect calls
-     * because we have no idea what to do about this
-     */ 
-    if (I.isIndirectCall()) 
-    {
-        errs() << "Found an indirect call! Instrumenting for now ... \n" 
-               << I << "\n";
-    }
+  /*
+   * Debugging --- FIX 
+   * 
+   * NOTE --- We are instrumenting all indirect calls
+   * because we have no idea what to do about this
+   */ 
+  if (I.isIndirectCall()) 
+  {
+    errs() << "Found an indirect call! Instrumenting for now ... \n" 
+      << I << "\n";
+  }
 
 
-    /*
-     * Debugging --- FIX
-     * 
-     * NOTE --- Ideally, only some intrinsics should be 
-     * instrumented (i.e. llvm.memcpy, etc.), and markers
-     * (i.e. llvm.lifetime, etc.) should be ignored. For
-     * now, we are instrumenting ALL intrinsics as a 
-     * conservative approach
-     * 
-     * APRIL, 2021 --- NOT HANDLING INTRINSICS --- REVISIT
-     * 
-     * Must ignore inline assembly
-     */  
-    if (false
-        || I.isInlineAsm() 
-        || (Callee && (Callee->isIntrinsic())))
-    {
-        errs() << "visitCallInst: Can't handle instrinsics or inline assembly\n";
-        return;
-    }
+  /*
+   * Debugging --- FIX
+   * 
+   * NOTE --- Ideally, only some intrinsics should be 
+   * instrumented (i.e. llvm.memcpy, etc.), and markers
+   * (i.e. llvm.lifetime, etc.) should be ignored. For
+   * now, we are instrumenting ALL intrinsics as a 
+   * conservative approach
+   * 
+   * APRIL, 2021 --- NOT HANDLING INTRINSICS --- REVISIT
+   * 
+   * Must ignore inline assembly
+   */  
+  if (false
+      || I.isInlineAsm() 
+      || (Callee && (Callee->isIntrinsic())))
+  {
+    errs() << "visitCallInst: Can't handle instrinsics or inline assembly\n";
+    return;
+  }
 
 
-    /*
-     * If the callee of @I has already been instrumented and 
-     * all stack locations are at the top of the entry basic
-     * block (@this->AllocaOutsideEntry), then nothing else 
-     * needs to be done --- return
-     */ 
-    if (true
-        && !AllocaOutsideEntry
-        && (Callee)
-        && (InstrumentedFunctions[Callee])) { 
-        return;
-    }
+  /*
+   * If the callee of @I has already been instrumented and 
+   * all stack locations are at the top of the entry basic
+   * block (@this->AllocaOutsideEntry), then nothing else 
+   * needs to be done --- return
+   */ 
+  if (true
+      && !AllocaOutsideEntry
+      && (Callee)
+      && (InstrumentedFunctions[Callee])) { 
+    return;
+  }
 
 
-    /*
-     * If not all stack locations are grouped at the 
-     * top of the entry basic block, we cannot hoist
-     * any guards of the call instruction --- instrument
-     * @I at @I
-     * 
-     * Otherwise, hoist the guard for @I to the first 
-     * instruction in the entry basic block
-     * 
-     * Finally, update statistics
-     */ 
-    if (AllocaOutsideEntry)
-    {
-        InjectionLocations[&I] = 
-            new GuardInfo(
-                &I,
-                NonCanonical, // TODO: change to the stack pointer location during the function call
-                true, /* IsWrite */
-                CARATNamesToMethods[CARAT_STACK_GUARD],
-                "protect", /* Metadata type */
-                "non.opt.call.guard" /* Metadata attached to injection */
+  /*
+   * If not all stack locations are grouped at the 
+   * top of the entry basic block, we cannot hoist
+   * any guards of the call instruction --- instrument
+   * @I at @I
+   * 
+   * Otherwise, hoist the guard for @I to the first 
+   * instruction in the entry basic block
+   * 
+   * Finally, update statistics
+   */ 
+  if (AllocaOutsideEntry)
+  {
+    InjectionLocations[&I] = 
+      new GuardInfo(
+          &I,
+          NonCanonical, // TODO: change to the stack pointer location during the function call
+          true, /* IsWrite */
+          CARATNamesToMethods[CARAT_STACK_GUARD],
+          "protect", /* Metadata type */
+          "non.opt.call.guard" /* Metadata attached to injection */
+          );
+
+    nonOptimizedGuard++;
+  }
+  else
+  {
+    if (!InjectedCallGuardAtFirst) {
+
+      InjectionLocations[&I] = 
+        new GuardInfo(
+            First,
+            NonCanonical, // TODO: change to the stack pointer location during the function call
+            true, /* IsWrite */ 
+            CARATNamesToMethods[CARAT_STACK_GUARD],
+            "protect", /* Metadata type */
+            "opt.call.guard" /* Metadata attached to injection */
             );
 
-        nonOptimizedGuard++;
-    }
-    else
-    {
-        if (!InjectedCallGuardAtFirst) {
+      InjectedCallGuardAtFirst |= true;
 
-            InjectionLocations[&I] = 
-                new GuardInfo(
-                    First,
-                    NonCanonical, // TODO: change to the stack pointer location during the function call
-                    true, /* IsWrite */ 
-                    CARATNamesToMethods[CARAT_STACK_GUARD],
-                    "protect", /* Metadata type */
-                    "opt.call.guard" /* Metadata attached to injection */
-                );
-
-            InjectedCallGuardAtFirst |= true;
-
-        }
-
-
-        callGuardOpt++;
     }
 
 
-    /*
-     * Mark the callee as handled
-     */ 
-    InstrumentedFunctions[Callee] = true;
+    callGuardOpt++;
+  }
 
 
-    return;
+  /*
+   * Mark the callee as handled
+   */ 
+  InstrumentedFunctions[Callee] = true;
+
+
+  return;
 }
 
 
 void ProtectionsInjector::visitStoreInst(StoreInst &I)
 {
-    bool IsWrite = true;
-    _invokeLambda(&I, IsWrite);
-    return;
+  bool IsWrite = true;
+  _invokeLambda(&I, IsWrite);
+  return;
 }
 
 
 void ProtectionsInjector::visitLoadInst(LoadInst &I)
 {
-    bool IsWrite = false;
-    _invokeLambda(&I, IsWrite);
-    return;
+  bool IsWrite = false;
+  _invokeLambda(&I, IsWrite);
+  return;
 }
 
 
@@ -251,138 +251,138 @@ void ProtectionsInjector::visitLoadInst(LoadInst &I)
  */
 void ProtectionsInjector::_findInjectionLocations(void)
 {
-    /*
-     * Invoke the visitors to fill out the InjectionLocations map
-     */ 
-    this->visit(F);
+  /*
+   * Invoke the visitors to fill out the InjectionLocations map
+   */ 
+  this->visit(F);
 
 
-    /*
-     * Debugging
-     */ 
-    _printGuards();
+  /*
+   * Debugging
+   */ 
+  _printGuards();
 
 
-    return;
+  return;
 }
 
 
 std::vector<Value *> ProtectionsInjector::_buildStackGuardArgs(GuardInfo *GI)
 {
-    /*
-     * TOP --- Build the function arguments for the call injection
-     * for the method "nk_carat_guard_callee_stack"
-     */
+  /*
+   * TOP --- Build the function arguments for the call injection
+   * for the method "nk_carat_guard_callee_stack"
+   */
 
-    /*
-     * Calculate the stack frame size to check --- set as a "uint64_t"
-     *
-     * TODO --- Actually calculate this, set to 512 for now
-     */
-    const uint64_t StackFrameSize = 512;
-    llvm::IRBuilder<> Builder{F->getContext()};
-    std::vector<Value *> CallArgs = {
-        Builder.getInt64(StackFrameSize)
-    };
+  /*
+   * Calculate the stack frame size to check --- set as a "uint64_t"
+   *
+   * TODO --- Actually calculate this, set to 512 for now
+   */
+  const uint64_t StackFrameSize = 512;
+  llvm::IRBuilder<> Builder{F->getContext()};
+  std::vector<Value *> CallArgs = {
+    Builder.getInt64(StackFrameSize)
+  };
 
 
-    return CallArgs;
+  return CallArgs;
 }
 
 
 std::vector<Value *> ProtectionsInjector::_buildGenericProtectionArgs(GuardInfo *GI)
 {
-    /*
-     * TOP --- Build the function arguments for the call injection
-     * for the method "nk_carat_guard_address"
-     */
+  /*
+   * TOP --- Build the function arguments for the call injection
+   * for the method "nk_carat_guard_address"
+   */
 
-    /*
-     * Set up builder
-     */
+  /*
+   * Set up builder
+   */
 
-    llvm::IRBuilder<> Builder = 
-        Utils::GetBuilder(
-            GI->InjectionLocation->getFunction(),
-            GI->InjectionLocation
+  llvm::IRBuilder<> Builder = 
+    Utils::GetBuilder(
+        GI->InjectionLocation->getFunction(),
+        GI->InjectionLocation
         );
 
 
-    /*
-     * Cast @GI->PointerToGuard as a void pointer for instrumentation
-     */
-    Value *VoidPointerToGuard = 
-        Builder.CreatePointerCast(
-            GI->PointerToGuard,
-            Builder.getInt8PtrTy()
+  /*
+   * Cast @GI->PointerToGuard as a void pointer for instrumentation
+   */
+  Value *VoidPointerToGuard = 
+    Builder.CreatePointerCast(
+        GI->PointerToGuard,
+        Builder.getInt8PtrTy()
         );
 
-    errs () << "THE INJECTION: " << *VoidPointerToGuard << "\n";
+  errs () << "THE INJECTION: " << *VoidPointerToGuard << "\n";
 
 
-    /*
-     * Build the call args
-     */
-    std::vector<Value *> CallArgs = {
-        VoidPointerToGuard,
-        Builder.getInt32(GI->IsWrite)
-    };
+  /*
+   * Build the call args
+   */
+  std::vector<Value *> CallArgs = {
+    VoidPointerToGuard,
+    Builder.getInt32(GI->IsWrite)
+  };
 
 
-    return CallArgs;
+  return CallArgs;
 }
 
 
 void ProtectionsInjector::_doTheInject(void)
 {
+  /*
+   * Do the inject
+   */ 
+  for (auto const &[InstToGuard, GI] : InjectionLocations) 
+  {
     /*
-     * Do the inject
+     * Set up builder
+     */
+    llvm::IRBuilder<> Builder = 
+      Utils::GetBuilder(
+          GI->InjectionLocation->getFunction(),
+          GI->InjectionLocation
+          );
+
+
+    /*
+     * Set up arguments based on the "GI->FunctionToInject" field
      */ 
-    for (auto const &[InstToGuard, GI] : InjectionLocations) 
+    Function *FTI = GI->FunctionToInject;
+    std::vector<Value *> CallArgs = 
+      (FTI == CARATNamesToMethods[CARAT_STACK_GUARD]) ?
+      (_buildStackGuardArgs(GI)) :
+      (_buildGenericProtectionArgs(GI));
+
+
+    /*
+     * Inject the call instruction(s) based on the selected
+     * args and set specialized metadata for each call
+     */
+    for (auto N = 0 ; N < GI->NumInjections ; N++)
     {
-        /*
-         * Set up builder
-         */
-        llvm::IRBuilder<> Builder = 
-            Utils::GetBuilder(
-                GI->InjectionLocation->getFunction(),
-                GI->InjectionLocation
-            );
+      CallInst *Instrumentation = 
+        Builder.CreateCall(
+            FTI, 
+            ArrayRef<Value *>(CallArgs)
+            );  
 
-
-        /*
-         * Set up arguments based on the "GI->FunctionToInject" field
-         */ 
-        Function *FTI = GI->FunctionToInject;
-        std::vector<Value *> CallArgs = 
-            (FTI == CARATNamesToMethods[CARAT_STACK_GUARD]) ?
-            (_buildStackGuardArgs(GI)) :
-            (_buildGenericProtectionArgs(GI));
-
-
-        /*
-         * Inject the call instruction(s) based on the selected
-         * args and set specialized metadata for each call
-         */
-        for (auto N = 0 ; N < GI->NumInjections ; N++)
-        {
-            CallInst *Instrumentation = 
-                Builder.CreateCall(
-                    FTI, 
-                    ArrayRef<Value *>(CallArgs)
-                );  
-
-            Utils::SetInstrumentationMetadata(
-                Instrumentation,
-                GI->MDTypeString,
-                GI->MDLiteral
-            );
-        }
-
+      Utils::SetInstrumentationMetadata(
+          Instrumentation,
+          GI->MDTypeString,
+          GI->MDLiteral
+          );
     }
 
+  }
 
-    return;
+
+  return;
 }
 
 
@@ -391,204 +391,241 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
     Instruction *I, 
     Value *PointerOfMemoryInstruction, 
     bool IsWrite
-)
+    )
 {
+  /*
+   * Debugging
+   */
+  errs() << "_optimizeForLoopInvariance\n";
+  errs() << "\t" << *PointerOfMemoryInstruction << "\n";
+
+
+  /*
+   * If @NestedLoop is not valid, we cannot optimize for loop invariance
+   */
+  if (!NestedLoop) { 
+    errs() << "\tliCondition 0: NestedLoop not valid!\n";
+    return false;
+  }
+
+
+  /*
+   * Fetch @PointerOfMemoryInstruction as an instruction
+   */
+  Instruction *PointerAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
+  // Instruction *JustInCasePointerAsInst = nullptr;
+  // Value *JustInCasePointer = nullptr;
+  // if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerAsInst)) {
+  //     Value *TheOperand = BC->getOperand(0);
+  //     JustInCasePointer = TheOperand;
+  //     if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
+  //         JustInCasePointerAsInst = TheOperandAsInst;
+  //     }
+  // }
+
+
+  /*
+   * If @PointerOfMemoryInstruction is an argument of @this->F, it's 
+   * able to be hoisted to the outermost loop of the loop nest
+   */
+  if (false
+      || isa<Argument>(PointerOfMemoryInstruction)
+      // || (JustInCasePointer && isa<Argument>(JustInCasePointer))
+      || !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst))) 
+    // || !(noelle->getInnermostLoopThatContains(*AllLoops, JustInCasePointerAsInst)))
+  {
     /*
-     * Debugging
+     * For this instance, the injection location will be the preheader of the
+     * outermost loop of the loop nest to which @I belongs. Fetch this basic block
+     * using the StayConnectedNestedLoopForest
      */
-    errs() << "_optimizeForLoopInvariance\n";
-    errs() << "\t" << *PointerOfMemoryInstruction << "\n";
+    LoopStructure *NestedLoopStructure = NestedLoop->getLoopStructure();
+    StayConnectedNestedLoopForestNode *Iterator = LoopForestOfFunction->getNode(NestedLoopStructure);
+    StayConnectedNestedLoopForestNode *PrevIterator = nullptr;
+    while (Iterator) {
+      PrevIterator = Iterator;
+      Iterator = Iterator->getParent();
+    }
+
+    assert(PrevIterator != nullptr); /* Sanity check */
+
+    LoopStructure *OutermostLS = PrevIterator->getLoop();
+    BasicBlock *PreHeader = OutermostLS->getPreHeader();
+    Instruction *InjectionLocation = PreHeader->getTerminator();
 
 
     /*
-     * If @NestedLoop is not valid, we cannot optimize for loop invariance
+     * Set up the guard
      */
-    if (!NestedLoop) { 
-        errs() << "\tliCondition 0: NestedLoop not valid!\n";
-        return false;
+    errs() << "\tHoisted with invariants using arg/li optimization!\n";
+    InjectionLocations[I] = 
+      new GuardInfo(
+          InjectionLocation,
+          PointerOfMemoryInstruction, 
+          IsWrite,
+          CARATNamesToMethods[CARAT_PROTECT],
+          "protect", /* Metadata type */
+          "loop.ivt.guard" /* Metadata attached to injection */
+          );
+
+    loopInvariantGuard++;
+
+    return true;
+
+  } else {
+    errs() << "\tCannot use arg/li optimization\n";
+    errs() << "\t\tisa<Argument>(PointerOfMemoryInstruction): " << isa<Argument>(PointerOfMemoryInstruction) << "\n";
+    errs() << "\t\t!(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst)): " << !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst)) << "\n";
+  }
+
+
+  /*
+   * Setup --- fetch the loop structure for @NestedLoop
+   */
+  bool Hoistable = false;
+  LoopDependenceInfo *NextLoop = NestedLoop;
+  LoopStructure *NextLoopStructure = NextLoop->getLoopStructure();
+  Instruction *InjectionLocation = nullptr;
+
+
+  /*
+   * Walk up the loop nest until @PointerOfMemoryInstruction to determine 
+   * the outermost loop of which PointerOfMemoryInstruction is a loop 
+   * invariant. 
+   */
+  while (NextLoop) 
+  {
+    errs() << "\t\tThe loop: " << "\n"; 
+    NextLoopStructure->print(errs());
+
+    /*
+     * If @PointerOfMemoryInstruction is defined within the 
+     * next loop, it can't be hoisted out of the loop without
+     * a proper LICM --- FIX. This is the farthest we can hoist.
+     * 
+     * HACK, TODO
+     */
+    bool IsInLoop = false;
+    if (PointerAsInst) {
+      errs() << *(PointerAsInst->getParent()) << "\n";
+      if (NextLoopStructure->isIncluded(PointerAsInst)) {
+        IsInLoop = true;
+      }
     }
 
 
+
     /*
-     * Fetch @PointerOfMemoryInstruction as an instruction
+     * Fetch the invariant manager of the next loop 
      */
-    Instruction *PointerAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
-    // Instruction *JustInCasePointerAsInst = nullptr;
-    // Value *JustInCasePointer = nullptr;
-    // if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerAsInst)) {
-    //     Value *TheOperand = BC->getOperand(0);
-    //     JustInCasePointer = TheOperand;
-    //     if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
-    //         JustInCasePointerAsInst = TheOperandAsInst;
-    //     }
-    // }
+    InvariantManager *Manager = NextLoop->getInvariantManager();
 
 
     /*
-     * If @PointerOfMemoryInstruction is an argument of @this->F, it's 
-     * able to be hoisted to the outermost loop of the loop nest
-     */
+     * If @PointerOfMemoryInstruction is not a loop invariant
+     * of this loop, we cannot iterate anymore --- break and 
+     * determine if the guard can actually be hoisted
+     * 
+     * Essentially, we continue if we can hoist
+     */ 
     if (false
-        || isa<Argument>(PointerOfMemoryInstruction)
-        // || (JustInCasePointer && isa<Argument>(JustInCasePointer))
-        || !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst))) 
-        // || !(noelle->getInnermostLoopThatContains(*AllLoops, JustInCasePointerAsInst)))
-    {
-        /*
-         * For this instance, the injection location will be the preheader of the
-         * outermost loop of the loop nest to which @I belongs. Fetch this basic block
-         * using the StayConnectedNestedLoopForest
-         */
-        LoopStructure *NestedLoopStructure = NestedLoop->getLoopStructure();
-        StayConnectedNestedLoopForestNode *Iterator = LoopForestOfFunction->getNode(NestedLoopStructure);
-        StayConnectedNestedLoopForestNode *PrevIterator = nullptr;
-        while (Iterator) {
-            PrevIterator = Iterator;
-            Iterator = Iterator->getParent();
-        }
-
-        assert(PrevIterator != nullptr); /* Sanity check */
-
-        LoopStructure *OutermostLS = PrevIterator->getLoop();
-        BasicBlock *PreHeader = OutermostLS->getPreHeader();
-        Instruction *InjectionLocation = PreHeader->getTerminator();
-
-        
-        /*
-         * Set up the guard
-         */
-        errs() << "\tHoisted with invariants using arg/li optimization!\n";
-        InjectionLocations[I] = 
-            new GuardInfo(
-                InjectionLocation,
-                PointerOfMemoryInstruction, 
-                IsWrite,
-                CARATNamesToMethods[CARAT_PROTECT],
-                "protect", /* Metadata type */
-                "loop.ivt.guard" /* Metadata attached to injection */
-            );
-
-        loopInvariantGuard++;
-
-        return true;
-
-    } else {
-        errs() << "\tCannot use arg/li optimization\n";
-        errs() << "\t\tisa<Argument>(PointerOfMemoryInstruction): " << isa<Argument>(PointerOfMemoryInstruction) << "\n";
-        errs() << "\t\t!(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst)): " << !(noelle->getInnermostLoopThatContains(*AllLoops, PointerAsInst)) << "\n";
+        || !(Manager->isLoopInvariant(PointerOfMemoryInstruction))
+        || (IsInLoop)) {
+      errs() << "\t\tPointerOfMemoryInstruction not a loop invariant of NextLoop!\n";
+      errs() << "\t\t\t!(Manager->isLoopInvariant(PointerOfMemoryInstruction): " 
+        << std::to_string(!(Manager->isLoopInvariant(PointerOfMemoryInstruction))) << "\n";
+      errs() << "\t\t\tIsInLoop: " << IsInLoop << "\n";
+      break;
     }
 
 
     /*
-     * Setup --- fetch the loop structure for @NestedLoop
+     * We know we're dealining with a loop invariant --- set the 
+     * injection location to this loop's preheader terminator and 
+     * continue to iterate.
      */
-    bool Hoistable = false;
-    LoopDependenceInfo *NextLoop = NestedLoop;
-    LoopStructure *NextLoopStructure = NextLoop->getLoopStructure();
-    Instruction *InjectionLocation = nullptr;
+    BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
+    InjectionLocation = PreHeader->getTerminator();
 
 
     /*
-     * Walk up the loop nest until @PointerOfMemoryInstruction to determine 
-     * the outermost loop of which PointerOfMemoryInstruction is a loop 
-     * invariant. 
+     * Set state for the next iteration up the loop nest
      */
-    while (NextLoop) 
-    {
-        errs() << "\t\tThe loop: " << "\n"; 
-        NextLoopStructure->print(errs());
+    LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
+    assert (ParentLoop != NextLoop);
 
-        /*
-         * If @PointerOfMemoryInstruction is defined within the 
-         * next loop, it can't be hoisted out of the loop without
-         * a proper LICM --- FIX. This is the farthest we can hoist.
-         * 
-         * HACK, TODO
-         */
-        bool IsInLoop = false;
-        if (PointerAsInst) {
-            errs() << *(PointerAsInst->getParent()) << "\n";
-            if (NextLoopStructure->isIncluded(PointerAsInst)) {
-                IsInLoop = true;
-            }
-        }
+    NextLoop = ParentLoop;
+    NextLoopStructure = 
+      (NextLoop) ?
+      (NextLoop->getLoopStructure()) :
+      (nullptr) ;
+
+    Hoistable |= true;
+  }
 
 
+  /*
+   * If we can truly hoist the guard --- mark the 
+   * injection location, update statistics, and return
+   */
+  if (Hoistable)
+  {
+    errs() << "Hoisted with invariants!\n";
+    errs() << "PointerOfMemoryInstruction again: " << *PointerOfMemoryInstruction << "\n";
+    errs() << "InjectionLocation again: " << *InjectionLocation << "\n";
+    errs() << "I again: " << *I << "\n";
+    InjectionLocations[I] = 
+      new GuardInfo(
+          InjectionLocation,
+          PointerOfMemoryInstruction, 
+          IsWrite,
+          CARATNamesToMethods[CARAT_PROTECT],
+          "protect", /* Metadata type */
+          "loop.ivt.guard" /* Metadata attached to injection */
+          );
 
-        /*
-         * Fetch the invariant manager of the next loop 
-         */
-        InvariantManager *Manager = NextLoop->getInvariantManager();
-
-
-        /*
-         * If @PointerOfMemoryInstruction is not a loop invariant
-         * of this loop, we cannot iterate anymore --- break and 
-         * determine if the guard can actually be hoisted
-         * 
-         * Essentially, we continue if we can hoist
-         */ 
-        if (false
-            || !(Manager->isLoopInvariant(PointerOfMemoryInstruction))
-            || (IsInLoop)) {
-            errs() << "\t\tPointerOfMemoryInstruction not a loop invariant of NextLoop!\n";
-            errs() << "\t\t\t!(Manager->isLoopInvariant(PointerOfMemoryInstruction): " 
-                   << std::to_string(!(Manager->isLoopInvariant(PointerOfMemoryInstruction))) << "\n";
-            errs() << "\t\t\tIsInLoop: " << IsInLoop << "\n";
-            break;
-        }
-
-
-        /*
-         * We know we're dealining with a loop invariant --- set the 
-         * injection location to this loop's preheader terminator and 
-         * continue to iterate.
-         */
-        BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
-        InjectionLocation = PreHeader->getTerminator();
+    loopInvariantGuard++;
+  }
 
 
-        /*
-         * Set state for the next iteration up the loop nest
-         */
-        LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
-        assert (ParentLoop != NextLoop);
+  return Hoistable;
+}
 
-        NextLoop = ParentLoop;
-        NextLoopStructure = 
-            (NextLoop) ?
-            (NextLoop->getLoopStructure()) :
-            (nullptr) ;
 
-        Hoistable |= true;
+
+//This function will take a SCEV and recursively go through it to determine if it is a valid scev for karat
+//Valid in karat means that it is a SCEVNAry that contains only SCEVAddRecExpr, SCEVAddExpr, or SCEVMulExpr as its base SCEV types 
+bool _isValidSCEV(const llvm::SCEV* scevPtr){
+  auto NAry = dyn_cast<SCEVNAryExpr>(scevPtr);
+  if(!NAry){
+    return false;
+  }
+  for(auto i = 0; i < NAry->getNumOperands(); i++){
+    auto NAryOp = NAry->getOperand(i);
+    errs() << "Considering NAry Op: " << *NAryOp << "...";
+    auto AR = dyn_cast<SCEVAddRecExpr>(NAryOp);
+    auto AE = dyn_cast<SCEVAddExpr>(NAryOp);
+    auto ME = dyn_cast<SCEVMulExpr>(NAryOp);
+    auto CE = dyn_cast<SCEVConstant>(NAryOp);
+    auto MM = dyn_cast<SCEVMinMaxExpr>(NAryOp);
+    if(MM){
+      errs() << "NOT Valid (MinMax)!\n";
+      return false;
     }
-
-
-    /*
-     * If we can truly hoist the guard --- mark the 
-     * injection location, update statistics, and return
-     */
-    if (Hoistable)
-    {
-        errs() << "Hoisted with invariants!\n";
-        errs() << "PointerOfMemoryInstruction again: " << *PointerOfMemoryInstruction << "\n";
-        errs() << "InjectionLocation again: " << *InjectionLocation << "\n";
-        errs() << "I again: " << *I << "\n";
-        InjectionLocations[I] = 
-            new GuardInfo(
-                InjectionLocation,
-                PointerOfMemoryInstruction, 
-                IsWrite,
-                CARATNamesToMethods[CARAT_PROTECT],
-                "protect", /* Metadata type */
-                "loop.ivt.guard" /* Metadata attached to injection */
-            );
-
-        loopInvariantGuard++;
+    if(false ||
+        AR ||
+        AE ||
+        ME ||
+        CE ||
+        _isValidSCEV(NAryOp)){
+      errs() << "Valid!\n";
+      continue;
     }
+    errs() << "NOT Valid!\n";
+    return false;
+  }
 
-
-    return Hoistable;
+  return true;
 }
 
 
@@ -597,91 +634,102 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     Instruction *I, 
     Value *PointerOfMemoryInstruction, 
     bool IsWrite
-)
+    )
 {
-    // return false;
-    errs() << "_optimizeForSCEVAnalysis\n";
-    errs() << "\tI: " << *I << "\n";
-    errs() << "\tPointerOfMemoryInstruction: " << *PointerOfMemoryInstruction << "\n";
+  // return false;
+  errs() << "_optimizeForSCEVAnalysis\n";
+  errs() << "\tI: " << *I << "\n";
+  errs() << "\tPointerOfMemoryInstruction: " << *PointerOfMemoryInstruction << "\n";
 
 
-    /*
-     * If @NestedLoop is not valid, we cannot optimize for loop invariance
-     */
-    if (!NestedLoop) { 
-        errs() << "\tscevCondition 0: NestedLoop not valid!\n";
-        return false; 
+  /*
+   * If @NestedLoop is not valid, we cannot optimize for loop invariance
+   */
+  if (!NestedLoop) { 
+    errs() << "\tscevCondition 0: NestedLoop not valid!\n";
+    return false; 
+  }
+
+
+
+  auto SE = FetchSELambda(F);
+  LoopStructure *NextLoopStructure = nullptr;
+  BasicBlock *PreHeader = nullptr;
+  Instruction *InjectionLocation = nullptr;
+  auto scevPtrComputationOfI = SE->getSCEV(PointerOfMemoryInstruction);
+  if (scevPtrComputationOfI){
+    errs() << "THE SCEV: " << *scevPtrComputationOfI << " of type " << scevPtrComputationOfI->getSCEVType() << "\n";
+  }
+  else{
+    errs() << "THE SCEV does not exist\n";
+  }
+  //auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputationOfI);
+  if (!(_isValidSCEV(scevPtrComputationOfI))){
+    errs() << "SCEV is not currently analyzable :(\n";
+    return false;
+  }
+
+  //This might be setting us up for failure, it seems like it is getting outermost loop without testing inner loops for scalar evolution
+  auto NextLoop = NestedLoop;
+  while (NextLoop)
+  {
+    NextLoopStructure = NextLoop->getLoopStructure();
+    PreHeader = NextLoopStructure->getPreHeader();
+    InjectionLocation = PreHeader->getTerminator();
+
+    LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
+    assert (ParentLoop != NextLoop);
+
+    NextLoop = ParentLoop;
+  }
+
+
+  Value *StartAddress = PointerOfMemoryInstruction;
+  while(1){
+    Instruction* newStart = dyn_cast<Instruction>(StartAddress);
+    //Check if we are an inst, if not we are done
+    if(!newStart){
+      errs() << *StartAddress << "is NOT an Instruction\n";
+      break;
+    }
+    //If we are out of the loop, we can be done, TODO improve this once we recursively pull out of loop
+    if (!(NextLoopStructure->isIncluded(newStart))) {
+      // if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
+      StartAddress = newStart;
+      errs() << *StartAddress << "is outside of the loop(s)\n";
+      break;
     }
 
-
-
-    auto SE = FetchSELambda(F);
-    LoopStructure *NextLoopStructure = nullptr;
-    BasicBlock *PreHeader = nullptr;
-    Instruction *InjectionLocation = nullptr;
-    auto scevPtrComputationOfI = SE->getSCEV(PointerOfMemoryInstruction);
-    if (scevPtrComputationOfI) errs() << "THE SCEV: " << *scevPtrComputationOfI << "\n";
-    auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputationOfI);
-    if (!AR) return false;
-
-    auto NextLoop = NestedLoop;
-    while (NextLoop)
-    {
-        NextLoopStructure = NextLoop->getLoopStructure();
-        PreHeader = NextLoopStructure->getPreHeader();
-        InjectionLocation = PreHeader->getTerminator();
-
-        LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
-        assert (ParentLoop != NextLoop);
-
-        NextLoop = ParentLoop;
+    if (CastInst *BC = dyn_cast<CastInst>(newStart)) {
+      errs() << "\tFound a cast, grabbing ptr\n";
+      StartAddress = BC->getOperand(0); 
     }
 
-
-    Value *StartAddress = PointerOfMemoryInstruction;
-    while(1){
-        Instruction* newStart = dyn_cast<Instruction>(StartAddress);
-        //Check if we are an inst, if not we are done
-        if(!newStart){
-            break;
-        }
-        //If we are out of the loop, we can be done, TODO improve this once we recursively pull out of loop
-        if (!(NextLoopStructure->isIncluded(newStart))) {
-        // if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
-            StartAddress = newStart;
-            break;
-        }
-
-        if (CastInst *BC = dyn_cast<CastInst>(newStart)) {
-            errs() << "\tFound a cast, grabbing ptr\n";
-            StartAddress = BC->getOperand(0); 
-        }
-        
-        else if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
-            errs() << "\tFound a load, grabbing ptr\n";
-            StartAddress = BC->getOperand(0);
-        }
-        else if(GetElementPtrInst* BC = dyn_cast<GetElementPtrInst>(newStart)){
-            errs() << "\tFound a GEP, grabbing pointer\n";
-            StartAddress = BC->getPointerOperand();
-        }
-        else{
-            errs() << "Can't handle it right now... abort: " << *newStart << "\n";
-            return false;
-        }
+    else if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
+      errs() << "\tFound a load, grabbing ptr\n";
+      StartAddress = BC->getOperand(0);
+    }
+    else if(GetElementPtrInst* BC = dyn_cast<GetElementPtrInst>(newStart)){
+      errs() << "\tFound a GEP, grabbing pointer\n";
+      StartAddress = BC->getPointerOperand();
+    }
+    else{
+      errs() << "Can't handle it right now... abort: " << *newStart << "\n";
+      return false;
+    }
     }
 
 
     InjectionLocations[I] = 
-        new GuardInfo(
-            InjectionLocation,
-            StartAddress,
-            IsWrite,
-            CARATNamesToMethods[CARAT_PROTECT],
-            "protect", /* Metadata type */
-            "iv.scev.guard.start", /* Metadata attached to injection */
-            1
-        );
+      new GuardInfo(
+          InjectionLocation,
+          StartAddress,
+          IsWrite,
+          CARATNamesToMethods[CARAT_PROTECT],
+          "protect", /* Metadata type */
+          "iv.scev.guard.start", /* Metadata attached to injection */
+          1
+          );
 
     return true;
 
@@ -693,8 +741,8 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
      */
     Instruction *PointerOfMemoryInstructionAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
     if (!PointerOfMemoryInstructionAsInst) { 
-        errs() << "\tscevCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
-        return false; 
+      errs() << "\tscevCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
+      return false; 
     }
 
 
@@ -703,24 +751,24 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     errs() << "\tRecursing the PointerOfMemoryInstructionAsInst\n";
     //Check iof we are dealing with a bitcast, if we are we will use that value
     if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerOfMemoryInstructionAsInst)) {
-        errs() << "\tFound a bitcast, grabbing ptr\n";
-        Value *TheOperand = BC->getOperand(0);
-        errs() << "\tptr is: "<< *TheOperand <<"\n";
-        if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
-            PointerOfMemoryInstructionAsInst = TheOperandAsInst;
-        }
+      errs() << "\tFound a bitcast, grabbing ptr\n";
+      Value *TheOperand = BC->getOperand(0);
+      errs() << "\tptr is: "<< *TheOperand <<"\n";
+      if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
+        PointerOfMemoryInstructionAsInst = TheOperandAsInst;
+      }
     }
-        
-    
+
+
 
     // BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
     GetElementPtrInst *PointerOfMemoryInstructionAsGEP = dyn_cast<GetElementPtrInst>(PointerOfMemoryInstructionAsInst);
     if (true
         // && !PointerOfMemoryInstructionAsBinOp
         && !PointerOfMemoryInstructionAsGEP) {
-        errs() << "\tscevCondition: PointerOfMemoryInstruction is not defined as a binary operation or GEP!\n";
-        errs() << "\t\tThe instruction is instead: " << *PointerOfMemoryInstructionAsInst << "\n";
-        return false;
+      errs() << "\tscevCondition: PointerOfMemoryInstruction is not defined as a binary operation or GEP!\n";
+      errs() << "\t\tThe instruction is instead: " << *PointerOfMemoryInstructionAsInst << "\n";
+      return false;
     }
 
 
@@ -735,13 +783,13 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     //      We need to recursively go out from the nest to see if it is invariant up to the outermost loop.
     //      This might mean we should make a while loop starting here until it is no longer hoistable.
     //      Perhaps we should start with the outermost loop and work in?
-    
+
     auto FetchTheDamnThang = [](Value *V) -> Value * {
-        Value *TheDamnThang = V;
-        if (auto *Cast = dyn_cast<CastInst>(V)) {
-            TheDamnThang = Cast->getOperand(0);
-        }
-        return TheDamnThang;
+      Value *TheDamnThang = V;
+      if (auto *Cast = dyn_cast<CastInst>(V)) {
+        TheDamnThang = Cast->getOperand(0);
+      }
+      return TheDamnThang;
     };
 
 
@@ -755,92 +803,92 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     std::vector<Value *> OperandsToAnalyze;
     for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
 
-        Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
+      Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
 
-        if (Operand == StartAddress) continue;
+      if (Operand == StartAddress) continue;
 
-        if (auto *BO = dyn_cast<BinaryOperator>(Operand)) {
-            OperandsToAnalyze.push_back(FetchTheDamnThang(BO->getOperand(0)));
-            OperandsToAnalyze.push_back(FetchTheDamnThang(BO->getOperand(1)));
-            continue;
+      if (auto *BO = dyn_cast<BinaryOperator>(Operand)) {
+        OperandsToAnalyze.push_back(FetchTheDamnThang(BO->getOperand(0)));
+        OperandsToAnalyze.push_back(FetchTheDamnThang(BO->getOperand(1)));
+        continue;
+      }
+
+      if (isa<CastInst>(Operand)) {
+        OperandsToAnalyze.push_back(FetchTheDamnThang(Operand));
+        continue;
+      }
+
+      if (LoadInst *Load = dyn_cast<LoadInst>(Operand)) {
+        OperandsToAnalyze.push_back(FetchTheDamnThang(Load->getPointerOperand()));
+        continue;
+      }
+
+      if (auto *PHI = dyn_cast<PHINode>(Operand)) {
+        for (auto j = 0 ; j < PHI->getNumIncomingValues() ; j++) {
+          OperandsToAnalyze.push_back(FetchTheDamnThang(PHI->getIncomingValue(j)));
         }
+        continue;  
+      }
 
-        if (isa<CastInst>(Operand)) {
-            OperandsToAnalyze.push_back(FetchTheDamnThang(Operand));
-            continue;
-        }
+      OperandsToAnalyze.push_back(Operand);
 
-        if (LoadInst *Load = dyn_cast<LoadInst>(Operand)) {
-            OperandsToAnalyze.push_back(FetchTheDamnThang(Load->getPointerOperand()));
-            continue;
-        }
-
-        if (auto *PHI = dyn_cast<PHINode>(Operand)) {
-            for (auto j = 0 ; j < PHI->getNumIncomingValues() ; j++) {
-                OperandsToAnalyze.push_back(FetchTheDamnThang(PHI->getIncomingValue(j)));
-            }
-            continue;  
-        }
-
-        OperandsToAnalyze.push_back(Operand);
-        
     }
 
 
     while (NextLoop)
     {
-        InvariantManager *Manager = NextLoop->getInvariantManager();
+      InvariantManager *Manager = NextLoop->getInvariantManager();
 
-        if (!(Manager->isLoopInvariant(StartAddress))) {
-            errs() << "\tscevCondition: Start address not li\n";
-            break;
+      if (!(Manager->isLoopInvariant(StartAddress))) {
+        errs() << "\tscevCondition: Start address not li\n";
+        break;
+      }
+
+
+
+      bool Hoistable = true; 
+      errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
+
+
+      // for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
+      for (auto Operand : OperandsToAnalyze) {
+        // Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
+        // if (Operand == StartAddress) continue;
+
+        // if (isa<CastInst>(Operand)) {
+        //     errs() << "Whoops! The operand is actually a cast ... converting: " << *Operand;
+        //     Operand = cast<CastInst>(Operand)->getOperand(0);
+        //     errs() << " to " << *Operand << "\n";
+        // }
+
+        if (Manager->isLoopInvariant(Operand)) {
+          continue; 
         }
 
-
-
-        bool Hoistable = true; 
-        errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
-
-
-        // for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
-        for (auto Operand : OperandsToAnalyze) {
-            // Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
-            // if (Operand == StartAddress) continue;
-
-            // if (isa<CastInst>(Operand)) {
-            //     errs() << "Whoops! The operand is actually a cast ... converting: " << *Operand;
-            //     Operand = cast<CastInst>(Operand)->getOperand(0);
-            //     errs() << " to " << *Operand << "\n";
-            // }
-
-            if (Manager->isLoopInvariant(Operand)) {
-                continue; 
-            }
-            
-            auto scevPtrComputation = SE->getSCEV(Operand);
-            if (scevPtrComputation) errs() << "THE SCEV: " << *scevPtrComputation << "\n";
-            if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
-                continue;
-            }
-
-            Hoistable = false;
-            errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
-            break;
-            
+        auto scevPtrComputation = SE->getSCEV(Operand);
+        if (scevPtrComputation) errs() << "THE SCEV: " << *scevPtrComputation << "\n";
+        if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
+          continue;
         }
 
-        if (!Hoistable) {
-            break;
-        }
+        Hoistable = false;
+        errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
+        break;
 
-        NextLoopStructure = NextLoop->getLoopStructure();
-        PreHeader = NextLoopStructure->getPreHeader();
-        InjectionLocation = PreHeader->getTerminator();
+      }
 
-        LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
-        assert (ParentLoop != NextLoop);
+      if (!Hoistable) {
+        break;
+      }
 
-        NextLoop = ParentLoop;
+      NextLoopStructure = NextLoop->getLoopStructure();
+      PreHeader = NextLoopStructure->getPreHeader();
+      InjectionLocation = PreHeader->getTerminator();
+
+      LoopDependenceInfo *ParentLoop = BasicBlockToLoopMap[PreHeader];
+      assert (ParentLoop != NextLoop);
+
+      NextLoop = ParentLoop;
     }
 
     if (NextLoopStructure == nullptr) return false;
@@ -854,14 +902,14 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     // auto SE = FetchSELambda(F);
     // errs() << "\t\tThe gep: " << *PointerOfMemoryInstructionAsGEP << "\n";
     // for (auto i = 0 ; i < PointerOfMemoryInstructionAsGEP->getNumOperands() ; i++) {
-        
+
     //     Value *Operand = PointerOfMemoryInstructionAsGEP->getOperand(i);
     //     if (Operand == StartAddress) continue;
 
     //     if (InvManager->isLoopInvariant(Operand)) {
     //         continue; 
     //     }
-        
+
     //     auto scevPtrComputation = SE->getSCEV(Operand);
     //     if (scevPtrComputation) errs() << *scevPtrComputation << "\n";
     //     if (auto AR = dyn_cast<SCEVAddRecExpr>(scevPtrComputation)) {
@@ -871,7 +919,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     //     Hoistable = false;
     //     errs() << "scevCondition: NOT HOISTABLE! because of " << *Operand << "\n";
     //     break;
-        
+
     // }
 
     // if (!Hoistable) {
@@ -881,41 +929,41 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
     // LoopStructure *NextLoopStructure = NestedLoop->getLoopStructure();
     // BasicBlock *PreHeader = NextLoopStructure->getPreHeader();
     // Instruction *InjectionLocation = PreHeader->getTerminator();
-    
+
     while(1){
-        Instruction* newStart = dyn_cast<Instruction>(StartAddress);
-        //Check if we are an inst, if not we are done
-        if(!newStart){
-            break;
-        }
-        //If we are out of the loop, we can be done, TODO improve this once we recursively pull out of loop
-        if (!(NextLoopStructure->isIncluded(newStart))) {
+      Instruction* newStart = dyn_cast<Instruction>(StartAddress);
+      //Check if we are an inst, if not we are done
+      if(!newStart){
+        break;
+      }
+      //If we are out of the loop, we can be done, TODO improve this once we recursively pull out of loop
+      if (!(NextLoopStructure->isIncluded(newStart))) {
         // if(BasicBlockToLoopMap[newStart->getParent()] != NestedLoop){
-            StartAddress = newStart;
-            break;
-        }
+        StartAddress = newStart;
+        break;
+      }
 
-        if (BitCastInst *BC = dyn_cast<BitCastInst>(newStart)) {
-            errs() << "\tFound a bitcast, grabbing ptr\n";
-            StartAddress = BC->getOperand(0); 
-        }
-        
-        else if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
-            errs() << "\tFound a load, grabbing ptr\n";
-            StartAddress = BC->getOperand(0);
-        }
-        else if(GetElementPtrInst* BC = dyn_cast<GetElementPtrInst>(newStart)){
-            errs() << "\tFound a GEP, grabbing pointer\n";
-            StartAddress = BC->getPointerOperand();
-        }
-        else{
-            errs() << "Can't handle it right now... abort: " << *newStart << "\n";
-            return false;
-        }
-    }
+      if (BitCastInst *BC = dyn_cast<BitCastInst>(newStart)) {
+        errs() << "\tFound a bitcast, grabbing ptr\n";
+        StartAddress = BC->getOperand(0); 
+      }
+
+      else if (LoadInst *BC = dyn_cast<LoadInst>(newStart)) {
+        errs() << "\tFound a load, grabbing ptr\n";
+        StartAddress = BC->getOperand(0);
+      }
+      else if(GetElementPtrInst* BC = dyn_cast<GetElementPtrInst>(newStart)){
+        errs() << "\tFound a GEP, grabbing pointer\n";
+        StartAddress = BC->getPointerOperand();
+      }
+      else{
+        errs() << "Can't handle it right now... abort: " << *newStart << "\n";
+        return false;
+      }
+      }
 
 
-    InjectionLocations[I] = 
+      InjectionLocations[I] = 
         new GuardInfo(
             InjectionLocation,
             StartAddress,
@@ -924,351 +972,351 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
             "protect", /* Metadata type */
             "iv.scev.guard.start", /* Metadata attached to injection */
             1
-        );
-    
+            );
 
 
-    return true;
+
+      return true;
 #endif
-}
+    }
 
-bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
-    LoopDependenceInfo *NestedLoop,
-    Instruction *I, 
-    Value *PointerOfMemoryInstruction, 
-    bool IsWrite
-)
-{
-    // return false;
-    /*
-     * Debugging
-     */
-    errs() << "_optimizeForInductionVariableAnalysis\n";
-    errs() << "\tI: " << *I << "\n";
-    errs() << "\tPointerOfMemoryInstruction: " << *PointerOfMemoryInstruction << "\n";
+    bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
+        LoopDependenceInfo *NestedLoop,
+        Instruction *I, 
+        Value *PointerOfMemoryInstruction, 
+        bool IsWrite
+        )
+    {
+      // return false;
+      /*
+       * Debugging
+       */
+      errs() << "_optimizeForInductionVariableAnalysis\n";
+      errs() << "\tI: " << *I << "\n";
+      errs() << "\tPointerOfMemoryInstruction: " << *PointerOfMemoryInstruction << "\n";
 
 
-    /*
-     * If @NestedLoop is not valid, we cannot optimize for loop invariance
-     */
-    if (!NestedLoop) { 
+      /*
+       * If @NestedLoop is not valid, we cannot optimize for loop invariance
+       */
+      if (!NestedLoop) { 
         errs() << "\tivCondition 0: NestedLoop not valid!\n";
         return false; 
-    }
+      }
 
-    for (auto EB : NestedLoop->getLoopStructure()->getLoopExitBasicBlocks()) {
+      for (auto EB : NestedLoop->getLoopStructure()->getLoopExitBasicBlocks()) {
         errs() << "EB: " << *EB << "\n";
-    }
+      }
 
-    for (auto LBB : NestedLoop->getLoopStructure()->getBasicBlocks()) {
+      for (auto LBB : NestedLoop->getLoopStructure()->getBasicBlocks()) {
         errs() << "LBB: " << *LBB << "\n";
-    }
+      }
 
-    /*
-     * Fetch @PointerOfMemoryInstruction as an instruction, sanity check
-     */
-    Instruction *PointerOfMemoryInstructionAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
-    if (!PointerOfMemoryInstructionAsInst) { 
+      /*
+       * Fetch @PointerOfMemoryInstruction as an instruction, sanity check
+       */
+      Instruction *PointerOfMemoryInstructionAsInst = dyn_cast<Instruction>(PointerOfMemoryInstruction);
+      if (!PointerOfMemoryInstructionAsInst) { 
         errs() << "\tivCondition 1: PointerOfMemoryInstructionAsInst not valid!\n";
         return false; 
-    }
+      }
 
 
-    if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerOfMemoryInstructionAsInst)) {
+      if (BitCastInst *BC = dyn_cast<BitCastInst>(PointerOfMemoryInstructionAsInst)) {
         Value *TheOperand = BC->getOperand(0);
         if (auto TheOperandAsInst = dyn_cast<Instruction>(TheOperand)) {
-            PointerOfMemoryInstructionAsInst = TheOperandAsInst;
+          PointerOfMemoryInstructionAsInst = TheOperandAsInst;
         }
-    }
+      }
 
 
-    /*
-     * Fetch the induction variable manager and check if @PointerOfMemoryInstruction 
-     * is defined by the following pattern: [IV/Inv] [bin op] [Inv/IV] --- if not, 
-     * there's no optimization we can do
-     */
-    BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
-    GetElementPtrInst *PointerOfMemoryInstructionAsGEP = dyn_cast<GetElementPtrInst>(PointerOfMemoryInstructionAsInst);
-    if (true
-        && !PointerOfMemoryInstructionAsBinOp
-        && !PointerOfMemoryInstructionAsGEP) {
+      /*
+       * Fetch the induction variable manager and check if @PointerOfMemoryInstruction 
+       * is defined by the following pattern: [IV/Inv] [bin op] [Inv/IV] --- if not, 
+       * there's no optimization we can do
+       */
+      BinaryOperator *PointerOfMemoryInstructionAsBinOp = dyn_cast<BinaryOperator>(PointerOfMemoryInstructionAsInst);
+      GetElementPtrInst *PointerOfMemoryInstructionAsGEP = dyn_cast<GetElementPtrInst>(PointerOfMemoryInstructionAsInst);
+      if (true
+          && !PointerOfMemoryInstructionAsBinOp
+          && !PointerOfMemoryInstructionAsGEP) {
         errs() << "\tivCondition 2: PointerOfMemoryInstruction is not defined as a binary operation or GEP!\n";
-        errs() << "\t\tThe instruction is instead: " << *PointerOfMemoryInstructionAsInst << "\n";
+        errs() << "\t\tThe instr-uction is instead: " << *PointerOfMemoryInstructionAsInst << "\n";
         return false;
-    }
+      }
 
-    
-    /*
-     * Determine which, if any, of the operands contribute to an IV and which are invariants
-     */    
-    InductionVariableManager *IVManager = NestedLoop->getInductionVariableManager();
-    InvariantManager *InvManager = NestedLoop->getInvariantManager();
 
-    Value *InvariantOperand = 
+      /*
+       * Determine which, if any, of the operands contribute to an IV and which are invariants
+       */    
+      InductionVariableManager *IVManager = NestedLoop->getInductionVariableManager();
+      InvariantManager *InvManager = NestedLoop->getInvariantManager();
+
+      Value *InvariantOperand = 
         _fetchInvariantFromInstruction(
             PointerOfMemoryInstructionAsInst,
             InvManager
-        );
+            );
 
-    Instruction *IVOperand = 
+      Instruction *IVOperand = 
         _fetchIVFromInstruction(
             PointerOfMemoryInstructionAsInst,
             IVManager
-        ); /* Flaky, InvariantOperand is a Value *, IVOperand is an Instruction * */
-    
-    if (false
-        || !InvariantOperand
-        || !IVOperand) {
-        
+            ); /* Flaky, InvariantOperand is a Value *, IVOperand is an Instruction * */
+
+      if (false
+          || !InvariantOperand
+          || !IVOperand) {
+
         errs() << "\tivCondition 2: PointerOfMemoryInstructionAsInst is not defined by the pattern [IV/Inv] [bin op] [Inv/IV] or GEP!\n";
-        
+
         if (InvariantOperand) {
-            errs() << "\t\tInvariantOperand is valid: " << *InvariantOperand << "\n";
+          errs() << "\t\tInvariantOperand is valid: " << *InvariantOperand << "\n";
         } else {
-            errs() << "\t\tInvariantOperand is invalid\n";
+          errs() << "\t\tInvariantOperand is invalid\n";
         }
 
         if (IVOperand) {
-            errs() << "\t\tIVOperand is valid: " << *IVOperand << "\n";
+          errs() << "\t\tIVOperand is valid: " << *IVOperand << "\n";
         } else {
-            errs() << "\t\tIVOperand is invalid\n";
+          errs() << "\t\tIVOperand is invalid\n";
         }
 
         return false;
-    }
+      }
 
-    // assert(InvariantOperand != IVOperand); /* Can we make this guarantee --- NO, change */
+      // assert(InvariantOperand != IVOperand); /* Can we make this guarantee --- NO, change */
 
 #if 0
-    if (!(IVManager->doesContributeToComputeAnInductionVariable(PointerOfMemoryInstructionAsInst))) {
+      if (!(IVManager->doesContributeToComputeAnInductionVariable(PointerOfMemoryInstructionAsInst))) {
         errs() << "\tPointerOfMemoryInstructionAsInst does not contribute to IV computation!\n";
         return false;
-    } /* We want to check if PointerOfMemoryInstructionAsInst = base [op] IV 
-    the op can be a binary operator or a getElementPtr
-    - the two ops (at least for bops) should be a loop invariant (the base) and one that contributes to the IV (the actual IV)
-    - print out how often the condition is satisfied or not (for kicks, and to see if we should handle GEP)
-    */
+      } /* We want to check if PointerOfMemoryInstructionAsInst = base [op] IV 
+           the op can be a binary operator or a getElementPtr
+           - the two ops (at least for bops) should be a loop invariant (the base) and one that contributes to the IV (the actual IV)
+           - print out how often the condition is satisfied or not (for kicks, and to see if we should handle GEP)
+           */
 #endif
 
-    /*
-     * At this point, we know that the computation of @PointerOfMemoryInstruction
-     * depends on a bounded scalar evolution --- which means that the guard can be
-     * hoisted outside the loop where the boundaries used in the check can range from
-     * start to end address of the scalar evolution
-     * 
-     * Fetch the IV for @PointerOfMemoryInstruction, and begin using this to compute
-     * this start and end address from this IV
-     */
-    bool Hoisted = false;
-    LoopStructure *NestedLoopStructure = NestedLoop->getLoopStructure();
-    InductionVariable *IV = 
+      /*
+       * At this point, we know that the computation of @PointerOfMemoryInstruction
+       * depends on a bounded scalar evolution --- which means that the guard can be
+       * hoisted outside the loop where the boundaries used in the check can range from
+       * start to end address of the scalar evolution
+       * 
+       * Fetch the IV for @PointerOfMemoryInstruction, and begin using this to compute
+       * this start and end address from this IV
+       */
+      bool Hoisted = false;
+      LoopStructure *NestedLoopStructure = NestedLoop->getLoopStructure();
+      InductionVariable *IV = 
         IVManager->getInductionVariable(
             *NestedLoopStructure,
             IVOperand
             // PointerOfMemoryInstructionAsInst 
             /* This actually needs to be IV as follows: POMIAI = 
-            base [op] iv. we need that IV, not POMIAI 
-            to fetch the Noelle IV pointer. NOTE base has to be loop invariant */
-        );
-    
-    if (!IV) {
+               base [op] iv. we need that IV, not POMIAI 
+               to fetch the Noelle IV pointer. NOTE base has to be loop invariant */
+            );
+
+      if (!IV) {
         /*
          * This is conservative, but it's possible to optimize more here based on outer loops --- FIX
          */
         errs() << "\tivCondition 3: Invalid induction variable object for the current loop and IVOperand!";
         return false;
-    }
+      }
 
 
-    /*
-     * Check that the step value of this IV is loop invariant
-     */
-    if (!(IV->isStepValueLoopInvariant())) { /* Still accurate b/c we only consider basic IVs, not derived IVs.
-        this makes the computation easy b/c step value is constant, you can extend the computation as follows:
-        base + start value of IV + (total number of iterations * (constant) step) = end address. with this type of IV. */
+      /*
+       * Check that the step value of this IV is loop invariant
+       */
+      if (!(IV->isStepValueLoopInvariant())) { /* Still accurate b/c we only consider basic IVs, not derived IVs.
+                                                  this makes the computation easy b/c step value is constant, you can extend the computation as follows:
+                                                  base + start value of IV + (total number of iterations * (constant) step) = end address. with this type of IV. */
         errs() << "\tivCondition 4: IV related to PointerOfMemoryInstructionAsInst's def does not have a loop invariant step value!\n";
         return false; 
-    }
+      }
 
 
-    /*
-     * Now switch to analyzing the loop governing IV
-     *
-     * Fetch the loop governing IV attribution and check its validity
-     * 
-     * this is needed for the IV utility and "total number of iterations"
-     */
-    LoopGoverningIVAttribution *LGIVAttr = IVManager->getLoopGoverningIVAttribution(*NestedLoopStructure);
-    if (!LGIVAttr) { 
+      /*
+       * Now switch to analyzing the loop governing IV
+       *
+       * Fetch the loop governing IV attribution and check its validity
+       * 
+       * this is needed for the IV utility and "total number of iterations"
+       */
+      LoopGoverningIVAttribution *LGIVAttr = IVManager->getLoopGoverningIVAttribution(*NestedLoopStructure);
+      if (!LGIVAttr) { 
         errs() << "\tivCondition 5: Loop Governing IV attribution is invalid!\n";
         return false; 
-    }
-    
-    
-    /*
-     * Fetch the loop governing induction variable (LGIV) and 
-     * ensure that its step value is loop invariant
-     * 
-     * need this (perhaps) because in order to get the total number of
-     * iterations, but GIVUtility covers this
-     */
-    InductionVariable *LGIV = &(LGIVAttr->getInductionVariable());
+      }
+
+
+      /*
+       * Fetch the loop governing induction variable (LGIV) and 
+       * ensure that its step value is loop invariant
+       * 
+       * need this (perhaps) because in order to get the total number of
+       * iterations, but GIVUtility covers this
+       */
+      InductionVariable *LGIV = &(LGIVAttr->getInductionVariable());
 #if 0
-    if (!(LGIV->isStepValueLoopInvariant())) {
+      if (!(LGIV->isStepValueLoopInvariant())) {
         errs() << "\tLoop Governing IV does not have a loop invariant step value!\n";
         return false;
-    }
+      }
 #endif
 
 
-    /*
-     * Fetch the loop governing IV utility
-     */
-    LoopGoverningIVUtility GIVUtility(
-        NestedLoopStructure,
-        *IVManager,
-        *LGIVAttr
-    ); /* UPDATE NOELLE ---, now takes an LS * and IVManager of the LS. */
+      /*
+       * Fetch the loop governing IV utility
+       */
+      LoopGoverningIVUtility GIVUtility(
+          NestedLoopStructure,
+          *IVManager,
+          *LGIVAttr
+          ); /* UPDATE NOELLE ---, now takes an LS * and IVManager of the LS. */
 
 
-    /*
-     * Generate the code to compute the total number of iterations for the current loop invocation, 
-     * and fetch the resulting loop iterations value
-     */
-    Instruction *PreHeaderTerminator = NestedLoopStructure->getPreHeader()->getTerminator();
-    IRBuilder<> NumIterationsBuilder = 
+      /*
+       * Generate the code to compute the total number of iterations for the current loop invocation, 
+       * and fetch the resulting loop iterations value
+       */
+      Instruction *PreHeaderTerminator = NestedLoopStructure->getPreHeader()->getTerminator();
+      IRBuilder<> NumIterationsBuilder = 
         Utils::GetBuilder(
             PreHeaderTerminator->getFunction(),
             PreHeaderTerminator
-        );
+            );
 
-    Value *NumIterations = GIVUtility.generateCodeToComputeTheTripCount(NumIterationsBuilder);
-    if (!NumIterations) {
+      Value *NumIterations = GIVUtility.generateCodeToComputeTheTripCount(NumIterationsBuilder);
+      if (!NumIterations) {
         errs() << "\tivCondition 6: Can't generate code to compute total number of iterations!\n";
         return false;
-    }
-    errs() << "\tNumIterations: " << *NumIterations << "\n";
+      }
+      errs() << "\tNumIterations: " << *NumIterations << "\n";
 
 
-    /*
-     * Fetch the start address and step value from the IV
-     * related to the pointer, check its validity
-     */
-    Value *IVStart = IV->getStartValue(), 
-          *IVStep = IV->getSingleComputedStepValue();
+      /*
+       * Fetch the start address and step value from the IV
+       * related to the pointer, check its validity
+       */
+      Value *IVStart = IV->getStartValue(), 
+            *IVStep = IV->getSingleComputedStepValue();
 
-    if (false
-        || !IVStart
-        || !IVStep) {
+      if (false
+          || !IVStart
+          || !IVStep) {
         errs() << "\tivCondition 7: IVStart or IVStep is invalid!\n";
         if (IVStart) {
-            errs() << "\t\tIVStart is valid: " << *IVStart << "\n";
+          errs() << "\t\tIVStart is valid: " << *IVStart << "\n";
         } else {
-            errs() << "\t\tIVStart is invalid!\n";
+          errs() << "\t\tIVStart is invalid!\n";
         }
         if (IVStep) {
-            errs() << "\t\tIVStep is valid: " << *IVStep << "\n";
+          errs() << "\t\tIVStep is valid: " << *IVStep << "\n";
         } else {
-            errs() << "\t\tIVStep is invalid!\n";
+          errs() << "\t\tIVStep is invalid!\n";
         }
         return false;
-    }
+      }
 
-    errs() << "IVStart: " << *IVStart << "\n";
-    errs() << "IVStep: " << *IVStep << "\n";
+      errs() << "IVStart: " << *IVStart << "\n";
+      errs() << "IVStep: " << *IVStep << "\n";
 
 
 
 #if 0
-    /*
-     * NOTE --- DO WE NEED TO CHECK IF THE BOUNDS VALUE (THE VALUE THAT
-     * IS ESSENTIALLY (LGIVAttr->getIntermediateValueUsedInCompare()) 
-     * IS LOOP INVARIANT? 
-     */
-    Value *BoundsValue = LGIVAttr->getIntermediateValueUsedInCompare(); /* WE ACTUALLY WANT LGIVAttr->getExitConditionValue() */
-    InvariantManager *InvManager = NestedLoop->getInvariantManager();
-    if (!(InvManager->isLoopInvariant(BoundsValue))) {
+      /*
+       * NOTE --- DO WE NEED TO CHECK IF THE BOUNDS VALUE (THE VALUE THAT
+       * IS ESSENTIALLY (LGIVAttr->getIntermediateValueUsedInCompare()) 
+       * IS LOOP INVARIANT? 
+       */
+      Value *BoundsValue = LGIVAttr->getIntermediateValueUsedInCompare(); /* WE ACTUALLY WANT LGIVAttr->getExitConditionValue() */
+      InvariantManager *InvManager = NestedLoop->getInvariantManager();
+      if (!(InvManager->isLoopInvariant(BoundsValue))) {
         return false;
-    }
+      }
 #endif
 
 
-    /*
-     * Compute ONLY (Step * NumIterations) + StartAddress and inject 
-     * this into the preheader of the loop directly --- HACK
-     * 
-     * First, set up injection locations and builders
-     */
+      /*
+       * Compute ONLY (Step * NumIterations) + StartAddress and inject 
+       * this into the preheader of the loop directly --- HACK
+       * 
+       * First, set up injection locations and builders
+       */
 
-    BasicBlock *PreHeader = NestedLoopStructure->getPreHeader();
-    errs() << "PREHEADER BEFORE: " << *PreHeader << "\n";
+      BasicBlock *PreHeader = NestedLoopStructure->getPreHeader();
+      errs() << "PREHEADER BEFORE: " << *PreHeader << "\n";
 
-    Instruction *InjectionLocation = PreHeader->getTerminator();
-    llvm::IRBuilder<> Builder = 
+      Instruction *InjectionLocation = PreHeader->getTerminator();
+      llvm::IRBuilder<> Builder = 
         Utils::GetBuilder(
             InjectionLocation->getFunction(),
             InjectionLocation
-        );
+            );
 
 
-    /*
-     * Compute StartAddress = IVStart + @PointerOfMemoryInstruction's base (IV Operand) (ACTUAL)
-     * FIX THIS DAMN CODE
-     */
-    Value *StartAddress = 
+      /*
+       * Compute StartAddress = IVStart + @PointerOfMemoryInstruction's base (IV Operand) (ACTUAL)
+       * FIX THIS DAMN CODE
+       */
+      Value *StartAddress = 
         Builder.CreateAdd(
             Builder.CreateMul(
-                IVStart,
-                Builder.getInt64(
-                    Utils::GetPrimitiveSizeInBytes(
-                        cast<PointerType>(InvariantOperand->getType())->getElementType()
-                    )
+              IVStart,
+              Builder.getInt64(
+                Utils::GetPrimitiveSizeInBytes(
+                  cast<PointerType>(InvariantOperand->getType())->getElementType()
+                  )
                 )
-            ),
+              ),
             Builder.CreatePtrToInt(
-                InvariantOperand,
-                Builder.getInt64Ty()
-            )
-        );
+              InvariantOperand,
+              Builder.getInt64Ty()
+              )
+            );
 
-    
-    /*
-     * Compute Offset = Step * NumIterations
-     */
-    Value *Offset = 
+
+      /*
+       * Compute Offset = Step * NumIterations
+       */
+      Value *Offset = 
         Builder.CreateMul(
             IVStep,
             NumIterations
-        );
+            );
 
-    
-    /*
-     * Compute EndAddress = Offset + StartAddress, and
-     * cast it back to a pointer type
-     */
-    Value *EndAddressVal = 
+
+      /*
+       * Compute EndAddress = Offset + StartAddress, and
+       * cast it back to a pointer type
+       */
+      Value *EndAddressVal = 
         Builder.CreateAdd(
             Offset,
             StartAddress
-        );
+            );
 
-    Value *EndAddress =
+      Value *EndAddress =
         Builder.CreateIntToPtr(
             EndAddressVal,
             InvariantOperand->getType()
-        );
+            );
 
-    errs() << "\tStartAddress: " << *StartAddress << "\n";
-    errs() << "\tOffset: " << *Offset << "\n";
-    errs() << "\tEndAddress: " << *EndAddress << "\n";
+      errs() << "\tStartAddress: " << *StartAddress << "\n";
+      errs() << "\tOffset: " << *Offset << "\n";
+      errs() << "\tEndAddress: " << *EndAddress << "\n";
 
-    errs() << "PREHEADER AFTER: " << *PreHeader << "\n";
+      errs() << "PREHEADER AFTER: " << *PreHeader << "\n";
 
 
-    /*
-     * Set up GuardInfo packages
-     */
-    InjectionLocations[I] = 
+      /*
+       * Set up GuardInfo packages
+       */
+      InjectionLocations[I] = 
         new GuardInfo(
             InjectionLocation,
             StartAddress,
@@ -1277,9 +1325,9 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
             "protect", /* Metadata type */
             "iv.scev.guard.start", /* Metadata attached to injection */
             1
-        );
+            );
 
-    InjectionLocations[I] = 
+      InjectionLocations[I] = 
         new GuardInfo(
             InjectionLocation,
             EndAddress,
@@ -1288,564 +1336,614 @@ bool ProtectionsInjector::_optimizeForInductionVariableAnalysis(
             "protect", /* Metadata type */
             "iv.scev.guard.end", /* Metadata attached to injection */
             1
-        );
+            );
 
 
-    scalarEvolutionGuard++;
-    Hoisted |= true;
+      scalarEvolutionGuard++;
+      Hoisted |= true;
 
 
-    return Hoisted;
-}
-
-
-Value *ProtectionsInjector::_fetchInvariantFromInstruction (
-    Instruction *I,
-    InvariantManager *InvManager
-)
-{
-    /*
-     * TOP --- Based on @I and @InvManager, find if either operands of 
-     * @I is a loop invariant. Otherwise, return nullptr
-     */
-
-    /*
-     * Setup
-     */
-    // assert(I->getNumOperands() == 2);
-    if (I->getNumOperands() != 2) {
-        return nullptr;
+      return Hoisted;
     }
 
-    Value *InvariantOperand = nullptr;
-    Value *FirstOp = I->getOperand(0);
-    Value *SecondOp = I->getOperand(1);
+
+    Value *ProtectionsInjector::_fetchInvariantFromInstruction (
+        Instruction *I,
+        InvariantManager *InvManager
+        )
+    {
+      /*
+       * TOP --- Based on @I and @InvManager, find if either operands of 
+       * @I is a loop invariant. Otherwise, return nullptr
+       */
+
+      /*
+       * Setup
+       */
+      // assert(I->getNumOperands() == 2);
+      if (I->getNumOperands() != 2) {
+        return nullptr;
+      }
+
+      Value *InvariantOperand = nullptr;
+      Value *FirstOp = I->getOperand(0);
+      Value *SecondOp = I->getOperand(1);
 
 
-    /*
-     * Check for loop invariance
-     */
-    if (InvManager->isLoopInvariant(FirstOp)) {
+      /*
+       * Check for loop invariance
+       */
+      if (InvManager->isLoopInvariant(FirstOp)) {
         errs() << "\t\t_fetchInvariantFromBinaryOperator: FirstOp is loop invariant: " << *FirstOp << "\n";
         InvariantOperand = FirstOp;
-    }
-    else if (InvManager->isLoopInvariant(SecondOp)) {
+      }
+      else if (InvManager->isLoopInvariant(SecondOp)) {
         errs() << "\t\t_fetchInvariantFromBinaryOperator: SecondOp is loop invariant: " << *SecondOp << "\n";
         InvariantOperand = SecondOp;
+      }
+
+
+      return InvariantOperand;
     }
 
 
-    return InvariantOperand;
-}
+    Instruction *ProtectionsInjector::_fetchIVFromInstruction (
+        Instruction *I,
+        InductionVariableManager *IVManager
+        )
+    {
+      /*
+       * TOP --- Based on @I and @IVManager, find if either operands of 
+       * @I contributes to an induction variable. Otherwise, return nullptr
+       */
 
-
-Instruction *ProtectionsInjector::_fetchIVFromInstruction (
-    Instruction *I,
-    InductionVariableManager *IVManager
-)
-{
-    /*
-     * TOP --- Based on @I and @IVManager, find if either operands of 
-     * @I contributes to an induction variable. Otherwise, return nullptr
-     */
-
-    /*
-     * Setup
-     */
-    // assert(I->getNumOperands() == 2);
-    if (I->getNumOperands() != 2) {
+      /*
+       * Setup
+       */
+      // assert(I->getNumOperands() == 2);
+      if (I->getNumOperands() != 2) {
         return nullptr;
-    }
+      }
 
-    Instruction *IVOperand = nullptr;
-    Instruction *FirstOpAsInst = dyn_cast<Instruction>(I->getOperand(0));
-    Instruction *SecondOpAsInst = dyn_cast<Instruction>(I->getOperand(1));
+      Instruction *IVOperand = nullptr;
+      Instruction *FirstOpAsInst = dyn_cast<Instruction>(I->getOperand(0));
+      Instruction *SecondOpAsInst = dyn_cast<Instruction>(I->getOperand(1));
 
 
-    /*
-     * Check for IV contribution
-     */
-    if (true
-        && FirstOpAsInst
-        && IVManager->doesContributeToComputeAnInductionVariable(FirstOpAsInst)) {
+      /*
+       * Check for IV contribution
+       */
+      if (true
+          && FirstOpAsInst
+          && IVManager->doesContributeToComputeAnInductionVariable(FirstOpAsInst)) {
         errs() << "\t\t_fetchIVFromBinaryOperator: FirstOp contributes to an IV: " << *FirstOpAsInst << "\n";
         IVOperand = FirstOpAsInst;
-    }
-    else if (
-        true
-        && SecondOpAsInst
-        && IVManager->doesContributeToComputeAnInductionVariable(SecondOpAsInst)) {
+      }
+      else if (
+          true
+          && SecondOpAsInst
+          && IVManager->doesContributeToComputeAnInductionVariable(SecondOpAsInst)) {
         errs() << "\t\t_fetchIVFromBinaryOperator: SecondOp contributes to an IV: " << *SecondOpAsInst << "\n";
         IVOperand = SecondOpAsInst;
+      }
+
+
+      return IVOperand;
     }
 
 
-    return IVOperand;
-}
 
 
+    bool ProtectionsInjector::_isAPointerReturnedByAllocator(Value *V)
+    {
+      /*
+       * Fetch @V as a call instruction
+       */
+      CallInst *Call = dyn_cast<CallInst>(V);
+      if (!Call) return false;
 
 
-bool ProtectionsInjector::_isAPointerReturnedByAllocator(Value *V)
-{
-    /*
-     * Fetch @V as a call instruction
-     */
-    CallInst *Call = dyn_cast<CallInst>(V);
-    if (!Call) return false;
+      /*
+       * Vet the callee
+       */ 
+      Function *Callee = Call->getCalledFunction();
+      if (!Callee) return false;
 
 
-    /*
-     * Vet the callee
-     */ 
-    Function *Callee = Call->getCalledFunction();
-    if (!Callee) return false;
-
-
-    /*
-     * Fetch the right memory allocator map
-     */ 
-    std::unordered_map<Function *, AllocID> MapToUse = 
+      /*
+       * Fetch the right memory allocator map
+       */ 
+      std::unordered_map<Function *, AllocID> MapToUse = 
         (InstrumentingUserCode) ?
         (UserAllocMethodsToIDs) :
         (KernelAllocMethodsToIDs) ;
 
 
-    /*
-     * Check if the callee is one of the recognized
-     * library allocator functions
-     */
-    if (MapToUse.find(Callee) == MapToUse.end()) return false;
+      /*
+       * Check if the callee is one of the recognized
+       * library allocator functions
+       */
+      if (MapToUse.find(Callee) == MapToUse.end()) return false;
 
 
-    /*
-     * We can prove that @V is from a memory allocator!
-     */
-    return true;
-}
+      /*
+       * We can prove that @V is from a memory allocator!
+       */
+      return true;
+    }
 
 
-Value *ProtectionsInjector::_fetchBitCastOperand(Value *Pointer)
-{
-    /*
-     * If @Pointer is actually a bitcast operation, fetch its 
-     * operand to analyze. If @Pointer isn't a bitcast, return
-     * a nullptr
-     */ 
+    Value *ProtectionsInjector::_fetchBitCastOperand(Value *Pointer)
+    {
+      /*
+       * If @Pointer is actually a bitcast operation, fetch its 
+       * operand to analyze. If @Pointer isn't a bitcast, return
+       * a nullptr
+       */ 
 
-    /*
-     * Attempt to fetch the operand as a bitcast instruction
-     */ 
-    BitCastInst *BCI = dyn_cast<BitCastInst>(Pointer);
-    if (BCI) return BCI->getOperand(0);
-
-
-    /*
-     * Attempt to fetch the operand as a bitcast operator
-     */ 
-    BitCastOperator *BCO = dyn_cast<BitCastOperator>(Pointer);
-    if (BCO) return BCO->getOperand(0);
+      /*
+       * Attempt to fetch the operand as a bitcast instruction
+       */ 
+      BitCastInst *BCI = dyn_cast<BitCastInst>(Pointer);
+      if (BCI) return BCI->getOperand(0);
 
 
-    return nullptr;
-}
+      /*
+       * Attempt to fetch the operand as a bitcast operator
+       */ 
+      BitCastOperator *BCO = dyn_cast<BitCastOperator>(Pointer);
+      if (BCO) return BCO->getOperand(0);
 
 
-Value *ProtectionsInjector::_fetchGEPBasePointer(
-    Value *Pointer,
-    bool CheckInBounds
-)
-{
-    /*
-     * TOP --- If @Pointer is a GEP, fetch the pointer operand,
-     * which represents the base pointer of the aggregate type
-     * that said GEP would be indexing into
-     * 
-     * Use @CheckInBounds to understand whether or not the GEP
-     * is safe! It must be an "inbounds" index, otherwise, send
-     * back a nullptr
-     */
-    GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Pointer);
+      return nullptr;
+    }
 
-    Value *BasePointer =
+
+    Value *ProtectionsInjector::_fetchGEPBasePointer(
+        Value *Pointer,
+        bool CheckInBounds
+        )
+    {
+      /*
+       * TOP --- If @Pointer is a GEP, fetch the pointer operand,
+       * which represents the base pointer of the aggregate type
+       * that said GEP would be indexing into
+       * 
+       * Use @CheckInBounds to understand whether or not the GEP
+       * is safe! It must be an "inbounds" index, otherwise, send
+       * back a nullptr
+       */
+      GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Pointer);
+
+      Value *BasePointer =
         (GEP) ?
         (GEP->getPointerOperand()) :
         (nullptr);
 
-    if (true
-        && CheckInBounds
-        && GEP
-        && !(GEP->isInBounds())) {
-        BasePointer = nullptr;
+      if (true
+          && CheckInBounds
+          && GEP
+          && (!(GEP->isInBounds()))) {
+        if(!(GEP->hasAllConstantIndices())){
+          BasePointer = nullptr;
+        }
+      }
+
+
+      return BasePointer;
     }
 
 
-    return BasePointer;
-}
+    bool ProtectionsInjector::_isASafeMemoryConstruct(Value *Pointer)
+    {
+      /*
+       * TOP --- See steps 1b-d in this->_findPointToInsertGuard
+       * 
+       * There is an added tidbit here --- it's possible that the 
+       * pointer we're analyzing is really an offset into an aggregate
+       * data type --- typically represented in the IR as a GEP. Check
+       * this level of indirection. We also handle the same level of 
+       * indirection for bitcast instructions, which are designed to 
+       * maintain type-safety in LLVM IR.
+       */
+      if (!Pointer) return false;
 
-
-bool ProtectionsInjector::_isASafeMemoryConstruct(Value *Pointer)
-{
-    /*
-     * TOP --- See steps 1b-d in this->_findPointToInsertGuard
-     * 
-     * There is an added tidbit here --- it's possible that the 
-     * pointer we're analyzing is really an offset into an aggregate
-     * data type --- typically represented in the IR as a GEP. Check
-     * this level of indirection. We also handle the same level of 
-     * indirection for bitcast instructions, which are designed to 
-     * maintain type-safety in LLVM IR.
-     */
-    if (!Pointer) return false;
-
-    if (false
-        || isa<AllocaInst>(Pointer)
-        || isa<GlobalVariable>(Pointer)
-        || _isAPointerReturnedByAllocator(Pointer)
-        || _isASafeMemoryConstruct(_fetchBitCastOperand(Pointer))
-        || _isASafeMemoryConstruct(_fetchGEPBasePointer(Pointer, true /* Check inbounds*/))) {
+      if (false
+          || isa<AllocaInst>(Pointer)
+          || isa<GlobalVariable>(Pointer)
+          || _isAPointerReturnedByAllocator(Pointer)
+          || _isASafeMemoryConstruct(_fetchBitCastOperand(Pointer))
+          || _isASafeMemoryConstruct(_fetchGEPBasePointer(Pointer, true /* Check inbounds*/))) {
         return true;
-    } 
+      } 
 
 
-    return false;
-}
+      return false;
+    }
 
 
-std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool isWrite)> ProtectionsInjector::_findPointToInsertGuard(void) 
-{
-    /*
-     * Define the lamda that will be executed to identify where to place the guards.
-     */
-    auto FindPointToInsertGuardFunc = 
-    [this](Instruction *inst, Value *PointerOfMemoryInstruction, bool isWrite) -> void {
+    std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool isWrite)> ProtectionsInjector::_findPointToInsertGuard(void) 
+    {
+      /*
+       * Define the lamda that will be executed to identify where to place the guards.
+       */
+      auto FindPointToInsertGuardFunc = 
+        [this](Instruction *inst, Value *PointerOfMemoryInstruction, bool isWrite) -> void {
 
-        /*
-         * The scoop:
-         * 
-         * - @inst will be some kind of memory instruction (load/store, potentially
-         *   call instruction)
-         * - @PointerOfMemoryInstruction will be the pointer operand of said
-         *   memory instruction (@inst)
-         * - @isWrite denotes the characteristic of @inst (i.e. load=FALSE, 
-         *   store=TRUE, etc.)
-         * 
-         * Several steps to check/perform (NOTE --- some of this is ad-hoc b/c deadline):
-         * 
-         * 1) If @PointerOfMemoryInstruction has already been guarded:
-         *    a) @PointerOfMemoryInstruction is in the IN set of @inst, indicating
-         *       that the DFA has determined that the pointer need not be checked
-         *       when considering guarding at @inst
-         *    b) @PointerOfMemoryInstruction is an alloca i.e. we know all origins
-         *       of allocas since they're on the stack, and there's a region for it.
-         *    c) @PointerOfMemoryInstruction originates from a library allocator
-         *       call instruction --- these pointers are the ones being tracked and
-         *       also assumed to be safe b/c we trust the allocator --- there's a 
-         *       region dedicated for this, it's the (at least initial) heap
-         *    d) @PointerOfMemoryInstruction originates from a global variable, 
-         *       we can assume a safe memory reference because globals lie in 
-         *       known and designated region --- the blob.
-         *    e) @PointerOfMemoryInstruction originates from an inbounds indexed 
-         *       location into a SAFE memory construct (i.e. described in steps 
-         *       1b.-1d.) (i.e. analyzing a GEP into an known alloca, global, etc.).
-         *    f) @PointerOfMemoryInstruction originates from an inbounds indexed 
-         *       location into SOME memory construct which the DFA has determined
-         *       need not be checked.
-         *    g) @PointerOfMemoryInstruction originates from a bitcast instruction,
-         *       which is designed just to maintain type safety and does not affect
-         *       the value of the pointer.
-         *    h) @PointerOfMemoryInstruction must aliases any of the variable or 
-         *       data types described in 1b-d.
-         *
-         *    ... then we're done --- don't have to do anything!
-         * 
-         * 2) Otherwise, we can check if @inst is part of a loop nest. If that's the
-         *    case, we can try to perform one of two optimizations:
-         *    a) If @inst is a loop invariant, we can use NOELLE to understand how 
-         *       far up the loop nest we can hoist the guard for @inst. Said guard will be 
-         *       injected in the determined loop's preheader (b/c that's how hoisting works) 
-         *       and guard the pointer directly.
-         *    b) If this isn't possible (i.e. @inst isn't a loop invariant), then we can
-         *       also determine if @inst contributes to an induction variable, which is
-         *       going to be based on a scalar evolution expression. If NOELLE determines
-         *       that @inst fits this characterization, then we guard the start address
-         *       through the end address (**do we need to guard the end addr, or can we 
-         *       guard start + an offset?**), and hoist this guard @inst's parent loop 
-         *       (i.e to the preheader).
-         *   
-         * 3) If @inst wasn't a part of a loop nest or if the optimizations attempted
-         *    did not work, then the guard must be placed right before @inst.
-         */
+          /*
+           * The scoop:
+           * 
+           * - @inst will be some kind of memory instruction (load/store, potentially
+           *   call instruction)
+           * - @PointerOfMemoryInstruction will be the pointer operand of said
+           *   memory instruction (@inst)
+           * - @isWrite denotes the characteristic of @inst (i.e. load=FALSE, 
+           *   store=TRUE, etc.)
+           * 
+           * Several steps to check/perform (NOTE --- some of this is ad-hoc b/c deadline):
+           * 
+           * 1) If @PointerOfMemoryInstruction has already been guarded:
+           *    a) @PointerOfMemoryInstruction is in the IN set of @inst, indicating
+           *       that the DFA has determined that the pointer need not be checked
+           *       when considering guarding at @inst
+           *    b) @PointerOfMemoryInstruction is an alloca i.e. we know all origins
+           *       of allocas since they're on the stack, and there's a region for it.
+           *    c) @PointerOfMemoryInstruction originates from a library allocator
+           *       call instruction --- these pointers are the ones being tracked and
+           *       also assumed to be safe b/c we trust the allocator --- there's a 
+           *       region dedicated for this, it's the (at least initial) heap
+           *    d) @PointerOfMemoryInstruction originates from a global variable, 
+           *       we can assume a safe memory reference because globals lie in 
+           *       known and designated region --- the blob.
+           *    e) @PointerOfMemoryInstruction originates from an inbounds indexed 
+           *       location into a SAFE memory construct (i.e. described in steps 
+           *       1b.-1d.) (i.e. analyzing a GEP into an known alloca, global, etc.).
+           *    f) @PointerOfMemoryInstruction originates from an inbounds indexed 
+           *       location into SOME memory construct which the DFA has determined
+           *       need not be checked.
+           *    g) @PointerOfMemoryInstruction originates from a bitcast instruction,
+           *       which is designed just to maintain type safety and does not affect
+           *       the value of the pointer.
+           *    h) @PointerOfMemoryInstruction must aliases any of the variable or 
+           *       data types described in 1b-d.
+           *    i) @PointerOfMemoryInstruction is an argument of the function,
+           *       all the callers of the function provide a safe memory construct as the argument
+           *
+           *    ... then we're done --- don't have to do anything!
+           * 
+           * 2) Otherwise, we can check if @inst is part of a loop nest. If that's the
+           *    case, we can try to perform one of two optimizations:
+           *    a) If @inst is a loop invariant, we can use NOELLE to understand how 
+           *       far up the loop nest we can hoist the guard for @inst. Said guard will be 
+           *       injected in the determined loop's preheader (b/c that's how hoisting works) 
+           *       and guard the pointer directly.
+           *    b) If this isn't possible (i.e. @inst isn't a loop invariant), then we can
+           *       also determine if @inst contributes to an induction variable, which is
+           *       going to be based on a scalar evolution expression. If NOELLE determines
+           *       that @inst fits this characterization, then we guard the start address
+           *       through the end address (**do we need to guard the end addr, or can we 
+           *       guard start + an offset?**), and hoist this guard @inst's parent loop 
+           *       (i.e to the preheader).
+           *   
+           * 3) If @inst wasn't a part of a loop nest or if the optimizations attempted
+           *    did not work, then the guard must be placed right before @inst.
+           */
 
 
-        /*
-         * <Step 1a.>
-         */
-        auto &INSetOfI = DFR->IN(inst);
-        if (INSetOfI.find(PointerOfMemoryInstruction) != INSetOfI.end()) 
-        {
+          /*
+           * <Step 1a.>
+           */
+          auto &INSetOfI = DFR->IN(inst);
+          if (INSetOfI.find(PointerOfMemoryInstruction) != INSetOfI.end()) 
+          {
             redundantGuard++;                  
             return;
-        }
+          }
 
 
-        /*
-         * <Step 1b.-e.>
-         */
-        errs() << "_findPointToInsertGuard:\n";
-        errs() << "\tinst: " << *inst  << "\n";
-        errs() << "\tptr: " << *PointerOfMemoryInstruction << "\n";
-        if (_isASafeMemoryConstruct(PointerOfMemoryInstruction))
-        {
+          /*
+           * <Step 1b.-e.>
+           */
+          errs() << "_findPointToInsertGuard:\n";
+          errs() << "\tinst: " << *inst  << "\n";
+          errs() << "\tptr: " << *PointerOfMemoryInstruction << "\n";
+          if (_isASafeMemoryConstruct(PointerOfMemoryInstruction))
+          {
             errs() << "\t\tisASafeMemoryConstruct!\n";
             redundantGuard++;                  
             return;
-        }
+          }
 
-        
-        /*
-         * <Step 1f.>
-         */
-        Value *PotentialBasePointer = 
+
+          /*
+           * <Step 1f.>
+           */
+          Value *PotentialBasePointer = 
             _fetchGEPBasePointer(
                 PointerOfMemoryInstruction,
                 true /* Check inbounds */
-            );
+                );
 
-        if (true
-            && PotentialBasePointer
-            && INSetOfI.find(PotentialBasePointer) != INSetOfI.end()) 
-        {
+          if (true
+              && PotentialBasePointer
+              && INSetOfI.find(PotentialBasePointer) != INSetOfI.end()) 
+          {
             redundantGuard++;                  
             return;
-        }
+          }
 
 
-        /*
-         * <Step 1g.>
-         */
-        Value *PointerCastOperand = _fetchBitCastOperand(PointerOfMemoryInstruction);
-        if (true
-            && PointerCastOperand
-            && INSetOfI.find(PointerCastOperand) != INSetOfI.end()) 
-        {
+          /*
+           * <Step 1g.>
+           */
+          Value *PointerCastOperand = _fetchBitCastOperand(PointerOfMemoryInstruction);
+          if (true
+              && PointerCastOperand
+              && INSetOfI.find(PointerCastOperand) != INSetOfI.end()) 
+          {
             redundantGuard++;                  
             return;
-        }
+          }
 
-        
-        /*
-         * <Step 1h.>
-         */
-        bool MustAliasesSafeConstructs = false; 
-        auto Iterator = 
+
+          /*
+           * <Step 1h.>
+           */
+          bool MustAliasesSafeConstructs = false; 
+          auto Iterator = 
             [this, inst, &MustAliasesSafeConstructs]
             (Value *depValue, DGEdge<Value> *dep) -> bool {
 
-            errs() << "\t\tdep: " << *depValue << "\n";
-        
-            /*
-             * If @dep is not a must dependence, return
-             */
-            if (!(dep->isMustDependence())) {
-                return false;
-            }
-            
-            errs() << "\t\t\tisMustDependence!\n";
+              errs() << "\t\tdep: " << *depValue << "\n";
 
-            /*
-             * <Conditions 1b-1d>.
-             */
-            if (_isASafeMemoryConstruct(depValue)) {
+              /*
+               * If @dep is not a must dependence, return
+               */
+              if (!(dep->isMustDependence())) {
+                return false;
+              }
+
+              errs() << "\t\t\tisMustDependence!\n";
+
+              /*
+               * <Conditions 1b-1d>.
+               */
+              if (_isASafeMemoryConstruct(depValue)) {
                 errs() << "\t\t\tMustAliasesSafeConstructs!\n";
                 MustAliasesSafeConstructs |= true;
-            }
+              }
 
 
-            return false;            
+              return false;            
 
-        };
+            };
 
 
-        /*
-         * Iterate over the dependences
-         */
-        auto Iterated = 
+          /*
+           * Iterate over the dependences
+           */
+          auto Iterated = 
             FDG->iterateOverDependencesTo(
                 PointerOfMemoryInstruction, 
                 false, /* Control dependences */
                 true, /* Memory dependences */
                 true, /* Register dependences */
                 Iterator
-            );
+                );
 
 
-        /*
-         * If the iterator has identified a redudant guard, return
-         */
-        if (MustAliasesSafeConstructs) 
-        {
+          /*
+           * If the iterator has identified a redudant guard, return
+           */
+          if (MustAliasesSafeConstructs) 
+          {
             redundantGuard++;
             return;
-        }
-         
+          }
 
-        /*
-         * We have to guard the pointer --- fetch the 
-         * potential loop nest that @inst belongs to
-         */
-        bool Guarded = false;
-        LoopDependenceInfo *NestedLoop = BasicBlockToLoopMap[inst->getParent()];
-        if (!NestedLoop) { 
+
+          /*
+           * <Step 1i.>
+           */
+          if(auto arg = dyn_cast<Argument>(PointerOfMemoryInstruction)){
+            //Grab the parent function the instruction exists in
+            auto parFunction = inst->getFunction();
+            //Get arg num
+            auto argumentNum = arg->getArgNo();
+
+            auto FM = noelle->getFunctionsManager();
+            auto CG = FM->getProgramCallGraph();
+            //_isASafeMemoryConstruct();
+            if(CG->doesItBelongToASCC(parFunction)){
+              errs() << "This function is in an SCC, abort!\n";
+            }
+            else{
+              auto parFunctionNode = CG->getFunctionNode(parFunction);
+
+              auto incomingEdges = parFunctionNode->getIncomingEdges();
+              bool areAllCallersSafe = true;
+              for(auto& edge : incomingEdges){
+                auto incomingSubEdges = edge->getSubEdges();
+                for(auto subEdge : incomingSubEdges){
+                  auto callInst = subEdge->getCaller()->getInstruction();
+                  auto callInstArg = callInst->getOperand(argumentNum);
+                  if(!_isASafeMemoryConstruct(callInstArg)){
+                    areAllCallersSafe = false;
+                    break;
+                  }
+
+                }
+                if(!areAllCallersSafe){
+                  break;
+                }
+              }
+              if(areAllCallersSafe){
+                redundantGuard++;
+                errs() << "We found a redundant argument based caller\n";
+                return;
+              }
+            }
+          }
+
+          /*
+           * We have to guard the pointer --- fetch the 
+           * potential loop nest that @inst belongs to
+           */
+          bool Guarded = false;
+          LoopDependenceInfo *NestedLoop = BasicBlockToLoopMap[inst->getParent()];
+          if (!NestedLoop) { 
             goto No_Loop;
-        }
-        errs() << "Trying loop optimization ...\n";
+          }
+          errs() << "Trying loop optimization ...\n";
 
 
-        /*
-         * <Step 2a.>
-         */
-        Guarded |= 
+          /*
+           * <Step 2a.>
+           */
+          Guarded |= 
             _optimizeForLoopInvariance(
                 NestedLoop,
                 inst,
                 PointerOfMemoryInstruction,
                 isWrite
-            );
-
-        if (Guarded) {
-            errs() << "Success LI! " << F->getName() << "\n";
-        }
-
-        /*
-         * <Step 2b.>
-         */
-        if (!Guarded)
-        {
-            Guarded |= 
-                // _optimizeForInductionVariableAnalysis(
-                _optimizeForSCEVAnalysis(                
-                    NestedLoop,
-                    inst,
-                    PointerOfMemoryInstruction,
-                    isWrite
                 );
+
+          if (Guarded) {
+            errs() << "Success LI! " << F->getName() << "\n";
+          }
+
+          /*
+           * <Step 2b.>
+           */
+          if (!Guarded)
+          {
+            Guarded |= 
+              // _optimizeForInductionVariableAnalysis(
+              _optimizeForSCEVAnalysis(                
+                  NestedLoop,
+                  inst,
+                  PointerOfMemoryInstruction,
+                  isWrite
+                  );
 
             if (Guarded) {
-                errs() << "Success SCEV! " << F->getName() << "\n";
+              errs() << "Success SCEV! " << F->getName() << "\n";
             }
-        }
-            
+            else{
+              errs() << "Failed SCEV! "  <<  F->getName()  <<  "\n";
+            }
+          }
+
 No_Loop:
 
-        /*
-         * <Step 3>
-         */
-        if (!Guarded) 
-        {
+          /*
+           * <Step 3>
+           */
+          if (!Guarded) 
+          {
             errs() << "Step 3 Guard\n";
             InjectionLocations[inst] = 
-                new GuardInfo(
-                    inst,
-                    PointerOfMemoryInstruction, 
-                    isWrite,
-                    CARATNamesToMethods[CARAT_PROTECT],
-                    "protect", /* Metadata type */
-                    "non.opt.mem.guard" /* Metadata attached to injection */
-                );
+              new GuardInfo(
+                  inst,
+                  PointerOfMemoryInstruction, 
+                  isWrite,
+                  CARATNamesToMethods[CARAT_PROTECT],
+                  "protect", /* Metadata type */
+                  "non.opt.mem.guard" /* Metadata attached to injection */
+                  );
 
             nonOptimizedGuard++;
-        }
+          }
 
 
-        return;
-    };
+          return;
+        };
 
 
-    return FindPointToInsertGuardFunc;
-}
-
-
-void ProtectionsInjector::_allocaOutsideFirstBBChecker(void) 
-{
-    /*
-     * Check if there is no stack allocations other than 
-     * those in the first basic block of the function.
-     */
-    BasicBlock *FirstBB = &*(F->begin());
-    for (auto &B : *F)
-    {
-        for (auto &I : B)
-        {
-            if (true
-                && isa<AllocaInst>(&I)
-                && (&B != FirstBB))
-            {
-                /*
-                 * We found a stack allocation not in the entry basic block.
-                 */
-                AllocaOutsideEntry |= true;
-                break;
-            }
-        }
+      return FindPointToInsertGuardFunc;
     }
 
 
-    return;
-}
+    void ProtectionsInjector::_allocaOutsideFirstBBChecker(void) 
+    {
+      /*
+       * Check if there is no stack allocations other than 
+       * those in the first basic block of the function.
+       */
+      BasicBlock *FirstBB = &*(F->begin());
+      for (auto &B : *F)
+      {
+        for (auto &I : B)
+        {
+          if (true
+              && isa<AllocaInst>(&I)
+              && (&B != FirstBB))
+          {
+            /*
+             * We found a stack allocation not in the entry basic block.
+             */
+            AllocaOutsideEntry |= true;
+            break;
+          }
+        }
+      }
 
 
-template<typename MemInstTy>
-void ProtectionsInjector::_invokeLambda(
-    MemInstTy *I,
-    bool IsWrite
-)
-{
-    /*
-     * Fetch the lambda to invoke --- FIX
-     */ 
-    auto TheLambda = _findPointToInsertGuard();
-    
-
-    /*
-     * Fetch the pointer to handle from @I
-     */
-    Value *PointerToHandle = I->getPointerOperand();
+      return;
+    }
 
 
-    /*
-     * Invoke the lambda
-     */
-    TheLambda(I, PointerToHandle, IsWrite);
+    template<typename MemInstTy>
+      void ProtectionsInjector::_invokeLambda(
+          MemInstTy *I,
+          bool IsWrite
+          )
+      {
+        /*
+         * Fetch the lambda to invoke --- FIX
+         */ 
+        auto TheLambda = _findPointToInsertGuard();
 
 
-    return;
-}
+        /*
+         * Fetch the pointer to handle from @I
+         */
+        Value *PointerToHandle = I->getPointerOperand();
 
 
-void ProtectionsInjector::_printGuards(void) 
-{
-    /*
-     * Print where to put the guards
-     */
-    errs() << "GUARDS for " << F->getName() << "\n";
-    for (auto &Guard : InjectionLocations)
+        /*
+         * Invoke the lambda
+         */
+        TheLambda(I, PointerToHandle, IsWrite);
+
+
+        return;
+      }
+
+
+    void ProtectionsInjector::_printGuards(void) 
+    {
+      /*
+       * Print where to put the guards
+       */
+      errs() << "GUARDS for " << F->getName() << "\n";
+      for (auto &Guard : InjectionLocations)
         errs() << " " << *(Guard.first) << "\n";
 
 
-    /*
-     * Print guard statistics
-     */
-    errs() << "GUARDS: Guard Information\n";
-    errs() << "GUARDS: Unoptimized Guards:\t" << nonOptimizedGuard << "\n"; 
-    errs() << "GUARDS: Redundant Optimized Guards:\t" << redundantGuard << "\n"; 
-    errs() << "GUARDS: Loop Invariant Hoisted Guards:\t" << loopInvariantGuard << "\n"; 
-    errs() << "GUARDS: Scalar Evolution Combined Guards:\t" << scalarEvolutionGuard << "\n"; 
-    errs() << "GUARDS: Hoisted Call Guards\t" << callGuardOpt << "\n"; 
-    errs() << "GUARDS: Total Guards:\t" << nonOptimizedGuard + loopInvariantGuard + scalarEvolutionGuard << "\n"; 
+      /*
+       * Print guard statistics
+       */
+      errs() << "GUARDS: Guard Information\n";
+      errs() << "GUARDS: Unoptimized Guards:\t" << nonOptimizedGuard << "\n"; 
+      errs() << "GUARDS: Redundant Optimized Guards:\t" << redundantGuard << "\n"; 
+      errs() << "GUARDS: Loop Invariant Hoisted Guards:\t" << loopInvariantGuard << "\n"; 
+      errs() << "GUARDS: Scalar Evolution Combined Guards:\t" << scalarEvolutionGuard << "\n"; 
+      errs() << "GUARDS: Hoisted Call Guards\t" << callGuardOpt << "\n"; 
+      errs() << "GUARDS: Total Guards:\t" << nonOptimizedGuard + loopInvariantGuard + scalarEvolutionGuard << "\n"; 
 
 
-    return;
-}
+      return;
+    }
 
 #endif

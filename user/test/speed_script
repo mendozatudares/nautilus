@@ -1,5 +1,0 @@
-#!/usr/bin/env -S bash -x
-
-BENCH=$1
-t=${NAUT}/user/test
-cd ${NAUT} && ./scripts/pass_build.sh carat KARAT.cpp && cd $t && ./scripts/nas_testing ${BENCH} B -fall /tmp/brian && cd $t
