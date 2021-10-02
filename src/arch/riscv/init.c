@@ -104,7 +104,7 @@ void init (int hartid, void* fdt) {
 
     // Bring up UART device and printing so we can have output
     uart_init();
-
+    
     printk_init();
 
     printk(NAUT_WELCOME);

@@ -63,7 +63,7 @@ int printk(const char *fmt, ...)
     int i, c;
     char *s;
 
-    PRINTK_LOCK();
+    // PRINTK_LOCK();
 
     if (fmt == 0)
         panic("null fmt");
@@ -104,7 +104,7 @@ int printk(const char *fmt, ...)
         }
     }
 
-    PRINTK_UNLOCK();
+    // PRINTK_UNLOCK();
     return 0;
 }
 

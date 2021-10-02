@@ -2,15 +2,14 @@
 #include <arch/riscv/riscv.h>
 #include <arch/riscv/memlayout.h>
 #include <arch/riscv/sbi.h>
+#include <arch/riscv/cpu.h>
 
 int boot_hart = -1;
 
 void
 plic_init_hart(void)
 {
-    sbi_call(SBI_CONSOLE_PUTCHAR, '0');
-    int hart = r_mhartid();
-    sbi_call(SBI_CONSOLE_PUTCHAR, '1');
+    int hart = 0;
 
     // Clear the "supervisor enable" field. This is the register that enables or disables external interrupts (UART, DISK, ETC)
     *(uint32_t*)PLIC_SENABLE(hart) = (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ);
@@ -21,7 +20,7 @@ plic_init_hart(void)
     if (boot_hart == -1) {
         boot_hart = hart;
     } else {
-        *(uint32_t*)PLIC_SENABLE(r_mhartid()) = PLIC_SENABLE(boot_hart);
+        *(uint32_t*)PLIC_SENABLE(hart) = PLIC_SENABLE(boot_hart);
     } 
 }
 
@@ -37,24 +36,23 @@ plic_init(void)
 int
 plic_claim(void)
 {
-    return PLIC_SCLAIM(r_mhartid());
+    return PLIC_SCLAIM(0);
 }
 
 // tell the PLIC we've served this IRQ.
 void
 plic_complete(int irq)
 {
-    *(uint32_t*)PLIC_SCLAIM(r_mhartid()) = irq;
+    *(uint32_t*)PLIC_SCLAIM(0) = irq;
 }
 
 void
 plic_enable(int irq, int priority) {
-    int hart = r_mhartid();
     *(uint32_t*)(PLIC + irq * 4) = 1;
-    *(uint32_t*)PLIC_SPRIORITY(hart) |= (1 << irq);
+    *(uint32_t*)PLIC_SPRIORITY(0) |= (1 << irq);
 }
 
 void
 plic_disable(int irq) {
-    *(uint32_t*)PLIC_SENABLE(r_mhartid()) &= ~(1 << irq);
+    *(uint32_t*)PLIC_SENABLE(0) &= ~(1 << irq);
 }
