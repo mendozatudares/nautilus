@@ -3,7 +3,6 @@ if [[ "$*" == *"clean"* ]]; then
   make clean
 fi
 
-
 ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
 
 if [[ "$*" == *"qemu"* ]]; then

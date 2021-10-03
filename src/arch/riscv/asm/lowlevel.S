@@ -73,16 +73,16 @@ GLOBAL(nautilus_entry)
 	# allocate space for the scratch pad
 	addi    sp, sp, -32 * SZREG
 
-	# disable supervisor address translation and protection, since we identity map anyways
+	# disable supervisor address translation and protection (paging), since we'd identity map anyways
     csrw    satp, 0
     # flush tlb and whatnot
     sfence.vma zero, zero
 
-        # enable supervisor interrupts
+    # enable supervisor interrupts
 	li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
 	csrs    sie, t0
 
-    la      t0, init_ptr
+    la      t0, main_ptr
     REG_L   t0, 0(t0)
 
 	jr      t0
@@ -90,7 +90,7 @@ GLOBAL(nautilus_entry)
 .section .text
 
 .balign 8
-init_ptr: .quad init
+main_ptr: .quad main
 
 # When the processor gets an interrupt or traps, it jumps here and sets some CSRs
 # like sstatus, sbadaddr, stval etc... The only problem is that we don't switch

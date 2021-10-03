@@ -74,7 +74,7 @@ virt_mmap_entry_t virt_mmap[VIRT_MMAP_SIZE] = {
 void
 arch_detect_mem_map (mmap_info_t * mm_info, 
                      mem_map_entry_t * memory_map,
-                     unsigned long mbd)
+                     ulong_t mbd)
 {
     uint32_t i;
 

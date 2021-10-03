@@ -12,7 +12,7 @@ plic_init_hart(void)
     int hart = 0;
 
     // Clear the "supervisor enable" field. This is the register that enables or disables external interrupts (UART, DISK, ETC)
-    *(uint32_t*)PLIC_SENABLE(hart) = (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ);
+    *(uint32_t*)PLIC_SENABLE(hart) = 0;
 
     // set this hart's S-mode priority threshold to 0.
     *(uint32_t*)PLIC_SPRIORITY(hart) = 0;
@@ -49,6 +49,7 @@ plic_complete(int irq)
 void
 plic_enable(int irq, int priority) {
     *(uint32_t*)(PLIC + irq * 4) = 1;
+    *(uint32_t*)PLIC_SENABLE(0) |= (1 << irq);
     *(uint32_t*)PLIC_SPRIORITY(0) |= (1 << irq);
 }
 

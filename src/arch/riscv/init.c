@@ -80,7 +80,6 @@ nk_get_num_cpus (void)
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-void printk_init(void);
 void trap_init(void);
 void uart_init(void);
 
@@ -95,25 +94,20 @@ void init (int hartid, void* fdt) {
     struct naut_info * naut = &nautilus_info;
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
-    // Write supervisor trap vector location
-    trap_init();
-
     // Initialize platform level interrupt controller for this HART
     plic_init();
     plic_init_hart();
 
     // Bring up UART device and printing so we can have output
     uart_init();
-    
-    printk_init();
+
+    // Write supervisor trap vector location
+    trap_init();
 
     printk(NAUT_WELCOME);
 
     // /* setup the temporary boot-time allocator */
-    // /* this will detect memory from an array in memory, not multiboot or e820 */
-    // mm_boot_init(mbd);
-
-    // naut->sys.mb_info = &riscv_fake_multiboot_info;
+    mm_boot_init(0);
 
     // /* initialize boot CPU */
     // arch_early_init(naut);
@@ -122,7 +116,7 @@ void init (int hartid, void* fdt) {
     // nk_paging_init(&(naut->sys.mem), mbd);
 
     // /* setup the main kernel memory allocator */
-    // // nk_kmem_init();
+    // nk_kmem_init();
 
     // /* setup per-core area for BSP */
     // w_tp((uint64_t)naut->sys.cpus[0]);

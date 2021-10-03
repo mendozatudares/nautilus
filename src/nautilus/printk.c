@@ -50,8 +50,8 @@
 #define do_puts(x)    do { nk_vc_puts(x); } while (0)
 #else
 // All output is handled via UART
-#define do_putchar(x) do { uart_putchar(x);} while (0)
-#define do_puts(x)    do { uart_puts(x); } while (0)
+#define do_putchar(x) do { uart_putchar(x); } while (0)
+#define do_puts(x)    do { uart_puts(x); uart_putchar('\n'); } while (0)
 
 extern void uart_putchar(uchar_t c);
 extern void uart_puts(char * b);

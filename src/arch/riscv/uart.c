@@ -83,7 +83,6 @@ uart_init(void)
 void
 uart_putchar(int c)
 {
-    sbi_call(SBI_CONSOLE_PUTCHAR, 0);
     sbi_call(SBI_CONSOLE_PUTCHAR, c);
     /*
     UART_LOCK_CONF;

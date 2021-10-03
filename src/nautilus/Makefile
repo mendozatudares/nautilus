@@ -63,6 +63,9 @@ endif
 obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	naut_string.o \
 	spinlock.o \
+	printk.o \
+	doprnt.o \
+	dtoa.o \
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o

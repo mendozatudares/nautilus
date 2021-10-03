@@ -36,7 +36,7 @@
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
-#define BMM_DEBUG(fmt, args...) 
+#define BMM_DEBUG(fmt, args...) DEBUG_PRINT("BOOTMEM: " fmt, ##args)
 #define BMM_PRINT(fmt, args...) printk("BOOTMEM: " fmt, ##args)
 #define BMM_WARN(fmt, args...)  WARN_PRINT("BOOTMEM: " fmt, ##args)
 
@@ -188,7 +188,7 @@ mm_boot_init (ulong_t mbd)
     npages = mm_info.last_pfn + 1;
     pm_len = (npages/BITS_PER_LONG + !!(npages%BITS_PER_LONG)) * sizeof(long);
 
-    BMM_PRINT("Detected %d.%d MB (%d pages) of usable System RAM\n", mm_info.usable_ram/(1024*1024), mm_info.usable_ram%(1024*1024), npages);
+    BMM_PRINT("Detected %llu.%llu MB (%lu pages) of usable System RAM\n", mm_info.usable_ram/(1024*1024), mm_info.usable_ram%(1024*1024), npages);
 
     mem->page_map = (ulong_t*)pm_start;
     mem->npages   = npages;

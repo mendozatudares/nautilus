@@ -15,12 +15,22 @@ SECTIONS
     . = ALIGN(0x1000);
     kernel_page_table = .;
     . += 0x1000;
+
     boot_stack_start = .;
     . += 0x200000;  /* we start out with a 2M stack */
     boot_stack_end = .;
     *(.text* .text.*)
     . = ALIGN(0x1000);
     etext = .;
+  }
+
+  _dataStart = .;
+
+  .data : {
+    . = ALIGN(16);
+    *(.sdata .sdata.*) /* do not need to distinguish this from .data */
+    . = ALIGN(16);
+    *(.data .data.*)
   }
 
   .rodata : {
@@ -30,24 +40,20 @@ SECTIONS
     *(.rodata .rodata.*)
   }
 
-  .data : {
-    . = ALIGN(16);
-    *(.sdata .sdata.*) /* do not need to distinguish this from .data */
-    . = ALIGN(16);
-    *(.data .data.*)
-  }
-
   _loadEnd = .;
-  _bssStart = .;
 
   .bss ALIGN(0x1000) : AT(ALIGN(ADDR(.data)+SIZEOF(.data),0x1000)) {
+    
     . = ALIGN(16);
+    _bssStart = .;
     *(.sbss .sbss.*) /* do not need to distinguish this from .bss */
     . = ALIGN(16);
     *(.bss .bss.*)
   }
 
   _bssEnd = .;
+
+  _dataEnd = .;
 
   PROVIDE(end = .);
 }

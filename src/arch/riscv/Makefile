@@ -4,7 +4,6 @@ obj-y += asm/ \
 	 smp.o \
 	 early_mem.o \
 	 uart.o \
-	 printk.o \
 	 trap.o \
 	 mm/ \
 	 paging.o \
