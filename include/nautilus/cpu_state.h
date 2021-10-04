@@ -52,12 +52,23 @@ static inline void *__cpu_state_get_cpu()
 }
 #endif
 
+
+#define INL_OFFSET 8
+#define PREEMPT_DISABLE_OFFSET 10
+
+#ifdef NAUT_CONFIG_RISCV_HOST
+#undef INL_OFFSET
+#define INL_OFFSET 8
+#undef PREEMPT_DISABLE_OFFSET
+#define PREEMPT_DISABLE_OFFSET 12
+#endif
+
 static inline void preempt_disable() 
 {
     void *base = __cpu_state_get_cpu();
     if (base) {
 	// per-cpu functional
-	__sync_fetch_and_add((uint32_t *)((uint64_t)base+12),1);
+	__sync_fetch_and_add((uint32_t *)((uint64_t)base+PREEMPT_DISABLE_OFFSET),1);
     } else {
 	// per-cpu is not running, so we are not going to get preempted anyway
     }
@@ -68,7 +79,7 @@ static inline void preempt_enable()
     void *base = __cpu_state_get_cpu();
     if (base) {
 	// per-cpu functional
-	__sync_fetch_and_sub((uint32_t *)((uint64_t)base+12),1);
+	__sync_fetch_and_sub((uint32_t *)((uint64_t)base+PREEMPT_DISABLE_OFFSET),1);
     } else {
 	// per-cpu is not running, so we are not going to get preempted anyway
     }
@@ -82,7 +93,7 @@ static inline void preempt_reset()
     void *base = __cpu_state_get_cpu();
     if (base) {
 	// per-cpu functional
-	__sync_fetch_and_and((uint32_t *)((uint64_t)base+12),0);
+	__sync_fetch_and_and((uint32_t *)((uint64_t)base+PREEMPT_DISABLE_OFFSET),0);
     } else {
 	// per-cpu is not running, so we are not going to get preempted anyway
     }
@@ -93,7 +104,7 @@ static inline int preempt_is_disabled()
     void *base = __cpu_state_get_cpu();
     if (base) {
 	// per-cpu functional
-	return __sync_fetch_and_add((uint32_t *)((uint64_t)base+12),0);
+	return __sync_fetch_and_add((uint32_t *)((uint64_t)base+PREEMPT_DISABLE_OFFSET),0);
     } else {
 	// per-cpu is not running, so we are not going to get preempted anyway
 	return 1;
@@ -104,7 +115,7 @@ static inline uint16_t interrupt_nesting_level()
 {
     void *base = __cpu_state_get_cpu();
     if (base) {
-	return __sync_fetch_and_add((uint32_t *)((uint64_t)base+8),0);
+	return __sync_fetch_and_add((uint32_t *)((uint64_t)base+INL_OFFSET),0);
     } else {
 	return 0; // no interrupt should be on if we don't have percpu
     }

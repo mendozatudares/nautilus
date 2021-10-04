@@ -169,7 +169,7 @@ mm_dump_page_map (void)
 }
 
 int 
-mm_boot_init (ulong_t mbd)
+mm_boot_init (ulong_t fdt)
 {
     addr_t kern_start     = (addr_t)&_loadStart;
     addr_t kern_end       = (addr_t)&_loadEnd;
@@ -182,7 +182,7 @@ mm_boot_init (ulong_t mbd)
 
     /* parse the multiboot2 memory map, filing in 
      * some global data that we will subsequently use here  */
-    detect_mem_map(mbd);
+    detect_mem_map(fdt);
 
 
     npages = mm_info.last_pfn + 1;
@@ -213,7 +213,7 @@ mm_boot_init (ulong_t mbd)
     /* reserve the zero page */
     mm_boot_reserve_mem(0, PAGE_SIZE);
 
-    arch_reserve_boot_regions(mbd);
+    arch_reserve_boot_regions(fdt);
 
     return 0;
 }

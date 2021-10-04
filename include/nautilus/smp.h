@@ -73,12 +73,18 @@ struct nk_xcall {
 
 struct cpu {
     struct nk_thread * cur_thread;             /* +0  KCH: this must be first! */
+
+    #ifdef NAUT_CONFIG_RISCV_HOST
+    uint32_t interrupt_nesting_level;
+    uint32_t preempt_disable_level;
+    #else
     // track whether we are in an interrupt, nested or otherwise
     // this is intended for use by the scheduler (any scheduler)
-    uint32_t interrupt_nesting_level;          /* +8  PAD: DO NOT MOVE */
+    uint16_t interrupt_nesting_level;          /* +8  PAD: DO NOT MOVE */
     // track whether the scheduler (any scheduler) should be able to preempt
     // the current thread (whether cooperatively or via any
-    uint32_t preempt_disable_level;            /* +10 PAD: DO NOT MOVE */
+    uint16_t preempt_disable_level;            /* +10 PAD: DO NOT MOVE */
+    #endif
 
     // Track statistics of interrupts and exceptions
     // these counts are updated by the low-level interrupt handling code

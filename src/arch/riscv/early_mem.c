@@ -65,7 +65,7 @@ virt_mmap_entry_t virt_mmap[VIRT_MMAP_SIZE] = {
 /*  [VIRT_UART0] =  */    { 0x10000000,            0x100,    MULTIBOOT_MEMORY_RESERVED },
 /*  [VIRT_VIRTIO] = */    { 0x10001000,           0x1000,    MULTIBOOT_MEMORY_RESERVED },
 /*  [VIRT_FLASH] =  */    { 0x20000000,        0x4000000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_DRAM] =   */    { 0x80000000, PHYSTOP-KERNBASE,   MULTIBOOT_MEMORY_AVAILABLE },
+/*  [VIRT_DRAM] =   */    { 0x80030000, PHYSTOP-KERNBASE,   MULTIBOOT_MEMORY_AVAILABLE },
 /*  [VIRT_PCIE_MMIO] = */ { 0x40000000,       0x40000000,    MULTIBOOT_MEMORY_RESERVED },
 /*  [VIRT_PCIE_PIO] =  */ { 0x03000000,       0x00010000,    MULTIBOOT_MEMORY_RESERVED },
 /*  [VIRT_PCIE_ECAM] = */ { 0x30000000,       0x10000000,    MULTIBOOT_MEMORY_RESERVED },
@@ -74,8 +74,11 @@ virt_mmap_entry_t virt_mmap[VIRT_MMAP_SIZE] = {
 void
 arch_detect_mem_map (mmap_info_t * mm_info, 
                      mem_map_entry_t * memory_map,
-                     ulong_t mbd)
+                     ulong_t fdt)
 {
+    BMM_PRINT("%p\n", fdt);
+    BMM_PRINT("%d\n", fdt);
+
     uint32_t i;
 
     BMM_PRINT("Parsing RISC-V virt machine memory map\n");

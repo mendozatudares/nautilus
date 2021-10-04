@@ -106,10 +106,13 @@ void init (int hartid, void* fdt) {
 
     printk(NAUT_WELCOME);
 
-    // /* setup the temporary boot-time allocator */
-    mm_boot_init(0);
+    // Setup per-core area for BSP
+    w_tp((uint64_t)naut->sys.cpus[0]);
 
-    // /* initialize boot CPU */
+    // Setup the temporary boot-time allocator
+    mm_boot_init(fdt);
+
+    // Initialize boot CPU
     // arch_early_init(naut);
 
     // /* this will finish up the identity map */
@@ -118,10 +121,13 @@ void init (int hartid, void* fdt) {
     // /* setup the main kernel memory allocator */
     // nk_kmem_init();
 
-    // /* setup per-core area for BSP */
-    // w_tp((uint64_t)naut->sys.cpus[0]);
-
     // sti();
 
-    while(1);
+    while(1) {
+        int c = uart_getchar();
+        if (c != -1) {
+            if (c == 13) printk("\n");
+            else printk("%c", c);
+        }
+    }
 }
