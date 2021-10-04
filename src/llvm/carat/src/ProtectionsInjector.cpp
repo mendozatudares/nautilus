@@ -1561,6 +1561,58 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
       return false;
     }
 
+    
+
+
+    //This function correspondes to 1i and will recursively find out if an argument is safe to not protect
+    bool ProtectionsInjector::_isSafeArgument(Instruction* inst, Argument* arg){
+      //Grab the parent function the instruction exists in
+      auto parFunction = inst->getFunction();
+      //Get arg num
+      auto argumentNum = arg->getArgNo();
+
+      auto FM = noelle->getFunctionsManager();
+      auto CG = FM->getProgramCallGraph();
+      //_isASafeMemoryConstruct();
+      if(CG->doesItBelongToASCC(parFunction)){
+        errs() << "This function is in an SCC, abort!\n";
+        return false;
+      }
+      else{
+        auto parFunctionNode = CG->getFunctionNode(parFunction);
+
+        auto incomingEdges = parFunctionNode->getIncomingEdges();
+        bool areAllCallersSafe = true;
+        for(auto& edge : incomingEdges){
+          auto incomingSubEdges = edge->getSubEdges();
+          for(auto subEdge : incomingSubEdges){
+            auto callInst = subEdge->getCaller()->getInstruction();
+            auto callInstArg = callInst->getOperand(argumentNum);
+            if(!_isASafeMemoryConstruct(callInstArg)){
+              //Before we give up, let us try to cast it as an argument and recurse this function.
+              if(auto tryArgCast = dyn_cast<Argument>(callInstArg)){
+                if(_isSafeArgument(callInst, tryArgCast)){
+                  continue;
+                }
+              }
+              areAllCallersSafe = false;
+              break;
+            }
+
+          }
+          if(!areAllCallersSafe){
+            break;
+          }
+        }
+        if(areAllCallersSafe){
+          return true;
+        }
+        //If we make it here, then the function does not have all callers use the argument safely
+        return false;
+      }
+      
+    }
+
 
     std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool isWrite)> ProtectionsInjector::_findPointToInsertGuard(void) 
     {
@@ -1745,44 +1797,16 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
           /*
            * <Step 1i.>
            */
-          if(auto arg = dyn_cast<Argument>(PointerOfMemoryInstruction)){
-            //Grab the parent function the instruction exists in
-            auto parFunction = inst->getFunction();
-            //Get arg num
-            auto argumentNum = arg->getArgNo();
-
-            auto FM = noelle->getFunctionsManager();
-            auto CG = FM->getProgramCallGraph();
-            //_isASafeMemoryConstruct();
-            if(CG->doesItBelongToASCC(parFunction)){
-              errs() << "This function is in an SCC, abort!\n";
-            }
-            else{
-              auto parFunctionNode = CG->getFunctionNode(parFunction);
-
-              auto incomingEdges = parFunctionNode->getIncomingEdges();
-              bool areAllCallersSafe = true;
-              for(auto& edge : incomingEdges){
-                auto incomingSubEdges = edge->getSubEdges();
-                for(auto subEdge : incomingSubEdges){
-                  auto callInst = subEdge->getCaller()->getInstruction();
-                  auto callInstArg = callInst->getOperand(argumentNum);
-                  if(!_isASafeMemoryConstruct(callInstArg)){
-                    areAllCallersSafe = false;
-                    break;
-                  }
-
-                }
-                if(!areAllCallersSafe){
-                  break;
-                }
-              }
-              if(areAllCallersSafe){
-                redundantGuard++;
-                errs() << "We found a redundant argument based caller\n";
-                return;
-              }
-            }
+          Value* BitcastValue = _fetchBitCastOperand(PointerOfMemoryInstruction); 
+          if(BitcastValue == nullptr){
+            BitcastValue = PointerOfMemoryInstruction;
+          }
+          if(auto arg = dyn_cast<Argument>(BitcastValue)){
+            if(_isSafeArgument(inst, arg)){
+              errs() << "SUCCESS: Memory location is a safe argument, skipping...\n";
+              redundantGuard++;
+              return;
+            } 
           }
 
           /*

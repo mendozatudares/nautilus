@@ -198,6 +198,8 @@ private:
     bool _isAPointerReturnedByAllocator(Value *V);
 
     Value *_fetchBitCastOperand(Value *Pointer);
+    
+    bool _isSafeArgument(Instruction*, Argument*);
 
     Value *_fetchGEPBasePointer(
         Value *Pointer,
