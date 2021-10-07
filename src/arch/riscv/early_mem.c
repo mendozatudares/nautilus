@@ -28,6 +28,7 @@
 #include <nautilus/multiboot2.h>
 
 #include <arch/riscv/memlayout.h>
+#include <nautilus/devicetree.h>
 
 extern char * mem_region_types[6];
 
@@ -78,6 +79,8 @@ arch_detect_mem_map (mmap_info_t * mm_info,
 {
     BMM_PRINT("%p\n", fdt);
     BMM_PRINT("%d\n", fdt);
+
+    dtb_parse((struct dtb_fdt_header *) fdt);
 
     uint32_t i;
 

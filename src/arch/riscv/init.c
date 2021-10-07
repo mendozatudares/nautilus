@@ -82,6 +82,7 @@ nk_get_num_cpus (void)
 
 void trap_init(void);
 void uart_init(void);
+int uart_getchar(void);
 
 void init (int hartid, void* fdt) {
 
@@ -110,15 +111,15 @@ void init (int hartid, void* fdt) {
     w_tp((uint64_t)naut->sys.cpus[0]);
 
     // Setup the temporary boot-time allocator
-    mm_boot_init(fdt);
+    mm_boot_init((ulong_t) fdt);
 
     // Initialize boot CPU
-    // arch_early_init(naut);
+    arch_early_init(naut);
 
     // /* this will finish up the identity map */
     // nk_paging_init(&(naut->sys.mem), mbd);
 
-    // /* setup the main kernel memory allocator */
+    // Setup the main kernel memory allocator
     // nk_kmem_init();
 
     // sti();
