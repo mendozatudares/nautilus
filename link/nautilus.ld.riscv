@@ -55,5 +55,5 @@ SECTIONS
 
   _dataEnd = .;
 
-  PROVIDE(end = .);
+  PROVIDE(kernel_end = .);
 }

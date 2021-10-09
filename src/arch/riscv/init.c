@@ -28,6 +28,7 @@
 #include <nautilus/cpu.h>
 #include <nautilus/percpu.h>
 #include <nautilus/errno.h>
+#include <nautilus/devicetree.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
 #include <nautilus/gdb-stub.h>
@@ -112,6 +113,7 @@ void init (int hartid, void* fdt) {
 
     // Setup the temporary boot-time allocator
     mm_boot_init((ulong_t) fdt);
+
 
     // Initialize boot CPU
     arch_early_init(naut);

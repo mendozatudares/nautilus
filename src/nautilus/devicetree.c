@@ -118,12 +118,12 @@ static struct dtb_node *alloc_device(const char *name) {
 static void node_set_prop(struct dtb_node *node, const char *name, int len, uint8_t *val) {
   // printk("%s.%s\n", node->name, name);
   if (STREQ(name, "#address-cells")) {
-    node->address_cells = val;
+    node->address_cells = bswap32(*(uint32_t *)val);
     return;
   }
 
   if (STREQ(name, "#size-cells")) {
-    node->size_cells = val;
+    node->size_cells= bswap32(*(uint32_t *)val);
     return;
   }
   if (STREQ(name, "interrupts")) {
@@ -140,7 +140,7 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
     int addr_cells = dtb_node_get_addr_cells(node);
     int size_cells = dtb_node_get_size_cells(node);
 
-    printk("%s: addr %d, size %d\n", node->name, addr_cells, size_cells);
+    // printk("%s: addr %d, size %d\n", node->name, addr_cells, size_cells);
     if (addr_cells > 0) {
       if (addr_cells == 1) node->reg.address = bswap32(*(uint32_t *)val);
       if (addr_cells == 2) node->reg.address = bswap64(*(uint64_t *)val);
@@ -159,11 +159,11 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
   if (STREQ(name, "compatible")) {
     node->is_device = true;
     strncpy(node->compatible, (const char *)val, sizeof(node->compatible));
-    printk("compatible: %s\n", val);
+    // printk("compatible: %s\n", val);
 
     return;
   }
-  printk("   %s@%llx\t%s = %p\n", node->name, node->address, name, val);
+  // printk("   %s@%llx\t%s = %p\n", node->name, node->address, name, val);
 }
 
 
@@ -209,11 +209,22 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
   printk("fdt at %p\n", fdt);
   global_fdt_header = fdt;
 
+  printk("  magic: %p\n", bswap32(fdt->magic));
+  printk("  totalsize: %d\n", bswap32(fdt->totalsize));
+  printk("  off_dt_struct: %p\n", bswap32(fdt->off_dt_struct));
+  printk("  off_dt_strings: %p\n", bswap32(fdt->off_dt_strings));
+  printk("  off_mem_rsvmap: %p\n", bswap32(fdt->off_mem_rsvmap));
+  printk("  version: %d\n", bswap32(fdt->version));
+  printk("  last_comp_version: %d\n", bswap32(fdt->last_comp_version));
+  printk("  boot_cpuid_phys: %p\n", bswap32(fdt->boot_cpuid_phys));
+  printk("  size_dt_strings: %p\n", bswap32(fdt->size_dt_strings));
+  printk("  size_dt_struct: %p\n", bswap32(fdt->size_dt_struct));
+
+  if (next_device != 0) panic("expected next_device = 0, got %d\n", next_device);
   struct dtb_node *root = alloc_device("");
 
   struct dtb_node *node = root;
   struct dtb_node *new_node = NULL;
-
 
   uint32_t *sp = (uint32_t *)((off_t)fdt + bswap32(fdt->off_dt_struct));
   const char *strings = (const char *)((off_t)fdt + bswap32(fdt->off_dt_strings));
@@ -260,19 +271,19 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
         sp++;
         nameoff = bswap32(*sp);
         sp++;
-        valptr = (const char *)sp;
-        node_set_prop(node, strings + nameoff, len, (uint8_t *)valptr);
+        valptr = (const uint8_t *)sp;
+        node_set_prop(node, strings + nameoff, len, valptr);
         for (int i = 0; i < round_up(len, 4) / 4; i++)
           sp++;
 
         break;
 
       case FDT_NOP:
-        printk("nop\n");
+        // printk("nop\n");
         break;
 
       case FDT_END:
-        printk("end\n");
+        // printk("end\n");
         break;
     }
   }
@@ -280,9 +291,6 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
   dump_dtb(node, 0);
   return next_device;
 }
-
-
-
 
 static struct fdt_type {
   const char *name;

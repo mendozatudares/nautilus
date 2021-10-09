@@ -41,6 +41,7 @@ extern char * mem_region_types[6];
 #define BMM_PRINT(fmt, args...) printk("BOOTMEM: " fmt, ##args)
 #define BMM_WARN(fmt, args...)  WARN_PRINT("BOOTMEM: " fmt, ##args)
 
+#define max(x, y) x > y ? x : y
 
 void 
 arch_reserve_boot_regions (unsigned long mbd)
@@ -48,75 +49,60 @@ arch_reserve_boot_regions (unsigned long mbd)
 
 }
 
-typedef struct {
-  uint64_t addr;
-  uint64_t len;
-  uint32_t type; // same as for multiboot2
-} __packed virt_mmap_entry_t;
+extern ulong_t kernel_end;
+static off_t dtb_ram_start = 0;
+static size_t dtb_ram_size = 0;
 
-/* From qemu's virt machine */
-#define VIRT_MMAP_SIZE 13
-virt_mmap_entry_t virt_mmap[VIRT_MMAP_SIZE] = {
-/*  [VIRT_DEBUG] =  */    {        0x0,            0x100,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_MROM] =   */    {     0x1000,          0x11000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_TEST] =   */    {   0x100000,           0x1000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_RTC] =    */    {   0x101000,           0x1000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_CLINT] =  */    {  0x2000000,          0x10000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_PLIC] =   */    {  0xc000000,        0x4000000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_UART0] =  */    { 0x10000000,            0x100,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_VIRTIO] = */    { 0x10001000,           0x1000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_FLASH] =  */    { 0x20000000,        0x4000000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_DRAM] =   */    { 0x80030000, PHYSTOP-KERNBASE,   MULTIBOOT_MEMORY_AVAILABLE },
-/*  [VIRT_PCIE_MMIO] = */ { 0x40000000,       0x40000000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_PCIE_PIO] =  */ { 0x03000000,       0x00010000,    MULTIBOOT_MEMORY_RESERVED },
-/*  [VIRT_PCIE_ECAM] = */ { 0x30000000,       0x10000000,    MULTIBOOT_MEMORY_RESERVED },
-};
+bool dtb_node_get_ram(struct dtb_node * n) {
+  if(!strcmp(n->name, "memory")) {
+    dtb_ram_size = n->reg.length;
+    dtb_ram_start = n->reg.address;
+    return false;
+  }
+  return true;
+}
 
 void
 arch_detect_mem_map (mmap_info_t * mm_info, 
                      mem_map_entry_t * memory_map,
                      ulong_t fdt)
 {
-    BMM_PRINT("%p\n", fdt);
-    BMM_PRINT("%d\n", fdt);
-
     dtb_parse((struct dtb_fdt_header *) fdt);
+    dtb_walk_devices(dtb_node_get_ram);
 
-    uint32_t i;
+    if (dtb_ram_start == 0) {
+      BMM_WARN("DTB did not contain memory segment. Assuming 128MB...\n");
+      dtb_ram_size = 128000000;
+      dtb_ram_start = &kernel_end;
+    }
 
     BMM_PRINT("Parsing RISC-V virt machine memory map\n");
 
-    for (i=0; i<VIRT_MMAP_SIZE; i++) {
-    
-    virt_mmap_entry_t *entry = &virt_mmap[i];
     ulong_t start,end;
     
-    start = round_up(entry->addr, PAGE_SIZE_4KB);
-    end   = round_down(entry->addr + entry->len, PAGE_SIZE_4KB);
+    start = round_up(max(dtb_ram_start, (ulong_t) &kernel_end), PAGE_SIZE_4KB);
+    end   = round_down(dtb_ram_start + dtb_ram_size, PAGE_SIZE_4KB);
+    if (end - start > 0) {
+      memory_map[0].addr = start;
+      memory_map[0].len  = end-start;
+      memory_map[0].type = MULTIBOOT_MEMORY_AVAILABLE;
 
-    memory_map[i].addr = start;
-    memory_map[i].len  = end-start;
-    memory_map[i].type = entry->type;
+      BMM_PRINT("Memory map[%d] - [%p - %p] <%s>\n", 
+          0, 
+          start,
+          end,
+          mem_region_types[memory_map[0].type]);
+      
+      mm_info->usable_ram += end-start;
 
-    BMM_PRINT("Memory map[%d] - [%p - %p] <%s>\n", 
-	      i, 
-	      start,
-	      end,
-	      mem_region_types[memory_map[i].type]);
-    
-    if (entry->type == 1) {
-      mm_info->usable_ram += entry->len;
+      if (end > (mm_info->last_pfn << PAGE_SHIFT)) {
+        mm_info->last_pfn = end >> PAGE_SHIFT;
+      }
+
+      mm_info->total_mem += end-start;
+
+      ++mm_info->num_regions;
     }
-
-    if (end > (mm_info->last_pfn << PAGE_SHIFT)) {
-      mm_info->last_pfn = end >> PAGE_SHIFT;
-    }
-
-    mm_info->total_mem += end-start;
-
-    ++mm_info->num_regions;
-    }
-    
 }
 
 
