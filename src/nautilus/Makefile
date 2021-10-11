@@ -66,7 +66,8 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	printk.o \
 	doprnt.o \
 	dtoa.o \
-	devicetree.o
+	devicetree.o \
+	mm/ \
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o

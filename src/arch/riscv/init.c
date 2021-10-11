@@ -101,7 +101,7 @@ void init (int hartid, void* fdt) {
     plic_init_hart();
 
     // Bring up UART device and printing so we can have output
-    uart_init();
+    // uart_init();
 
     // Write supervisor trap vector location
     trap_init();
@@ -114,7 +114,6 @@ void init (int hartid, void* fdt) {
     // Setup the temporary boot-time allocator
     mm_boot_init((ulong_t) fdt);
 
-
     // Initialize boot CPU
     arch_early_init(naut);
 
@@ -122,7 +121,11 @@ void init (int hartid, void* fdt) {
     // nk_paging_init(&(naut->sys.mem), mbd);
 
     // Setup the main kernel memory allocator
-    // nk_kmem_init();
+    nk_kmem_init();
+
+    /* now we switch to the real kernel memory allocator, pages
+     * allocated in the boot mem allocator are kept reserved */
+    // mm_boot_kmem_init();
 
     // sti();
 

@@ -167,6 +167,14 @@ void *nk_gc_pdsgc_malloc_specific(uint64_t, int cpu);
 void arch_detect_mem_map (mmap_info_t * mm_info, mem_map_entry_t * memory_map, unsigned long mbd);
 void arch_reserve_boot_regions(unsigned long mbd);
 
+#ifdef NAUT_CONFIG_RISCV_HOST
+#define MM_PRINT(fmt, args...) printk(fmt, ##args)
+#define ctz(x) __ctzdi2(x)
+#else
+#define MM_PRINT(fmt, args...) nk_vc_printf(fmt, ##args)
+#define ctz(x) __builtin_ctzl(x)
+#endif
+
 
 struct kmem_stats {
     uint64_t total_num_pools; // how many memory pools there are

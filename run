@@ -8,6 +8,6 @@ ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
 if [[ "$*" == *"qemu"* ]]; then
   echo 'Starting QEMU...'
   printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' _
-  qemu-system-riscv64 -nographic -smp 1 -m 256M -machine virt -bios default -kernel nautilus.bin -gdb tcp::1234
+  qemu-system-riscv64 -nographic -machine sifive_u -bios default -kernel nautilus.bin -gdb tcp::1234
 fi
 

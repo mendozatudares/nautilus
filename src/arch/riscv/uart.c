@@ -155,12 +155,15 @@ uart_start()
 int
 uart_getchar(void)
 {
+    return sbi_call(SBI_CONSOLE_GETCHAR).value;
+    /*
     if(ReadReg(LSR) & 0x01){
         // input data is ready.
         return ReadReg(RHR);
     } else {
         return -1;
     }
+    */
 }
 
 // handle a uart interrupt, raised because input has

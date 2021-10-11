@@ -330,7 +330,7 @@ kmem_add_memory (struct mem_region * mem,
      * buddy_free() will coalesce these chunks as appropriate
      */
 
-    uint64_t max_chunk_size = base_addr ? 1ULL << __builtin_ctzl(base_addr) : size;
+    uint64_t max_chunk_size = base_addr ? 1ULL << ctz(base_addr) : size;
     uint64_t chunk_size = max_chunk_size < size ? max_chunk_size : size;
     uint64_t chunk_order = ilog2(chunk_size); // floor
     uint64_t num_chunks = size/chunk_size; // floor
@@ -569,7 +569,7 @@ _kmem_malloc (size_t size, int cpu, int zero)
 	// attempt to get memory back by reaping threads now...
 	if (first) {
 	    KMEM_DEBUG("malloc initially failed for size %lu order %lu attempting reap\n",size,order);
-	    nk_sched_reap(1);
+	    // nk_sched_reap(1);
 	    first=0;
 	    goto retry;
 	}
@@ -985,7 +985,7 @@ handle_meminfo (char * buf, void * priv)
     uint64_t i;
 
     if (!s) { 
-        nk_vc_printf("Failed to allocate space for mem info\n");
+        MM_PRINT("Failed to allocate space for mem info\n");
         return 0;
     }
 
@@ -994,7 +994,7 @@ handle_meminfo (char * buf, void * priv)
     kmem_stats(s);
 
     for (i=0;i<s->num_pools;i++) { 
-        nk_vc_printf("pool %lu %p-%p %lu blks free %lu bytes free\n  %lu bytes min %lu bytes max\n", 
+        MM_PRINT("pool %lu %p-%p %lu blks free %lu bytes free\n  %lu bytes min %lu bytes max\n", 
                 i,
                 s->pool_stats[i].start_addr,
                 s->pool_stats[i].end_addr,
@@ -1004,8 +1004,8 @@ handle_meminfo (char * buf, void * priv)
                 s->pool_stats[i].max_alloc_size);
     }
 
-    nk_vc_printf("%lu pools %lu blks free %lu bytes free\n", s->total_num_pools, s->total_blocks_free, s->total_bytes_free);
-    nk_vc_printf("  %lu bytes min %lu bytes max\n", s->min_alloc_size, s->max_alloc_size);
+    MM_PRINT("%lu pools %lu blks free %lu bytes free\n", s->total_num_pools, s->total_blocks_free, s->total_bytes_free);
+    MM_PRINT("  %lu bytes min %lu bytes max\n", s->min_alloc_size, s->max_alloc_size);
 
     free(s);
 
@@ -1032,21 +1032,21 @@ handle_mem (char * buf, void * priv)
             (size=8, sscanf(buf, "mem %lx %lu", &addr, &len)==2)) { 
         uint64_t i,j,k;
         for (i=0;i<len;i+=BYTES_PER_LINE) {
-            nk_vc_printf("%016lx :",addr+i);
+            MM_PRINT("%016lx :",addr+i);
             for (j=0;j<BYTES_PER_LINE && (i+j)<len; j+=size) {
-                nk_vc_printf(" ");
+                MM_PRINT(" ");
                 for (k=0;k<size;k++) { 
-                    nk_vc_printf("%02x", *(uint8_t*)(addr+i+j+k));
+                    MM_PRINT("%02x", *(uint8_t*)(addr+i+j+k));
                 }
             }
-            nk_vc_printf(" ");
+            MM_PRINT(" ");
             for (j=0;j<BYTES_PER_LINE && (i+j)<len; j+=size) {
                 for (k=0;k<size;k++) { 
-                    nk_vc_printf("%c", isalnum(*(uint8_t*)(addr+i+j+k)) ? 
+                    MM_PRINT("%c", isalnum(*(uint8_t*)(addr+i+j+k)) ? 
                             *(uint8_t*)(addr+i+j+k) : '.');
                 }
             }
-            nk_vc_printf("\n");
+            MM_PRINT("\n");
         }	      
 
         return 0;
@@ -1076,28 +1076,28 @@ handle_peek (char * buf, void * priv)
         switch (bwdq) { 
             case 'b': 
                 data = *(uint8_t*)addr;       
-                nk_vc_printf("Mem[0x%016lx] = 0x%02lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%02lx\n",addr,data);
                 break;
             case 'w': 
                 data = *(uint16_t*)addr;       
-                nk_vc_printf("Mem[0x%016lx] = 0x%04lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%04lx\n",addr,data);
                 break;
             case 'd': 
                 data = *(uint32_t*)addr;       
-                nk_vc_printf("Mem[0x%016lx] = 0x%08lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%08lx\n",addr,data);
                 break;
             case 'q': 
                 data = *(uint64_t*)addr;       
-                nk_vc_printf("Mem[0x%016lx] = 0x%016lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%016lx\n",addr,data);
                 break;
             default:
-                nk_vc_printf("Unknown size requested\n",bwdq);
+                MM_PRINT("Unknown size requested\n",bwdq);
                 break;
         }
         return 0;
     }
 
-    nk_vc_printf("invalid poke command\n");
+    MM_PRINT("invalid poke command\n");
 
     return 0;
 }
@@ -1123,28 +1123,28 @@ handle_poke (char * buf, void * priv)
         switch (bwdq) { 
             case 'b': 
                 *(uint8_t*)addr = data; clflush_unaligned((void*)addr,1);
-                nk_vc_printf("Mem[0x%016lx] = 0x%02lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%02lx\n",addr,data);
                 break;
             case 'w': 
                 *(uint16_t*)addr = data; clflush_unaligned((void*)addr,2);
-                nk_vc_printf("Mem[0x%016lx] = 0x%04lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%04lx\n",addr,data);
                 break;
             case 'd': 
                 *(uint32_t*)addr = data; clflush_unaligned((void*)addr,4);
-                nk_vc_printf("Mem[0x%016lx] = 0x%08lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%08lx\n",addr,data);
                 break;
             case 'q': 
                 *(uint64_t*)addr = data; clflush_unaligned((void*)addr,8);
-                nk_vc_printf("Mem[0x%016lx] = 0x%016lx\n",addr,data);
+                MM_PRINT("Mem[0x%016lx] = 0x%016lx\n",addr,data);
                 break;
             default:
-                nk_vc_printf("Unknown size requested\n");
+                MM_PRINT("Unknown size requested\n");
                 break;
         }
         return 0;
     }
 
-    nk_vc_printf("invalid poke command\n");
+    MM_PRINT("invalid poke command\n");
 
     return 0;
 }

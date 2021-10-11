@@ -5,6 +5,5 @@ obj-y += asm/ \
 	 early_mem.o \
 	 uart.o \
 	 trap.o \
-	 mm/ \
 	 sbi.o \
 	 plic.o

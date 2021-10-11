@@ -51,6 +51,7 @@ char * mem_region_types[6] = {
 
 
 extern addr_t _loadStart;
+extern addr_t _loadEnd;
 extern addr_t _bssEnd;
 extern ulong_t pml4;
 extern ulong_t boot_stack_start;
@@ -171,7 +172,11 @@ int
 mm_boot_init (ulong_t mbd)
 {
     addr_t kern_start     = (addr_t)&_loadStart;
+#ifdef NAUT_CONFIG_RISCV_HOST
+    addr_t kern_end       = (addr_t)&_loadEnd;
+#else
     addr_t kern_end       = multiboot_get_modules_end(mbd);
+#endif
     addr_t pm_start       = round_up(kern_end, PAGE_SIZE);
     boot_mem_info_t * mem = &bootmem;
     ulong_t npages;

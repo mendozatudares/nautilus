@@ -357,7 +357,7 @@ buddy_free(
     ASSERT(mp);
     ASSERT(order <= mp->pool_order);
     ASSERT(// cannot be aligned to own size if pool start is not multiple of alignment
-	   (mp->base_addr && (order > __builtin_ctzl(mp->base_addr)))
+	   (mp->base_addr && (order > ctz(mp->base_addr)))
 	   // otherwise must be aligned to own size
 	   || !((uint64_t)addr % (1ULL<<order)));
 
@@ -458,7 +458,7 @@ static int _buddy_sanity_check(struct buddy_mempool *mp, struct buddy_pool_stats
     min_alloc = 0;
     max_alloc = 0;
 
-    //nk_vc_printf("buddy pool %p-%p, order=%lu, min order=%lu\n", mp->base_addr, mp->base_addr + (1ULL<<mp->pool_order),mp->pool_order,mp->min_order);
+    //MM_PRINT("buddy pool %p-%p, order=%lu, min order=%lu\n", mp->base_addr, mp->base_addr + (1ULL<<mp->pool_order),mp->pool_order,mp->min_order);
 
     for (i = mp->min_order; i <= mp->pool_order; i++) {
 
@@ -466,8 +466,8 @@ static int _buddy_sanity_check(struct buddy_mempool *mp, struct buddy_pool_stats
         num_blocks = 0;
         list_for_each(entry, &mp->avail[i])  {
 	    struct block *block = list_entry(entry, struct block, link);
-	    //nk_vc_printf("order %lu block %lu\n",i, num_blocks);
-	    //nk_vc_printf("entry %p - block %p order %lx\n",entry, block,block->order);
+	    //MM_PRINT("order %lu block %lu\n",i, num_blocks);
+	    //MM_PRINT("entry %p - block %p order %lx\n",entry, block,block->order);
 	    if ((uint64_t)block<(uint64_t)mp->base_addr || 
 		(uint64_t)block>=(uint64_t)(mp->base_addr+(1ULL<<mp->pool_order))) { 
 		ERROR_PRINT("BLOCK %p IS OUTSIDE OF POOL RANGE (%p-%p)\n", block,
@@ -490,7 +490,7 @@ static int _buddy_sanity_check(struct buddy_mempool *mp, struct buddy_pool_stats
             ++num_blocks;
 	}
 
-	//nk_vc_printf("%lu blocks at order %lu\n",num_blocks,i);
+	//MM_PRINT("%lu blocks at order %lu\n",num_blocks,i);
 
 	if (min_alloc==0) { 
 	    min_alloc = 1ULL << mp->min_order ;
