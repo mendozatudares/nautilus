@@ -104,8 +104,13 @@ struct cpu {
 
     cpu_id_t id;
     uint32_t lapic_id;   
+    #ifdef NAUT_CONFIG_RISCV_HOST
     uint32_t enabled;
     uint32_t is_bsp;
+    #else
+    uint8_t enabled;
+    uint8_t is_bsp;
+    #endif
     uint32_t cpu_sig;
     uint32_t feat_flags;
 
