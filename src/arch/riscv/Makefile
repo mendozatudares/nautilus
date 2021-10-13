@@ -6,4 +6,5 @@ obj-y += asm/ \
 	 uart.o \
 	 trap.o \
 	 sbi.o \
-	 plic.o
+	 plic.o \
+	 numa.o

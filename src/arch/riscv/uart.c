@@ -7,7 +7,7 @@
 // the UART control registers are memory-mapped
 // at address UART0. this macro returns the
 // address of one of the registers.
-#define Reg(reg) ((volatile unsigned char *)(UART0 + reg))
+#define Reg(reg) ((volatile unsigned char *)(0x10010000 + reg))
 
 // the UART control registers.
 // some have different meanings for
@@ -155,15 +155,13 @@ uart_start()
 int
 uart_getchar(void)
 {
-    return sbi_call(SBI_CONSOLE_GETCHAR).value;
-    /*
-    if(ReadReg(LSR) & 0x01){
-        // input data is ready.
-        return ReadReg(RHR);
-    } else {
-        return -1;
-    }
-    */
+    sbi_call(SBI_CONSOLE_GETCHAR).value;
+    // if(ReadReg(LSR) & 0x01){
+    //     // input data is ready.
+    //     return ReadReg(RHR);
+    // } else {
+    //     return -1;
+    // }
 }
 
 // handle a uart interrupt, raised because input has

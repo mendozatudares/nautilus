@@ -50,10 +50,12 @@ arch_reserve_boot_regions (unsigned long mbd)
 }
 
 extern ulong_t kernel_end;
-static off_t dtb_ram_start = 0;
-static size_t dtb_ram_size = 0;
+off_t dtb_ram_start = 0;
+size_t dtb_ram_size = 0;
+off_t rsv_ram_start = 0;
+size_t rsv_ram_size = 0;
 
-bool dtb_node_get_ram(struct dtb_node * n) {
+bool dtb_node_get_ram (struct dtb_node * n) {
   if(!strcmp(n->name, "memory")) {
     dtb_ram_size = n->reg.length;
     dtb_ram_start = n->reg.address;
@@ -62,38 +64,37 @@ bool dtb_node_get_ram(struct dtb_node * n) {
   return true;
 }
 
+bool dtb_node_get_rsv_ram (struct dtb_node *n) {
+  if(!strcmp(n->name, "mmode_resv0")) {
+    rsv_ram_size = n->reg.length;
+    rsv_ram_start = n->reg.address;
+    return false;
+  }
+  return true;
+}
+
 void
-arch_detect_mem_map (mmap_info_t * mm_info, 
-                     mem_map_entry_t * memory_map,
-                     ulong_t fdt)
+add_mem_map_entry (mmap_info_t * mm_info,
+                   mem_map_entry_t * memory_map,
+                   ulong_t start,
+                   ulong_t end,
+                   int index,
+                   int type)
 {
-    dtb_parse((struct dtb_fdt_header *) fdt);
-    dtb_walk_devices(dtb_node_get_ram);
-
-    if (dtb_ram_start == 0) {
-      BMM_WARN("DTB did not contain memory segment. Assuming 128MB...\n");
-      dtb_ram_size = 128000000;
-      dtb_ram_start = &kernel_end;
-    }
-
-    BMM_PRINT("Parsing RISC-V virt machine memory map\n");
-
-    ulong_t start,end;
-    
-    start = round_up(max(dtb_ram_start, (ulong_t) &kernel_end), PAGE_SIZE_4KB);
-    end   = round_down(dtb_ram_start + dtb_ram_size, PAGE_SIZE_4KB);
     if (end - start > 0) {
-      memory_map[0].addr = start;
-      memory_map[0].len  = end-start;
-      memory_map[0].type = MULTIBOOT_MEMORY_AVAILABLE;
+      memory_map[index].addr = start;
+      memory_map[index].len  = end-start;
+      memory_map[index].type = type;
 
       BMM_PRINT("Memory map[%d] - [%p - %p] <%s>\n", 
-          0, 
+          index, 
           start,
           end,
-          mem_region_types[memory_map[0].type]);
+          mem_region_types[memory_map[index].type]);
       
-      mm_info->usable_ram += end-start;
+      if (memory_map[index].type == MULTIBOOT_MEMORY_AVAILABLE) {
+        mm_info->usable_ram += end-start;
+      }
 
       if (end > (mm_info->last_pfn << PAGE_SHIFT)) {
         mm_info->last_pfn = end >> PAGE_SHIFT;
@@ -103,6 +104,34 @@ arch_detect_mem_map (mmap_info_t * mm_info,
 
       ++mm_info->num_regions;
     }
+}
+
+void
+arch_detect_mem_map (mmap_info_t * mm_info, 
+                     mem_map_entry_t * memory_map,
+                     ulong_t fdt)
+{
+    dtb_parse((struct dtb_fdt_header *) fdt);
+    dtb_walk_devices(dtb_node_get_ram);
+    dtb_walk_devices(dtb_node_get_rsv_ram);
+
+    if (dtb_ram_start == 0) {
+      BMM_WARN("DTB did not contain memory segment. Assuming 128MB...\n");
+      dtb_ram_size = 128000000;
+      dtb_ram_start = (ulong_t) &kernel_end;
+    }
+
+    BMM_PRINT("Parsing RISC-V virt machine memory map\n");
+
+    ulong_t start, end;
+
+    start = rsv_ram_start;
+    end = round_down(max(rsv_ram_start + rsv_ram_size, (ulong_t) &kernel_end), PAGE_SIZE_4KB);
+    add_mem_map_entry(mm_info, memory_map, start, end, 0, MULTIBOOT_MEMORY_RESERVED);
+    
+    start = round_up(max(dtb_ram_start, (ulong_t) &kernel_end), PAGE_SIZE_4KB);
+    end   = round_down(dtb_ram_start + dtb_ram_size, PAGE_SIZE_4KB);
+    add_mem_map_entry(mm_info, memory_map, start, end, 1, MULTIBOOT_MEMORY_AVAILABLE);
 }
 
 

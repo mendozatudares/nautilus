@@ -85,12 +85,12 @@ struct device_tree {
   struct device_tree_node root;
 };
 
-struct device_tree_node *device_tree_node_spawn(struct device_tree_node *n, const char *name);
+struct device_tree_node *device_tree_node_spawn(struct device_tree_node *n, char *name);
 struct prop* device_tree_node_get_prop(struct device_tree_node *n, char* name);
 void device_tree_node_set_prop(struct device_tree_node *n, char* name, int vlen, void *value);
 void device_tree_node_dump(struct device_tree_node *n, int depth);
 
-struct device_tree device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt);
+void device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt);
 void device_tree_deinit(struct device_tree *dt);
 void device_tree_dump(struct device_tree *dt);
 

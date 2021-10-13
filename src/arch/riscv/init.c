@@ -95,6 +95,8 @@ void init (int hartid, void* fdt) {
 
     struct naut_info * naut = &nautilus_info;
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
+    naut->sys.bsp_id = hartid;
+    naut->sys.fdt_header = fdt;
 
     // Initialize platform level interrupt controller for this HART
     plic_init();
@@ -119,13 +121,14 @@ void init (int hartid, void* fdt) {
 
     // /* this will finish up the identity map */
     // nk_paging_init(&(naut->sys.mem), mbd);
+    arch_numa_init(&naut->sys);
 
     // Setup the main kernel memory allocator
     nk_kmem_init();
 
     /* now we switch to the real kernel memory allocator, pages
      * allocated in the boot mem allocator are kept reserved */
-    // mm_boot_kmem_init();
+    mm_boot_kmem_init();
 
     // sti();
 

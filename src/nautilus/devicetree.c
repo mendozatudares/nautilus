@@ -51,7 +51,7 @@ void device_tree_node_set_prop(struct device_tree_node *n, char* name, int vlen,
   }
 }
 
-struct device_tree_node *device_tree_node_spawn(struct device_tree_node *n, const char *name) {
+struct device_tree_node *device_tree_node_spawn(struct device_tree_node *n, char *name) {
   struct device_tree_node *nn = mm_boot_alloc(sizeof(*nn));
   nn->name = name;
   nn->parent = n;
@@ -135,7 +135,7 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
   if (STREQ(name, "reg")) {
     node->is_device = true;
     /* TODO: It's unsafe to assume 64 bit here... But since we are 64bit only... (for now) */
-    int *cells = (unsigned long *)val;
+    // int *cells = (unsigned long *)val;
 
     int addr_cells = dtb_node_get_addr_cells(node);
     int size_cells = dtb_node_get_size_cells(node);
@@ -227,7 +227,7 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
   struct dtb_node *new_node = NULL;
 
   uint32_t *sp = (uint32_t *)((off_t)fdt + bswap32(fdt->off_dt_struct));
-  const char *strings = (const char *)((off_t)fdt + bswap32(fdt->off_dt_strings));
+  const char *strings = (char *)((off_t)fdt + bswap32(fdt->off_dt_strings));
   int depth = 0;
 
   while (bswap32(*sp) != FDT_END) {
@@ -237,13 +237,13 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
 
     uint32_t len;
     uint32_t nameoff;
-    const char *name;
-    const char *valptr = NULL;
+    char *name;
+    char *valptr = NULL;
     char value[256];
 
     switch (op) {
       case FDT_BEGIN_NODE:
-        name = (const char *)sp;
+        name = (char *)sp;
 
         len = round_up(strlen(name) + 1, 4) / 4;
         for (int i = 0; i < len; i++)
@@ -271,7 +271,7 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
         sp++;
         nameoff = bswap32(*sp);
         sp++;
-        valptr = (const uint8_t *)sp;
+        valptr = (uint8_t *)sp;
         node_set_prop(node, strings + nameoff, len, valptr);
         for (int i = 0; i < round_up(len, 4) / 4; i++)
           sp++;
@@ -293,7 +293,7 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
 }
 
 static struct fdt_type {
-  const char *name;
+  char *name;
   int type;
 } fdt_types[] = {
     {"compatible", FDT_T_STRING},
@@ -321,12 +321,12 @@ static int get_fdt_prop_type(const char *c) {
   return -1;
 }
 
-struct device_tree device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt) {
+void device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt) {
   dt->fdt = (struct dtb_fdt_header *)mm_boot_alloc(bswap32(fdt->totalsize));
   memcpy(fdt, dt->fdt, bswap32(fdt->totalsize));
 
   uint32_t *sp = (uint32_t *)((off_t)fdt + bswap32(fdt->off_dt_struct));
-  const char *strings = (const char *)((off_t)fdt + bswap32(fdt->off_dt_strings));
+  char *strings = (char *)((off_t)fdt + bswap32(fdt->off_dt_strings));
   int depth = 0;
 
   struct device_tree_node *node = &dt->root;
@@ -338,13 +338,13 @@ struct device_tree device_tree_init(struct device_tree *dt, struct dtb_fdt_heade
 
     uint32_t len;
     uint32_t nameoff;
-    const char *name;
-    const char *valptr = NULL;
+    char *name;
+    char *valptr = NULL;
     char value[256];
 
     switch (op) {
       case FDT_BEGIN_NODE:
-        name = (const char *)sp;
+        name = (char *)sp;
 
         len = round_up(strlen(name) + 1, 4) / 4;
         for (int i = 0; i < len; i++)
@@ -363,7 +363,7 @@ struct device_tree device_tree_init(struct device_tree *dt, struct dtb_fdt_heade
         sp++;
         nameoff = bswap32(*sp);
         sp++;
-        valptr = (const char *)sp;
+        valptr = (char *)sp;
         device_tree_node_set_prop(node, strings + nameoff, len, (uint8_t *)valptr);
 
         for (int i = 0; i < round_up(len, 4) / 4; i++)
