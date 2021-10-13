@@ -43,7 +43,7 @@ dev_intr(void)
     } else if (scause == 0x8000000000000001L){
         // software interrupt from a machine-mode timer interrupt,
         // forwarded by timervec in kernelvec.S.
-        
+
         printk("\n+++ Timer Interrupt +++\nsepc: %p\ntime: %p\n", r_sepc(), r_time());
 
         // acknowledge the software interrupt by clearing
@@ -59,7 +59,7 @@ dev_intr(void)
 void panic(char *s);
 
 /* Supervisor Trap Function */
-void 
+void
 kernel_trap()
 {
     int which_dev = 0;
@@ -69,15 +69,15 @@ kernel_trap()
 
     if ((sstatus & SSTATUS_SPP) == 0) {
         printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, r_sepc(), r_stval());
-        panic("Not from supervisor mode");
+        panic("Not from supervisor mode\n");
     }
     if (intr_get() != 0) {
         printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, r_sepc(), r_stval());
-        panic("Interrupts enabled");
+        panic("Interrupts enabled\n");
     }
     if ((which_dev = dev_intr()) == 0){
         printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, r_sepc(), r_stval());
-        panic("Unhandled trap");
+        panic("Unhandled trap\n");
     }
 
     // give up the CPU if this is a timer interrupt.
