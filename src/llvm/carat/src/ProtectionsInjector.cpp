@@ -594,36 +594,77 @@ bool ProtectionsInjector::_optimizeForLoopInvariance(
 
 //This function will take a SCEV and recursively go through it to determine if it is a valid scev for karat
 //Valid in karat means that it is a SCEVNAry that contains only SCEVAddRecExpr, SCEVAddExpr, or SCEVMulExpr as its base SCEV types 
-bool _isValidSCEV(const llvm::SCEV* scevPtr){
+bool ProtectionsInjector::_isValidSCEV(const llvm::SCEV* scevPtr){
+  bool kill = true;
   auto NAry = dyn_cast<SCEVNAryExpr>(scevPtr);
-  if(!NAry){
-    return false;
-  }
-  for(auto i = 0; i < NAry->getNumOperands(); i++){
-    auto NAryOp = NAry->getOperand(i);
-    errs() << "Considering NAry Op: " << *NAryOp << "...";
-    auto AR = dyn_cast<SCEVAddRecExpr>(NAryOp);
-    auto AE = dyn_cast<SCEVAddExpr>(NAryOp);
-    auto ME = dyn_cast<SCEVMulExpr>(NAryOp);
-    auto CE = dyn_cast<SCEVConstant>(NAryOp);
-    auto MM = dyn_cast<SCEVMinMaxExpr>(NAryOp);
-    if(MM){
-      errs() << "NOT Valid (MinMax)!\n";
+  auto SCEVCast = dyn_cast<SCEVCastExpr>(scevPtr);
+  auto SCEVConst = dyn_cast<SCEVConstant>(scevPtr);
+  auto SCEVCNC = dyn_cast<SCEVCouldNotCompute>(scevPtr);
+  auto SCEVUD = dyn_cast<SCEVUDivExpr>(scevPtr);
+  auto SCEVUNK = dyn_cast<SCEVUnknown>(scevPtr);
+  if(NAry){
+    for(auto i = 0; i < NAry->getNumOperands(); i++){
+      auto NAryOp = NAry->getOperand(i);
+      errs() << "Considering NAry Op: " << *NAryOp << "...";
+      auto AR = dyn_cast<SCEVAddRecExpr>(NAryOp);
+      auto AE = dyn_cast<SCEVAddExpr>(NAryOp);
+      auto ME = dyn_cast<SCEVMulExpr>(NAryOp);
+      auto CE = dyn_cast<SCEVConstant>(NAryOp);
+      auto MM = dyn_cast<SCEVMinMaxExpr>(NAryOp);
+      if(MM){
+        errs() << "NOT Valid (MinMax)!\n";
+        return false;
+      }
+      if(false ||
+          AR   ||
+          AE   ||
+          ME   ||
+          CE   ||
+          _isValidSCEV(NAryOp)){
+        errs() << "Valid!\n";
+        continue;
+      }
+      errs() << "NOT Valid!\n";
       return false;
     }
-    if(false ||
-        AR ||
-        AE ||
-        ME ||
-        CE ||
-        _isValidSCEV(NAryOp)){
-      errs() << "Valid!\n";
-      continue;
-    }
-    errs() << "NOT Valid!\n";
+
+  }
+  else if(SCEVCast){
+    errs() << "Is SCEVCastExpr\n";
     return false;
   }
-
+  else if(SCEVConst){
+    errs() << "Is SCEVCastExpr\n";
+    return false;
+  }
+  else if(SCEVCNC){
+    errs() << "Is SCEVCNC\n";
+    return false;
+  }
+  else if(SCEVUD){
+    errs() << "Is SCEVUD\n";
+    return false;
+  }
+  else if(SCEVUNK){
+    errs() << "Is SCEVUNK\n";
+    auto LI = dyn_cast<LoadInst>(SCEVUNK->getValue());
+    if(LI){
+      errs() << "Is a load inst\n";
+      auto val = LI->getPointerOperand();
+      auto safe = false;
+      safe |= _isASafeMemoryConstruct(val);
+      auto arg = dyn_cast<Argument>(val); 
+      if(arg){
+        safe |= _isSafeArgument(LI, arg);
+      }
+      return safe;
+    }
+    return false;
+  }
+  else{
+    errs() << "Is something else o_o\n";
+    return false;
+  }
   return true;
 }
 
@@ -1549,7 +1590,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
       return false;
     }
 
-    
+
 
 
     //This function correspondes to 1i and will recursively find out if an argument is safe to not protect
@@ -1598,7 +1639,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
         //If we make it here, then the function does not have all callers use the argument safely
         return false;
       }
-      
+
     }
 
 

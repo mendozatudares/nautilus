@@ -131,7 +131,6 @@ private:
 
     PDG *FDG;
 
-
     /*
      * New analysis state
      */ 
@@ -140,6 +139,8 @@ private:
     Instruction *First;
 
     bool AllocaOutsideEntry=false;
+    bool InjectedCallGuardAtFirst=false;
+
 
     std::unordered_map<Function *, bool> InstrumentedFunctions;
 
@@ -198,6 +199,8 @@ private:
     Value *_fetchBitCastOperand(Value *Pointer);
     
     bool _isSafeArgument(Instruction*, Argument*);
+    
+    bool _isValidSCEV(const llvm::SCEV* scevPtr);
 
     Value *_fetchGEPBasePointer(
         Value *Pointer,
