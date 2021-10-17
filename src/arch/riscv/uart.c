@@ -49,6 +49,8 @@ void uart_start();
 void
 uart_init(void)
 {
+    return;
+
     // disable interrupts.
     WriteReg(IER, 0x00);
 

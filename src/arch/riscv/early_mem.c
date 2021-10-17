@@ -56,21 +56,21 @@ off_t rsv_ram_start = 0;
 size_t rsv_ram_size = 0;
 
 bool dtb_node_get_ram (struct dtb_node * n) {
-  if(!strcmp(n->name, "memory")) {
-    dtb_ram_size = n->reg.length;
-    dtb_ram_start = n->reg.address;
-    return false;
-  }
-  return true;
+    if(!strcmp(n->name, "memory")) {
+        dtb_ram_size = n->reg.length;
+        dtb_ram_start = n->reg.address;
+        return false;
+    }
+    return true;
 }
 
 bool dtb_node_get_rsv_ram (struct dtb_node *n) {
-  if(!strcmp(n->name, "mmode_resv0")) {
-    rsv_ram_size = n->reg.length;
-    rsv_ram_start = n->reg.address;
-    return false;
-  }
-  return true;
+    if(!strcmp(n->name, "mmode_resv0")) {
+        rsv_ram_size = n->reg.length;
+        rsv_ram_start = n->reg.address;
+        return false;
+    }
+    return true;
 }
 
 void
@@ -126,7 +126,7 @@ arch_detect_mem_map (mmap_info_t * mm_info,
     ulong_t start, end;
 
     start = rsv_ram_start;
-    end = round_down(max(rsv_ram_start + rsv_ram_size, (ulong_t) &kernel_end), PAGE_SIZE_4KB);
+    end = round_up(max(rsv_ram_start + rsv_ram_size, (ulong_t) &kernel_end), PAGE_SIZE_4KB);
     add_mem_map_entry(mm_info, memory_map, start, end, 0, MULTIBOOT_MEMORY_RESERVED);
     
     start = round_up(max(dtb_ram_start, (ulong_t) &kernel_end), PAGE_SIZE_4KB);

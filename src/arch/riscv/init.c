@@ -63,13 +63,6 @@ out_err:
     return -EINVAL;
 }
 
-uint32_t
-nk_get_num_cpus (void)
-{
-    struct sys_info * sys = per_cpu_get(system);
-    return sys->num_cpus;
-}
-
 #define NAUT_WELCOME \
 "Welcome to                                         \n" \
 "    _   __               __   _  __                \n" \
@@ -95,6 +88,7 @@ void init (int hartid, void* fdt) {
 
     struct naut_info * naut = &nautilus_info;
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
+
     naut->sys.bsp_id = hartid;
     naut->sys.fdt_header = fdt;
 
@@ -103,7 +97,7 @@ void init (int hartid, void* fdt) {
     plic_init_hart();
 
     // Bring up UART device and printing so we can have output
-    // uart_init();
+    uart_init();
 
     // Write supervisor trap vector location
     trap_init();
@@ -111,16 +105,14 @@ void init (int hartid, void* fdt) {
     printk(NAUT_WELCOME);
 
     // Setup per-core area for BSP
-    w_tp((uint64_t)naut->sys.cpus[0]);
+    w_tp(&(naut->sys.cpus[hartid]));
 
     // Setup the temporary boot-time allocator
     mm_boot_init((ulong_t) fdt);
 
     // Initialize boot CPU
-    arch_early_init(naut);
+    smp_early_init(naut);
 
-    // /* this will finish up the identity map */
-    // nk_paging_init(&(naut->sys.mem), mbd);
     arch_numa_init(&naut->sys);
 
     // Setup the main kernel memory allocator
@@ -130,7 +122,9 @@ void init (int hartid, void* fdt) {
      * allocated in the boot mem allocator are kept reserved */
     mm_boot_kmem_init();
 
-    // sti();
+    mm_boot_kmem_cleanup();
+
+    sti();
 
     while(1) {
         int c = uart_getchar();
@@ -138,5 +132,27 @@ void init (int hartid, void* fdt) {
             if (c == 13) printk("\n");
             else printk("%c", c);
         }
+    }
+}
+
+
+void secondary_entry(int hartid) {
+
+    struct naut_info * naut = &nautilus_info;
+
+    w_tp(&(naut->sys.cpus[hartid]));
+
+    /* Initialize the platform level interrupt controller for this HART */
+    plic_init_hart();
+
+    /* Write supervisor trap vector location */
+    trap_init();
+
+    /* set the timer with sbi :) */
+    // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
+
+    sti();
+
+    while (1) {
     }
 }

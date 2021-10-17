@@ -3,6 +3,7 @@
 #include <arch/riscv/memlayout.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/cpu.h>
+#include <nautilus/devicetree.h>
 
 int boot_hart = -1;
 

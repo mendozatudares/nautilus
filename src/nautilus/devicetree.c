@@ -123,9 +123,10 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
   }
 
   if (STREQ(name, "#size-cells")) {
-    node->size_cells= bswap32(*(uint32_t *)val);
+    node->size_cells = bswap32(*(uint32_t *)val);
     return;
   }
+
   if (STREQ(name, "interrupts")) {
     int size_cells = dtb_node_get_size_cells(node);
     node->irq = bswap32(*(uint32_t *)val);
@@ -383,7 +384,7 @@ void device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt) {
 }
 
 
-void device_tree_deinit(struct device_tree *dt) { mm_boot_free((void *)dt->fdt, dt->fdt->totalsize); }
+void device_tree_deinit(struct device_tree *dt) { mm_boot_free((void *)dt->fdt, sizeof(dt->fdt)); }
 
 void device_tree_node_dump(struct device_tree_node *n, int depth) {
   for (int i = 0; i < depth; i++)

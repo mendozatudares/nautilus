@@ -92,6 +92,30 @@ GLOBAL(nautilus_entry)
 .balign 8
 main_ptr: .quad main
 
+.global secondary_core_stack
+secondary_core_stack:
+	.quad 0
+
+.global secondary_core_startup_sbi
+secondary_core_startup_sbi:
+	ld sp, secondary_core_stack
+
+	# disable supervisor address translation and protection (paging), since we'd identity map anyways
+    csrw    satp, 0
+    # flush tlb and whatnot
+    sfence.vma zero, zero
+
+	#	enable supervisor interrupts
+	li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
+	csrs    sie, t0
+
+	la      t0, second_entry_ptr
+	REG_L   t0, 0(t0)
+	jr      t0
+
+second_entry_ptr:
+	.quad secondary_entry
+
 # When the processor gets an interrupt or traps, it jumps here and sets some CSRs
 # like sstatus, sbadaddr, stval etc... The only problem is that we don't switch
 # stacks when jumping from userspace. To fix this, we gotta do some extra nonsense

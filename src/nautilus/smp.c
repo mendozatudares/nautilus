@@ -89,6 +89,7 @@ init_ap_area (struct ap_init_area * ap_area,
               struct naut_info * naut,
               int core_num)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     memset((void*)ap_area, 0, sizeof(struct ap_init_area));
 
     /* setup pointer to this CPUs stack */
@@ -115,6 +116,7 @@ init_ap_area (struct ap_init_area * ap_area,
 
     /* pointer to our entry routine */
     ap_area->entry       = smp_ap_entry;
+#endif
 
     return 0;
 }
@@ -139,6 +141,7 @@ smp_wait_for_ap (struct naut_info * naut, unsigned int core_num)
 int
 smp_bringup_aps (struct naut_info * naut)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     struct ap_init_area * ap_area;
 
     addr_t boot_target     = (addr_t)&init_smp_boot;
@@ -262,6 +265,8 @@ smp_bringup_aps (struct naut_info * naut)
     cpu_info_ready = 1;
 
     return (status|err);
+#endif
+    return 0;
 }
 
 
@@ -274,11 +279,13 @@ static int xcall_handler(excp_entry_t * e, excp_vec_t v, void *state);
 static int
 smp_xcall_init_queue (struct cpu * core)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     core->xcall_q = nk_queue_create();
     if (!core->xcall_q) {
         ERROR_PRINT("Could not allocate xcall queue on cpu %u\n", core->id);
         return -1;
     }
+#endif
 
     return 0;
 }
@@ -287,6 +294,7 @@ smp_xcall_init_queue (struct cpu * core)
 int
 smp_setup_xcall_bsp (struct cpu * core)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     SMP_PRINT("Setting up cross-core IPI event queue\n");
     smp_xcall_init_queue(core);
 
@@ -294,6 +302,7 @@ smp_setup_xcall_bsp (struct cpu * core)
         ERROR_PRINT("Could not assign interrupt handler for XCALL on core %u\n", core->id);
         return -1;
     }
+#endif
 
     return 0;
 }
@@ -302,6 +311,7 @@ smp_setup_xcall_bsp (struct cpu * core)
 static int
 smp_ap_setup (struct cpu * core)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     // Note that any use of SSE/AVX, for example produced by
     // clang/llvm optimation, that happens before fpu_init will
     // cause a panic.  Initialize FPU ASAP.
@@ -365,6 +375,7 @@ smp_ap_setup (struct cpu * core)
     }
 #endif
 
+#endif
     return 0;
 }
 
@@ -374,6 +385,7 @@ extern void nk_rand_init(struct cpu*);
 static void
 smp_ap_finish (struct cpu * core)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     nk_rand_init(core);
 
     nk_cpu_topo_discover(core);
@@ -406,6 +418,7 @@ smp_ap_finish (struct cpu * core)
 #ifdef NAUT_CONFIG_PROFILE
     nk_instrument_calibrate(INSTR_CAL_LOOPS);
 #endif
+#endif
 }
 
 
@@ -414,6 +427,7 @@ extern void idle(void* in, void**out);
 void 
 smp_ap_entry (struct cpu * core) 
 { 
+#ifndef NAUT_CONFIG_RISCV_HOST
     struct cpu * my_cpu;
     SMP_DEBUG("Core %u starting up\n", core->id);
     if (smp_ap_setup(core) < 0) {
@@ -446,6 +460,7 @@ smp_ap_entry (struct cpu * core)
     sti();
 
     idle(NULL, NULL);
+#endif
 }
 
 
@@ -547,6 +562,7 @@ smp_xcall (cpu_id_t cpu_id,
            void * arg,
            uint8_t wait)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     struct sys_info * sys = per_cpu_get(system);
     nk_queue_t * xcq  = NULL;
     struct nk_xcall x;
@@ -603,6 +619,7 @@ smp_xcall (cpu_id_t cpu_id,
         }
 
     }
+#endif
 
     return 0;
 }

@@ -41,13 +41,17 @@ struct gdt_desc32 {
 static inline void
 lgdt32 (const struct gdt_desc32 * g)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     asm volatile ("lgdt %0" :: "m" (*g));
+#endif
 }
 
 static inline void
 lgdt64 (const struct gdt_desc64 * g) 
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     asm volatile ("lgdt %0" :: "m" (*g)); 
+#endif
 }
 
 

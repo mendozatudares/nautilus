@@ -164,7 +164,9 @@ set_intr_gate (struct gate_desc64 * idt, unsigned gate, const void * func)
 static inline void 
 lidt (const struct idt_desc * d) 
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
         asm volatile ("lidt %0" :: "m" (*d));
+#endif
 }
 
 #endif /* !__ASSEMBLER__ */
