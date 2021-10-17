@@ -106,12 +106,16 @@ add_mem_map_entry (mmap_info_t * mm_info,
     }
 }
 
+static uint32_t bswap32(uint32_t val) {
+  val =  (val & 0x0000FFFF) << 16 | (val & 0xFFFF0000) >> 16;
+  return (val & 0x00FF00FF) << 8  | (val & 0xFF00FF00) >> 8;
+}
+
 void
 arch_detect_mem_map (mmap_info_t * mm_info, 
                      mem_map_entry_t * memory_map,
                      ulong_t fdt)
 {
-    dtb_parse((struct dtb_fdt_header *) fdt);
     dtb_walk_devices(dtb_node_get_ram);
     dtb_walk_devices(dtb_node_get_rsv_ram);
 

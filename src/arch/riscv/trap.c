@@ -66,17 +66,18 @@ kernel_trap()
     uint64_t sepc = r_sepc();
     uint64_t sstatus = r_sstatus();
     uint64_t scause = r_scause();
+    printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
 
     if ((sstatus & SSTATUS_SPP) == 0) {
-        printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, r_sepc(), r_stval());
+        // printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
         panic("Not from supervisor mode\n");
     }
     if (intr_get() != 0) {
-        printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, r_sepc(), r_stval());
+        // printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
         panic("Interrupts enabled\n");
     }
     if ((which_dev = dev_intr()) == 0){
-        printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, r_sepc(), r_stval());
+        // printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
         panic("Unhandled trap\n");
     }
 

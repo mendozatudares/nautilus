@@ -36,6 +36,11 @@
 
 #include <stddef.h>
 
+#ifdef NAUT_CONFIG_RISCV_HOST
+#define PRINTF(fmt, args...) printk(fmt, ##args)
+#else
+#define PRINTF(fmt, args...) nk_vc_printf(fmt, ##args)
+#endif
 
 #ifndef NAUT_CONFIG_DEBUG_TIMERS
 #undef DEBUG_PRINT
@@ -473,7 +478,7 @@ void nk_timer_dump_timers()
     STATE_LOCK();
     list_for_each(cur,&timer_list) {
 	t = list_entry(cur,nk_timer_t, node);
-	nk_vc_printf("%-32s %s %s%s%s %luw %luns 0x%lx %u %p \n",
+	PRINTF("%-32s %s %s%s%s %luw %luns 0x%lx %u %p \n",
 		     t->name,
 		     t->state==NK_TIMER_INACTIVE ? "inactive" :
 		     t->state==NK_TIMER_ACTIVE ? "ACTIVE" :
@@ -496,12 +501,12 @@ handle_delay (char * buf, void * priv)
     uint64_t time_us;
 
     if (sscanf(buf,"delay %lu", &time_us) == 1) {
-        nk_vc_printf("Delaying for %lu us\n", time_us);
+        PRINTF("Delaying for %lu us\n", time_us);
         nk_delay(time_us*1000UL);
         return 0;
     }
 
-    nk_vc_printf("invalid delay format\n");
+    PRINTF("invalid delay format\n");
 
     return 0;
 }
@@ -512,12 +517,12 @@ handle_sleep (char * buf, void * priv)
     uint64_t time_us;
 
     if (sscanf(buf,"sleep %lu", &time_us) == 1) {
-        nk_vc_printf("Sleeping for %lu us\n", time_us);
+        PRINTF("Sleeping for %lu us\n", time_us);
         nk_sleep(time_us*1000UL);
         return 0;
     }
 
-    nk_vc_printf("invalid sleep format\n");
+    PRINTF("invalid sleep format\n");
 
     return 0;
 }

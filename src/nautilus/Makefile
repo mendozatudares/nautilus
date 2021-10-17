@@ -69,6 +69,7 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	devicetree.o \
 	mm/ \
 	smp.o \
+	barrier.o \
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o

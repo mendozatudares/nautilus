@@ -80,51 +80,63 @@ int uart_getchar(void);
 
 void init (int hartid, void* fdt) {
 
+    if (!fdt) panic("reboot");
+
     // Get necessary information from SBI
     sbi_early_init();
 
     // M-Mode passes scratch struct through tp. Move it to sscratch
     w_sscratch(r_tp());
 
+    // Zero out tp for now until tls is set up
+    w_tp(0);
+
     struct naut_info * naut = &nautilus_info;
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
     naut->sys.bsp_id = hartid;
-    naut->sys.fdt_header = fdt;
+    naut->sys.dtb = fdt;
 
-    // Initialize platform level interrupt controller for this HART
-    plic_init();
-    plic_init_hart();
-
-    // Bring up UART device and printing so we can have output
-    uart_init();
-
-    // Write supervisor trap vector location
-    trap_init();
+    dtb_parse((struct dtb_fdt_header *) fdt);
 
     printk(NAUT_WELCOME);
-
-    // Setup per-core area for BSP
-    w_tp(&(naut->sys.cpus[hartid]));
 
     // Setup the temporary boot-time allocator
     mm_boot_init((ulong_t) fdt);
 
-    // Initialize boot CPU
+    // Enumate CPUs and initialize them
     smp_early_init(naut);
 
+    /* this will populate NUMA-related structures */
     arch_numa_init(&naut->sys);
 
     // Setup the main kernel memory allocator
     nk_kmem_init();
 
+    // Setup per-core area for BSP
+    w_tp((uint64_t)naut->sys.cpus[hartid]);
+
     /* now we switch to the real kernel memory allocator, pages
      * allocated in the boot mem allocator are kept reserved */
     mm_boot_kmem_init();
 
+    // Write supervisor trap vector location
+    trap_init();
+
+    // Initialize platform level interrupt controller for this HART
+    plic_init();
+
+    plic_init_hart();
+
+    /* from this point on, we can use percpu macros (even if the APs aren't up) */
+
+    sysinfo_init(&(naut->sys));
+
     mm_boot_kmem_cleanup();
 
     sti();
+
+    /* interrupts are now on */
 
     while(1) {
         int c = uart_getchar();
@@ -140,7 +152,8 @@ void secondary_entry(int hartid) {
 
     struct naut_info * naut = &nautilus_info;
 
-    w_tp(&(naut->sys.cpus[hartid]));
+    w_sscratch(r_tp());
+    w_tp((uint64_t)naut->sys.cpus[hartid]);
 
     /* Initialize the platform level interrupt controller for this HART */
     plic_init_hart();

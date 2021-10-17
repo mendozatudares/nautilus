@@ -117,7 +117,7 @@ struct sys_info {
 
     struct nk_prog_info * prog_info;
 
-    struct dtb_fdt_header * fdt_header;
+    struct dtb_fdt_header * dtb; /* Device tree binary */
 
 };
 

@@ -255,13 +255,19 @@ void nk_tls_test(void);
 static inline nk_thread_t*
 get_cur_thread (void)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     return (nk_thread_t*)per_cpu_get(cur_thread);
+#else
+    return 0;
+#endif
 }
 
 static inline void
 put_cur_thread (nk_thread_t * t) 
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     per_cpu_put(cur_thread, t);
+#endif
 }
 
 

@@ -99,6 +99,12 @@
 #define DUMP_THREAD_RT_STATE 0
 #define DUMP_SCHED_STATE     0
 
+#ifdef NAUT_CONFIG_RISCV_HOST
+#define PRINTF(fmt, args...) printk(fmt, ##args)
+#else
+#define PRINTF(fmt, args...) nk_vc_printf(fmt, ##args)
+#endif
+
 #define INFO(fmt, args...) INFO_PRINT("Scheduler: " fmt, ##args)
 #define ERROR(fmt, args...) ERROR_PRINT("Scheduler: " fmt, ##args)
 
@@ -563,7 +569,7 @@ static void print_thread(rt_thread *r, void *priv)
 
     if (cpu==t->current_cpu || cpu<0) { 
 
-	nk_vc_printf("%llut %lur %dc%s %s %s %s %llus %lluc %llur %llud %llue", 
+	PRINTF("%llut %lur %dc%s %s %s %s %llus %lluc %llur %llud %llue", 
 		     t->tid, 
 		     t->refcount,
 		     t->current_cpu,
@@ -590,26 +596,26 @@ static void print_thread(rt_thread *r, void *priv)
 	
 	switch (r->constraints.type) {
 	case APERIODIC:
-	    nk_vc_printf(" aperiodic(%utp, %llu)", r->constraints.interrupt_priority_class,CO(r->constraints.aperiodic.priority));
+	    PRINTF(" aperiodic(%utp, %llu)", r->constraints.interrupt_priority_class,CO(r->constraints.aperiodic.priority));
 	    break;
 	case SPORADIC:
-	    nk_vc_printf(" sporadic(%utp, %llu)", r->constraints.interrupt_priority_class,CO(r->constraints.sporadic.size));
+	    PRINTF(" sporadic(%utp, %llu)", r->constraints.interrupt_priority_class,CO(r->constraints.sporadic.size));
 	    break;
 	case PERIODIC:
-	    nk_vc_printf(" periodic(%utp, %llu,%llu)", r->constraints.interrupt_priority_class,CO(r->constraints.periodic.period), CO(r->constraints.periodic.slice));
+	    PRINTF(" periodic(%utp, %llu,%llu)", r->constraints.interrupt_priority_class,CO(r->constraints.periodic.period), CO(r->constraints.periodic.slice));
 	    break;
 	}
 
-	nk_vc_printf(" stats: %llua %llure %llurl %llusw %llum",
+	PRINTF(" stats: %llua %llure %llurl %llusw %llum",
 		     r->arrival_count,
 		     r->resched_count,
 		     r->resched_long_count,
 		     r->switch_in_count,
 		     r->miss_count);
 
-	nk_vc_printf(" [%s]", r->thread->aspace ? r->thread->aspace->name : "default");
+	PRINTF(" [%s]", r->thread->aspace ? r->thread->aspace->name : "default");
 	
-	nk_vc_printf("\n");
+	PRINTF("\n");
 
     }
 }
@@ -703,9 +709,9 @@ void nk_sched_dump_cores(int cpu_arg)
 #endif
 	    LOCAL_UNLOCK(s);
 
-	    nk_vc_printf(buf);
+	    PRINTF(buf);
 #if INSTRUMENT
-	    nk_vc_printf(buf2);
+	    PRINTF(buf2);
 #endif
 	}
     }
@@ -724,7 +730,7 @@ void nk_sched_dump_time(int cpu_arg)
 	    struct apic_dev *apic = sys->cpus[cpu]->apic;
 	    struct tsc_info *tsc = &sys->cpus[cpu]->sched_state->tsc;
 			 
-            nk_vc_printf("%dc %luhz %luppt %lucpu %lucpt %uts %uct %lutc %lust %lustc %ldstr %ldstrc\n",
+            PRINTF("%dc %luhz %luppt %lucpu %lucpt %uts %uct %lutc %lust %lustc %ldstr %ldstrc\n",
 			 cpu, apic->bus_freq_hz, apic->ps_per_tick,
 			 apic->cycles_per_us, apic->cycles_per_tick,
 			 apic->timer_set, apic->current_ticks, apic->timer_count,
@@ -857,7 +863,7 @@ void nk_topo_map_socket_sibling_threads(void (func)(struct nk_thread *t, void *s
 static void
 topo_test (struct nk_thread * t, void * state)
 {
-    nk_vc_printf("THREADMAPPER: Applying func to thread %x\n", t->tid);
+    PRINTF("THREADMAPPER: Applying func to thread %x\n", t->tid);
 }
 
 static int
@@ -870,23 +876,23 @@ handle_threadtopotest (char * buf, void * priv)
 			((aps='s', strcmp(buf,"threadtopotest s"))==0)) {
         switch (aps) { 
             case 'a': 
-				nk_vc_printf("Mapping func to all siblings\n");
+				PRINTF("Mapping func to all siblings\n");
                 nk_topo_map_sibling_threads(topo_test,  NK_TOPO_ALL_FILT, NULL);
                 break;
             case 'l': 
-				nk_vc_printf("Mapping func to logical core siblings\n");
+				PRINTF("Mapping func to logical core siblings\n");
                 nk_topo_map_hwthread_sibling_threads(topo_test,  NULL);
                 break;
             case 'p': 
-				nk_vc_printf("Mapping func to core siblings\n");
+				PRINTF("Mapping func to core siblings\n");
                 nk_topo_map_core_sibling_threads(topo_test, NULL);
                 break;
             case 's': 
-				nk_vc_printf("Mapping func to socket siblings\n");
+				PRINTF("Mapping func to socket siblings\n");
                 nk_topo_map_socket_sibling_threads(topo_test, NULL);
                 break;
             default:
-                nk_vc_printf("Unknown threadtopotest command requested\n");
+                PRINTF("Unknown threadtopotest command requested\n");
                 return -1;
         }
     }
@@ -1320,7 +1326,7 @@ static inline rt_thread *round_robin_remove_aperiodic(rt_scheduler *s, rt_thread
 static inline uint64_t get_random()
 {
     uint64_t t;
-    nk_get_rand_bytes((uint8_t *)&t,sizeof(t));
+    // nk_get_rand_bytes((uint8_t *)&t,sizeof(t));
     return t;
 }
 
@@ -2018,7 +2024,7 @@ static inline void set_interrupt_priority(rt_thread *t)
 #else
     // if we are not using the interrupt thread model, then use the 
     // interrupt priority class selected by the thread itself
-    write_cr8((uint64_t)t->constraints.interrupt_priority_class);
+    // write_cr8((uint64_t)t->constraints.interrupt_priority_class);
 #endif
 }
 
@@ -4181,7 +4187,7 @@ static int shared_init(struct cpu *my_cpu, struct nk_sched_config *cfg)
 #endif
 
     // reset local cycle count - this will be synchronized later
-    msr_write(IA32_TIME_STAMP_COUNTER,0);
+    // msr_write(IA32_TIME_STAMP_COUNTER,0);
 
     irq_enable_restore(flags);
 
@@ -4317,7 +4323,7 @@ void nk_sched_start()
 	}
     }
 
-    msr_write(IA32_TIME_STAMP_COUNTER,tsc_start);
+    // msr_write(IA32_TIME_STAMP_COUNTER,tsc_start);
 
     cur_cycles = rdtsc();
 
@@ -4578,6 +4584,7 @@ struct burner_args {
 static void 
 burner (void * in, void ** out)
 {
+    #ifndef NAUT_CONFIG_RISCV_HOST
     uint64_t start, end, dur;
     struct burner_args *a = (struct burner_args *)in;
 
@@ -4588,15 +4595,15 @@ burner (void * in, void ** out)
         return;
     }
 
-    nk_vc_printf("%s (tid %llu) attempting to promote itself\n", a->name, get_cur_thread()->tid);
+    PRINTF("%s (tid %llu) attempting to promote itself\n", a->name, get_cur_thread()->tid);
 #if 1
     if (nk_sched_thread_change_constraints(&a->constraints)) { 
-        nk_vc_printf("%s (tid %llu) rejected - exiting\n", a->name, get_cur_thread()->tid);
+        PRINTF("%s (tid %llu) rejected - exiting\n", a->name, get_cur_thread()->tid);
         return;
     }
 #endif
 
-    nk_vc_printf("%s (tid %llu) promotion complete - spinning for %lu ns\n", a->name, get_cur_thread()->tid, a->size_ns);
+    PRINTF("%s (tid %llu) promotion complete - spinning for %lu ns\n", a->name, get_cur_thread()->tid, a->size_ns);
 
     while (1) {
         NK_GPIO_OUTPUT_MASK(0x1, GPIO_XOR);
@@ -4605,15 +4612,16 @@ burner (void * in, void ** out)
         udelay(10);
         end = nk_sched_get_realtime();
         dur = end - start;
-        //	nk_vc_printf("%s (tid %llu) start=%llu, end=%llu left=%llu\n",a->name,get_cur_thread()->tid, start, end,a->size_ns);
+        //	PRINTF("%s (tid %llu) start=%llu, end=%llu left=%llu\n",a->name,get_cur_thread()->tid, start, end,a->size_ns);
         if (dur >= a->size_ns) { 
-            nk_vc_printf("%s (tid %llu) done - exiting\n",a->name,get_cur_thread()->tid);
+            PRINTF("%s (tid %llu) done - exiting\n",a->name,get_cur_thread()->tid);
             free(in);
             return;
         } else {
             a->size_ns -= dur;
         }
     }
+    #endif
 }
 
 
@@ -4623,6 +4631,7 @@ launch_aperiodic_burner (char * name,
                          uint32_t tpr, 
                          uint64_t priority)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
     nk_thread_id_t tid;
     struct burner_args *a;
 
@@ -4646,6 +4655,7 @@ launch_aperiodic_burner (char * name,
     } else {
         return 0;
     }
+#endif
 }
 
 static int 
@@ -4729,7 +4739,7 @@ handle_burn (char * buf, void * priv)
     char name[SHELL_MAX_CMD];
 
     if (sscanf(buf, "burn a %s %llu %u %llu", name, &size_ns, &tpr, &priority) == 4) { 
-        nk_vc_printf("Starting aperiodic burner %s with tpr %u, size %llu ms.and priority %llu\n", name, tpr, size_ns, priority);
+        PRINTF("Starting aperiodic burner %s with tpr %u, size %llu ms.and priority %llu\n", name, tpr, size_ns, priority);
         size_ns *= 1000000;
         launch_aperiodic_burner(name,size_ns,tpr,priority);
         return 0;
@@ -4737,7 +4747,7 @@ handle_burn (char * buf, void * priv)
 
     if (sscanf(buf,"burn s %s %llu %u %llu %llu %llu %llu", name, &size_ns, &tpr, &phase, &size, &deadline, &priority) == 7) { 
 
-        nk_vc_printf("Starting sporadic burner %s with size %llu ms tpr %u phase %llu from now size %llu ms deadline %llu ms from now and priority %lu\n",name,size_ns,tpr,phase,size,deadline,priority);
+        PRINTF("Starting sporadic burner %s with size %llu ms tpr %u phase %llu from now size %llu ms deadline %llu ms from now and priority %lu\n",name,size_ns,tpr,phase,size,deadline,priority);
         
         size_ns  *= 1000000;
         phase    *= 1000000;
@@ -4752,7 +4762,7 @@ handle_burn (char * buf, void * priv)
     }
 
     if (sscanf(buf,"burn p %s %llu %u %llu %llu %llu", name, &size_ns, &tpr, &phase, &period, &slice)==6) { 
-        nk_vc_printf("Starting periodic burner %s with size %llu ms tpr %u phase %llu from now period %llu ms slice %llu ms\n",name,size_ns,tpr,phase,period,slice);
+        PRINTF("Starting periodic burner %s with size %llu ms tpr %u phase %llu from now period %llu ms slice %llu ms\n",name,size_ns,tpr,phase,period,slice);
         size_ns *= 1000000;
         phase   *= 1000000; 
         period  *= 1000000;
@@ -4763,7 +4773,7 @@ handle_burn (char * buf, void * priv)
     }
 
     if (sscanf(buf, "burn up %s %llu %u %llu %llu %llu", name, &size_ns, &tpr, &phase, &period, &slice)==6) { 
-        nk_vc_printf("Starting periodic burner %s with size %llu ms tpr %u phase %llu from now period %llu us slice %llu us\n",name,size_ns,tpr,phase,period,slice);
+        PRINTF("Starting periodic burner %s with size %llu ms tpr %u phase %llu from now period %llu us slice %llu us\n",name,size_ns,tpr,phase,period,slice);
         size_ns *= 1000000;
         phase   *= 1000; 
         period  *= 1000;
@@ -4773,7 +4783,7 @@ handle_burn (char * buf, void * priv)
         return 0;
     }
 
-    nk_vc_printf("Unknown burner command (%s)\n", buf);
+    PRINTF("Unknown burner command (%s)\n", buf);
 
     return 0;
 }
@@ -4796,9 +4806,9 @@ test_stop (char * buf, void * priv)
 #define N 16
     
     for (i = 0; i < N; i++) { 
-        nk_vc_printf("Stopping world iteration %d\n", i);
+        PRINTF("Stopping world iteration %d\n", i);
         nk_sched_stop_world();
-        nk_vc_printf("Executing during stopped world iteration %d\n", i);
+        PRINTF("Executing during stopped world iteration %d\n", i);
         nk_sched_start_world();
     }
 
