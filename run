@@ -3,7 +3,13 @@ if [[ "$*" == *"clean"* ]]; then
   make clean
 fi
 
-ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- V=1 make -j
+CROSS_COMPILE=riscv64-unknown-elf-
+
+if [[ "$TOOLCHAIN_OVERRIDE" != "" ]]; then
+	CROSS_COMPILE=$TOOLCHAIN_OVERRIDE
+fi
+
+ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE V=1 make -j
 
 if [[ "$*" == *"qemu"* ]]; then
   echo 'Starting QEMU...'

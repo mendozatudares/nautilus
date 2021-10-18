@@ -7,3 +7,5 @@ tags
 *.syms
 *.bc
 *.ll
+
+include/config/

@@ -316,7 +316,7 @@ static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 #define NO_STRTOD_BIGCOMP
 #endif
 
-#include "errno.h"
+#include <nautilus/errno.h>
 
 #ifdef NO_ERRNO /*{*/
 #undef Set_errno
@@ -361,7 +361,7 @@ static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 #endif /* Bad_float_h */
 
 #ifndef __MATH_H__
-#include "math.h"
+#include <nautilus/math.h>
 #endif
 
 #ifdef __cplusplus

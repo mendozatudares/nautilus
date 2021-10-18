@@ -80,6 +80,9 @@ int uart_getchar(void);
 
 void init (int hartid, void* fdt) {
 
+		long x = 0;
+		printk("x: %llx, fdt: %llx\n", x, fdt);
+
     if (!fdt) panic("reboot");
 
     // Get necessary information from SBI
@@ -97,6 +100,7 @@ void init (int hartid, void* fdt) {
     naut->sys.bsp_id = hartid;
     naut->sys.dtb = fdt;
 
+	
     dtb_parse((struct dtb_fdt_header *) fdt);
 
     printk(NAUT_WELCOME);

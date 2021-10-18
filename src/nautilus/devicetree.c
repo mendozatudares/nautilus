@@ -5,7 +5,7 @@
 #include <nautilus/mm.h>
 
 //! Byte swap int
-static uint32_t bswap32(uint32_t val) {
+static uint32_t bswap32(uint64_t val) {
   val =  (val & 0x0000FFFF) << 16 | (val & 0xFFFF0000) >> 16;
   return (val & 0x00FF00FF) << 8  | (val & 0xFF00FF00) >> 8;
 }
@@ -105,7 +105,7 @@ static struct dtb_node *alloc_device(const char *name) {
   }
 
   if (at_off != -1) {
-    if (sscanf(name + at_off + 1, "%x", &dev->address) != 1) {
+    if (sscanf(name + at_off + 1, "%lx", &dev->address) != 1) {
       // printk("INVALID NODE NAME: '%s'\n", name);
     }
     dev->name[at_off] = 0;
@@ -207,7 +207,7 @@ void dump_dtb(struct dtb_node *node, int depth) {
 }
 
 int dtb_parse(struct dtb_fdt_header *fdt) {
-  printk("fdt at %p\n", fdt);
+  printk("fdt at %llx\n", fdt);
   global_fdt_header = fdt;
 
   printk("  magic: %p\n", bswap32(fdt->magic));
@@ -220,6 +220,8 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
   printk("  boot_cpuid_phys: %p\n", bswap32(fdt->boot_cpuid_phys));
   printk("  size_dt_strings: %p\n", bswap32(fdt->size_dt_strings));
   printk("  size_dt_struct: %p\n", bswap32(fdt->size_dt_struct));
+
+	next_device = 0;
 
   if (next_device != 0) panic("expected next_device = 0, got %d\n", next_device);
   struct dtb_node *root = alloc_device("");

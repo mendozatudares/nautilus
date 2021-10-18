@@ -770,6 +770,14 @@ $(SEC_NAME): $(BIN_NAME)
 
 nautilus: $(BIN_NAME) $(SYM_NAME) $(SEC_NAME)
 
+
+uImage: $(BIN_NAME)
+	$(CROSS_COMPILE)objcopy -O binary $(BIN_NAME) Image
+	mkimage -A riscv -O linux -T kernel -C none \
+		-a 0x80100000 -e 0x80100000 -n "Nautilus" \
+		-d Image uImage
+	rm Image
+
 # New function to run a Python script which generates Lua test code,
 # addition of a separate flag (LUA_BUILD_FLAG) which is set to indicate
 # that the debug symbols we need for wrapping Nautilus functions will
