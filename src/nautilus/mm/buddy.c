@@ -313,6 +313,10 @@ buddy_alloc (struct buddy_mempool *mp, ulong_t order)
         }
 
         block = list_first_entry(list, struct block, link);
+        #ifdef NAUT_CONFIG_RISCV_HOST
+        /* Ensure we're not accessing addresses 0x0 to prevent PMP fault */
+        if (block->link.prev && block->link.next)
+        #endif
         list_del_init(&block->link);
         mark_allocated(mp, block);
 

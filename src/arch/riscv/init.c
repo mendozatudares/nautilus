@@ -80,10 +80,10 @@ int uart_getchar(void);
 
 void init (int hartid, void* fdt) {
 
-		long x = 0;
-		printk("x: %llx, fdt: %llx\n", x, fdt);
+	long x = 0;
+	printk("x: %llx, fdt: %llx\n", x, fdt);
 
-    if (!fdt) panic("reboot");
+    if (!fdt) panic("reboot\n");
 
     // Get necessary information from SBI
     sbi_early_init();
@@ -136,7 +136,7 @@ void init (int hartid, void* fdt) {
 
     sysinfo_init(&(naut->sys));
 
-    mm_boot_kmem_cleanup();
+    // mm_boot_kmem_cleanup();
 
     sti();
 
