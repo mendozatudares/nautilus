@@ -136,9 +136,11 @@ void init (int hartid, void* fdt) {
 
     sysinfo_init(&(naut->sys));
 
-    // mm_boot_kmem_cleanup();
+    mm_boot_kmem_cleanup();
 
     sti();
+
+    sbi_init();
 
     /* interrupts are now on */
 
@@ -153,6 +155,8 @@ void init (int hartid, void* fdt) {
 
 
 void secondary_entry(int hartid) {
+
+    printk("booted!\n");
 
     struct naut_info * naut = &nautilus_info;
 

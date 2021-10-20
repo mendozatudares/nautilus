@@ -129,8 +129,8 @@ second_entry_ptr:
 #define TP_USER_SP 6
 #define TF_SIZE_ON_STACK (36 * SZREG)
 
+.balign 4
 GLOBAL(kernel_vec)
-
         // make room to save registers.
         addi sp, sp, -256
 
