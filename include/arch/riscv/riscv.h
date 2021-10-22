@@ -1,3 +1,6 @@
+#ifndef __RISCV_H__
+#define __RISCV_H__
+
 /* Macros for pointer/register sizes */
 #define PTRLOG 3
 #define SZREG 8
@@ -340,3 +343,5 @@ static inline void sfence_vma()
 
 typedef uint64_t pte_t;
 typedef uint64_t *pagetable_t; // 512 PTEs
+
+#endif

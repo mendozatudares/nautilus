@@ -187,3 +187,27 @@ uart_intr(void)
     uart_start();
     UART_UNLOCK();
 }
+
+#include <stdarg.h>
+
+int nk_vc_print(char *s)
+{
+    printk(s);
+    return 0;
+}
+
+#define PRINT_MAX 1024
+
+int nk_vc_printf(char *fmt, ...)
+{
+  char buf[PRINT_MAX];
+
+  va_list args;
+  int i;
+
+  va_start(args, fmt);
+  i=vsnprintf(buf,PRINT_MAX,fmt,args);
+  va_end(args);
+  nk_vc_print(buf);
+  return i;
+}

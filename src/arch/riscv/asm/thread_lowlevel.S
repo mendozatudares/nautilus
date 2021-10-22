@@ -2,6 +2,10 @@
 #include <nautilus/gdt.h>
 #include <nautilus/thread.h>
 
+.section .text
+
+ENTRY(nk_thread_switch)
+
 /* Macros for pointer/register sizes */
 #define PTRLOG 3
 #define SZREG 8
@@ -9,9 +13,6 @@
 #define REG_L ld
 #define REG_SC sc.d
 #define ROFF(N, R) N* SZREG(R)
-
-
-ENTRY(context_switch)
 
 #define CTX_SIZE (13 * SZREG)
 
@@ -54,7 +55,74 @@ ENTRY(context_switch)
     addi sp, sp, CTX_SIZE
 
     ret
-END(context_switch)
+
+END(nk_thread_switch)
+
+// rdi = new thread
+// rsi = target address to write
+// edx = value to write (as 4 bytes)
+ENTRY(nk_thread_switch_exit_helper)
+	// reset interrupt nesting
+	// the context switch will decrement it to zero
+	# movw $1,  %gs:8
+
+	// reset preemption disable level
+    # movw $0, %gs:10
+    
+	// note that interrupts are still off
+
+	// We now mark ourselves as toast for the reaper
+    # REG_S a3, ROFF(0, a2)
+	
+	// At this point, we are racing with the reaper on a different core,
+	// which might take away our stack.  However, we have interrupts
+	// off locally, so as long as *we* don't use the stack, we should be OK
+	j nk_thread_switch_on_exit
+
+	// and this should never happen...
+	ret
+
+END(nk_thread_switch_exit_helper)
+
+
+// On a thread exit we must avoid saving thread state
+// or using the stack at all since at this point the thread and its stack
+// might already be deleted.  Interrupts are off, however.
+// We also want to save the cost of any state saves
+// We should get here via a JUMP
+// Note that the first three instructions establish the new stack
+// and thread structure	
+ENTRY(nk_thread_switch_on_exit)
+
+    # movq %rdi, %rax     /* load up pointer to the next thread */
+    
+
+    # movq %rax, %gs:0x0  /* make it the new current thread */
+    # movq (%rax), %rsp   /* load its stack pointer */
+
+    # RESTORE_GPRS()      /* load the new thread's GPRs */
+
+    # leaq 16(%rsp), %rsp /* pop off the vector and the error code */
+
+    # decw %gs:8          // decrement interrupt nesting level -
+	#                 // we may now be leaving interrupt context
+
+    ret               /* and off we go */
+
+END(nk_thread_switch_on_exit)
+
+#define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
+
+ENTRY(nk_thread_entry)
+
+    csrr    t0, sstatus
+    li      t1, SSTATUS_SIE
+    or      t0, t0, t1
+    csrw    sstatus, t0
+
+    ret
+    
+END(nk_thread_entry)
 
 /* _setjmp functions */
 ENTRY (_setjmp)
@@ -82,8 +150,8 @@ ENTRY (__sigsetjmp)
     REG_S sp, 13*SZREG(a0)
 
 /* TODO: save signal mask? */
-        li a0, 0
-        ret
+    li a0, 0
+    ret
 END (__sigsetjmp)
 
 ENTRY (longjmp)

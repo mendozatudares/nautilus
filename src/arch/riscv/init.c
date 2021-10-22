@@ -85,7 +85,7 @@ out_err:
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-extern uint64_t secondary_core_startup_sbi;
+extern uint8_t secondary_core_startup_sbi[];
 extern uint64_t secondary_core_stack;
 extern int uart_getchar(void);
 
@@ -93,6 +93,8 @@ bool second_done = false;
 
 void secondary_entry(int hartid) {
     
+    printk("RISCV: Hart %d started!\n", hartid);
+
     struct naut_info * naut = &nautilus_info;
 
     w_sscratch(r_tp());
@@ -120,17 +122,23 @@ int start_secondary(void) {
     for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
         if (i == my_cpu_id()) continue;
 
-        printk("RISCV: Hart %d trying to start hart %d\n", my_cpu_id(), i);
-
         secondary_core_stack = (uint64_t)malloc(2 * 4096);
         secondary_core_stack += 2 * 4096;
 
-        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &secondary_core_startup_sbi, 0);
-        if (ret.error != SBI_SUCCESS) continue;
+        second_done = false;
+        __sync_synchronize();
 
-        while (second_done != true) {
-        //     // __sync_synchronize();
+        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, secondary_core_startup_sbi, 0);
+        if (ret.error != SBI_SUCCESS) {
+            continue;
         }
+
+        printk("RISCV: Hart %d trying to start hart %d\n", my_cpu_id(), i);
+
+        // while (second_done != true) {
+        //     __sync_synchronize();
+        // }
+
         printk("RISCV: Hart %d successfully started hart %d\n", my_cpu_id(), i);
     }
 
@@ -141,8 +149,6 @@ void init (int hartid, void* fdt) {
 
 	long x = 0;
 	printk("x: %llx, fdt: %llx\n", x, fdt);
-
-    if (!fdt) panic("reboot\n");
 
     // Get necessary information from SBI
     sbi_early_init();
@@ -195,9 +201,9 @@ void init (int hartid, void* fdt) {
 
     sysinfo_init(&(naut->sys));
 
-    // nk_wait_queue_init();
+    nk_wait_queue_init();
 
-    // nk_sched_init(&sched_cfg);
+    nk_sched_init(&sched_cfg);
 
     mm_boot_kmem_cleanup();
 

@@ -1027,7 +1027,7 @@ __thread_fork (void)
     uint64_t     rsp;
 
 #ifdef NAUT_CONFIG_RISCV_HOST
-    __asm__ __volatile__ ( "lw %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
+    __asm__ __volatile__ ( "mv %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
 #else
     __asm__ __volatile__ ( "movq %%rsp, %0" : "=r"(rsp) : : "memory");
 #endif
