@@ -38,7 +38,18 @@
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/plic.h>
 #include <arch/riscv/memlayout.h>
+#include <arch/riscv/trap.h>
 
+
+#define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
+
+struct nk_sched_config sched_cfg = {
+    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT*10000ULL, // convert percent to 10^-6 units
+    .sporadic_reservation =  NAUT_CONFIG_SPORADIC_RESERVATION*10000ULL, // ..
+    .aperiodic_reservation = NAUT_CONFIG_APERIODIC_RESERVATION*10000ULL, // ..
+    .aperiodic_quantum = QUANTUM_IN_NS,
+    .aperiodic_default_priority = QUANTUM_IN_NS,
+};
 
 
 static int
@@ -74,9 +85,57 @@ out_err:
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-void trap_init(void);
-void uart_init(void);
-int uart_getchar(void);
+extern uint64_t secondary_core_startup_sbi;
+extern uint64_t secondary_core_stack;
+extern int uart_getchar(void);
+
+bool second_done = false;
+
+void secondary_entry(int hartid) {
+    
+    struct naut_info * naut = &nautilus_info;
+
+    w_sscratch(r_tp());
+
+    w_tp((uint64_t)naut->sys.cpus[hartid]);
+
+    /* Initialize the platform level interrupt controller for this HART */
+    plic_init_hart();
+
+    // Write supervisor trap vector location
+    trap_init_hart();
+
+    /* set the timer with sbi :) */
+    // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
+
+    second_done = true;
+
+    sti();
+
+    while (1) {
+    }
+}
+
+int start_secondary(void) {
+    for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
+        if (i == my_cpu_id()) continue;
+
+        printk("RISCV: Hart %d trying to start hart %d\n", my_cpu_id(), i);
+
+        secondary_core_stack = (uint64_t)malloc(2 * 4096);
+        secondary_core_stack += 2 * 4096;
+
+        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &secondary_core_startup_sbi, 0);
+        if (ret.error != SBI_SUCCESS) continue;
+
+        while (second_done != true) {
+        //     // __sync_synchronize();
+        }
+        printk("RISCV: Hart %d successfully started hart %d\n", my_cpu_id(), i);
+    }
+
+    return 0;
+}
 
 void init (int hartid, void* fdt) {
 
@@ -125,7 +184,7 @@ void init (int hartid, void* fdt) {
     mm_boot_kmem_init();
 
     // Write supervisor trap vector location
-    trap_init();
+    trap_init_hart();
 
     // Initialize platform level interrupt controller for this HART
     plic_init();
@@ -136,6 +195,10 @@ void init (int hartid, void* fdt) {
 
     sysinfo_init(&(naut->sys));
 
+    // nk_wait_queue_init();
+
+    // nk_sched_init(&sched_cfg);
+
     mm_boot_kmem_cleanup();
 
     sti();
@@ -144,36 +207,13 @@ void init (int hartid, void* fdt) {
 
     /* interrupts are now on */
 
+    // start_secondary();
+
     while(1) {
         int c = uart_getchar();
         if (c != -1) {
             if (c == 13) printk("\n");
             else printk("%c", c);
         }
-    }
-}
-
-
-void secondary_entry(int hartid) {
-
-    printk("booted!\n");
-
-    struct naut_info * naut = &nautilus_info;
-
-    w_sscratch(r_tp());
-    w_tp((uint64_t)naut->sys.cpus[hartid]);
-
-    /* Initialize the platform level interrupt controller for this HART */
-    plic_init_hart();
-
-    /* Write supervisor trap vector location */
-    trap_init();
-
-    /* set the timer with sbi :) */
-    // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
-
-    sti();
-
-    while (1) {
     }
 }

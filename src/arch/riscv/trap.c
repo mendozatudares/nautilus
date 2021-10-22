@@ -1,4 +1,5 @@
 
+#include <nautilus/percpu.h>
 #include <nautilus/naut_types.h>
 #include <nautilus/spinlock.h>
 #include <arch/riscv/riscv.h>
@@ -9,12 +10,11 @@ void kernel_vec();
 
 // set up to take exceptions and traps while in the kernel.
 void
-trap_init(void)
+trap_init_hart(void)
 {
     w_stvec((uint64_t)kernel_vec);
 }
 
-void printk(char *fmt, ...);
 void uart_intr(void);
 
 int
@@ -56,8 +56,6 @@ dev_intr(void)
     }
 }
 
-void panic(char *s);
-
 /* Supervisor Trap Function */
 void
 kernel_trap()
@@ -66,7 +64,7 @@ kernel_trap()
     uint64_t sepc = r_sepc();
     uint64_t sstatus = r_sstatus();
     uint64_t scause = r_scause();
-    printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
+    printk("\n+++ Kernel Trap +++\nCPU: %d\nscause: %p\nsepc:   %p\nstval:  %p\n", my_cpu_id(), scause, sepc, r_stval());
 
     if ((sstatus & SSTATUS_SPP) == 0) {
         // printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
