@@ -188,6 +188,14 @@ uart_intr(void)
     UART_UNLOCK();
 }
 
+/* Faking some vc stuff */
+
+inline int nk_vc_is_active()
+{
+  return 0;
+}
+
+#include <nautilus/printk.h>
 #include <stdarg.h>
 
 int nk_vc_print(char *s)
@@ -209,5 +217,19 @@ int nk_vc_printf(char *fmt, ...)
   i=vsnprintf(buf,PRINT_MAX,fmt,args);
   va_end(args);
   nk_vc_print(buf);
+  return i;
+}
+
+int nk_vc_log(char *fmt, ...)
+{
+  char buf[PRINT_MAX];
+
+  va_list args;
+  int i;
+  
+  va_start(args, fmt);
+  i=vsnprintf(buf,PRINT_MAX,fmt,args);
+  va_end(args);
+  
   return i;
 }
