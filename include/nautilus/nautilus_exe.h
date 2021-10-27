@@ -69,7 +69,7 @@ void* nk_func_table_access(volatile int entry_no, void* arg1, void* arg2);
  * User framework switches 
  */
 #define USER_REGION_CHECK 0
-#define USER_TIMING 1
+#define USER_TIMING 0
 
 #else
 

@@ -602,7 +602,21 @@ bool ProtectionsInjector::_isValidSCEV(const llvm::SCEV* scevPtr){
   auto SCEVCNC = dyn_cast<SCEVCouldNotCompute>(scevPtr);
   auto SCEVUD = dyn_cast<SCEVUDivExpr>(scevPtr);
   auto SCEVUNK = dyn_cast<SCEVUnknown>(scevPtr);
-  if(NAry){
+  auto SAR = dyn_cast<SCEVAddRecExpr>(scevPtr);
+  auto SAE = dyn_cast<SCEVAddExpr>(scevPtr);
+  auto SME = dyn_cast<SCEVMulExpr>(scevPtr);
+  auto SMM = dyn_cast<SCEVMinMaxExpr>(scevPtr);
+
+  if( false     ||
+      SAR       ||
+      SAE       ||
+      SMM       ||
+      SCEVCast  ||
+      SCEVConst
+    ){
+    return true;
+  }
+  else if(NAry){
     for(auto i = 0; i < NAry->getNumOperands(); i++){
       auto NAryOp = NAry->getOperand(i);
       errs() << "Considering NAry Op: " << *NAryOp << "...";
@@ -628,14 +642,6 @@ bool ProtectionsInjector::_isValidSCEV(const llvm::SCEV* scevPtr){
       return false;
     }
 
-  }
-  else if(SCEVCast){
-    errs() << "Is SCEVCastExpr\n";
-    return false;
-  }
-  else if(SCEVConst){
-    errs() << "Is SCEVCastExpr\n";
-    return false;
   }
   else if(SCEVCNC){
     errs() << "Is SCEVCNC\n";
@@ -1590,11 +1596,30 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
       return false;
     }
 
+    //This function will attempt to walk a value up the chain of its function if it is being casted, GEP'ed, or loaded
+    //Returns value* to unCastGepLoad value if success, nullptr if failed
+    Value* ProtectionsInjector::unCastGepLoad(Value* recurseVal){
+      auto LI = dyn_cast<LoadInst>(recurseVal);
+      auto GEPI = dyn_cast<GetElementPtrInst>(recurseVal);
+      auto CI = dyn_cast<CastInst>(recurseVal);
+      auto ARG = dyn_cast<Argument>(recurseVal);
+      if(LI){
+        return LI->getPointerOperand();
+      }
+      else if(GEPI){
+        return _fetchGEPBasePointer(recurseVal, 0);
+      }
+      else if(CI){
+        return _fetchBitCastOperand(recurseVal);
+      }
+      return nullptr;
+    }
 
 
 
     //This function correspondes to 1i and will recursively find out if an argument is safe to not protect
     bool ProtectionsInjector::_isSafeArgument(Instruction* inst, Argument* arg){
+      errs() << "isSafeArgument called on inst in function: "<< inst->getFunction()->getName() << "\n";
       //Grab the parent function the instruction exists in
       auto parFunction = inst->getFunction();
       //Get arg num
@@ -1616,27 +1641,49 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
           auto incomingSubEdges = edge->getSubEdges();
           for(auto subEdge : incomingSubEdges){
             auto callInst = subEdge->getCaller()->getInstruction();
+            errs() << "Investigating callInst: " << *callInst << " of parent function: " << callInst->getFunction()->getName() << "\n";
             auto callInstArg = callInst->getOperand(argumentNum);
-            if(!_isASafeMemoryConstruct(callInstArg)){
-              //Before we give up, let us try to cast it as an argument and recurse this function.
-              if(auto tryArgCast = dyn_cast<Argument>(callInstArg)){
-                if(_isSafeArgument(callInst, tryArgCast)){
-                  continue;
-                }
+            auto tempVal = callInstArg;
+            //Walk up the cast, gep, load, arg chain
+            bool safeChain = false;
+            while(1){
+              //breaks if safe construct 
+              if(_isASafeMemoryConstruct(tempVal)){
+                safeChain = true;
+                break;
+              } 
+              auto tempVal2 = unCastGepLoad(tempVal);
+              //Breaks when tempVal cannot walk up chain
+              if(!tempVal2){
+                break;
               }
-              areAllCallersSafe = false;
-              break;
+              tempVal = tempVal2;
             }
-
+            if(safeChain){
+              continue;
+            } 
+            //Before we give up, let us try to cast it as an argument and recurse this function.
+            if(auto tryArgCast = dyn_cast<Argument>(tempVal)){
+              if(_isSafeArgument(callInst, tryArgCast)){
+                continue;
+              }
+            }
+            errs() << "Not safe!\n";
+            areAllCallersSafe = false;
+            break;
           }
+
+
           if(!areAllCallersSafe){
             break;
           }
         }
         if(areAllCallersSafe){
+          errs() << "All callers safe!\n";
           return true;
         }
         //If we make it here, then the function does not have all callers use the argument safely
+        errs() << "All callers not safe!\n";
         return false;
       }
 
@@ -1689,6 +1736,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
            *       data types described in 1b-d.
            *    i) @PointerOfMemoryInstruction is an argument of the function,
            *       all the callers of the function provide a safe memory construct as the argument
+           *    j) Follow the cast, load GEP path of instruction to check for safe construct
            *
            *    ... then we're done --- don't have to do anything!
            * 
@@ -1839,6 +1887,61 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
           }
 
           /*
+           *  <Step 1j.>
+           */
+
+          //Keep trying to cast the inst as a cast, gep, or load and check if they are safe constructs
+          Value* recurseVal = PointerOfMemoryInstruction;
+          while(1){
+            if(!recurseVal){
+              break;
+            }
+            errs() << "1j, Checking: " << *recurseVal << " of FUNCTION: " << inst->getFunction()->getName() <<"\n";
+
+            if (INSetOfI.find(recurseVal) != INSetOfI.end()) 
+            {
+              redundantGuard++;                  
+              return;
+            }
+            auto LI = dyn_cast<LoadInst>(recurseVal);
+            auto GEPI = dyn_cast<GetElementPtrInst>(recurseVal);
+            auto CI = dyn_cast<CastInst>(recurseVal);
+            auto ARG = dyn_cast<Argument>(recurseVal);
+            if(ARG){
+              if(_isSafeArgument(inst, ARG)){
+                redundantGuard++;
+                return;
+              }
+            }
+            if(LI){
+              recurseVal = LI->getPointerOperand();
+              if(_isASafeMemoryConstruct(recurseVal)){
+                redundantGuard++;
+                return;
+              }
+              continue;
+            }
+            else if(GEPI){
+              recurseVal = _fetchGEPBasePointer(recurseVal, 0);
+              if(_isASafeMemoryConstruct(recurseVal)){
+                redundantGuard++;
+                return;
+              }
+              continue;
+            }
+            else if(CI){
+              recurseVal = _fetchBitCastOperand(recurseVal);
+              if(_isASafeMemoryConstruct(recurseVal)){
+                redundantGuard++;
+                return;
+              }
+              continue;
+            }
+            break;
+          }
+
+
+          /*
            * We have to guard the pointer --- fetch the 
            * potential loop nest that @inst belongs to
            */
@@ -1894,7 +1997,7 @@ No_Loop:
            */
           if (!Guarded) 
           {
-            errs() << "Step 3 Guard\n";
+            errs() << "Step 3 Guard: "<< *inst << "::" << *PointerOfMemoryInstruction << "\n";
             InjectionLocations[inst] = 
               new GuardInfo(
                   inst,
@@ -1904,7 +2007,6 @@ No_Loop:
                   "protect", /* Metadata type */
                   "non.opt.mem.guard" /* Metadata attached to injection */
                   );
-
             nonOptimizedGuard++;
           }
 

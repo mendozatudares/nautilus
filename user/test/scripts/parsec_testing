@@ -56,8 +56,8 @@ export KARAT=${KARAT_FLAGS} ;
 cd ${PARSEC} && \
     ./bin/parsecmgmt -a uninstall -p ${BENCH} -c clang && \
     ./bin/parsecmgmt -a build -p ${BENCH} -c clang && \
-    cp ${BENCH_DIR}/obj/amd64-linux.clang/${BENCH} ${MNT}/${FILE_NAME}.EXE && \
-    cp ${BENCH_DIR}/inputs/I.txt ${MNT}/${FILE_NAME}I.TXT \
+    cp ${BENCH_DIR}/obj/amd64-linux.clang/${BENCH} ${MNT}/${FILE_NAME^^}.EXE && \
+    cp ${BENCH_DIR}/inputs/I.txt ${MNT}/${FILE_NAME^^}I.TXT \
 
 
 # Unmount 

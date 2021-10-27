@@ -208,7 +208,7 @@ private:
     );
 
     bool _isASafeMemoryConstruct(Value *Pointer);
-
+    Value* unCastGepLoad(Value*);
     std::function<void (Instruction *inst, Value *pointerOfMemoryInstruction, bool isWrite)> _findPointToInsertGuard(void);
 
     void _allocaOutsideFirstBBChecker(void);

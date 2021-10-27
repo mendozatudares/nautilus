@@ -758,7 +758,7 @@ $(SYM_NAME): $(BIN_NAME)
 	@scripts/gen_sym_file.sh $(BIN_NAME) tmp.sym
 
 nautilus: $(BIN_NAME) $(SYM_NAME)
-
+	echo "HI"
 # New function to run a Python script which generates Lua test code,
 # addition of a separate flag (LUA_BUILD_FLAG) which is set to indicate
 # that the debug symbols we need for wrapping Nautilus functions will

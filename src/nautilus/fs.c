@@ -158,6 +158,7 @@ static inline ssize_t file_read(nk_fs_fd_t fd, char *buf, size_t num_bytes)
 
 static inline ssize_t file_write(nk_fs_fd_t fd, char *buf, size_t num_bytes) 
 {
+  return num_bytes;
     if (!FS_FD_ERR(fd) && fd->fs && fd->fs->interface 
 	&& fd->fs->interface->write_file) {
 	return fd->fs->interface->write_file(fd->fs->state, 

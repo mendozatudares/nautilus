@@ -36,7 +36,7 @@
 ProtectionsDFA::ProtectionsDFA(
     Function *F,
     Noelle *N
-) : F(F), N(N) {}
+    ) : F(F), N(N) {}
 
 
 /*
@@ -44,34 +44,34 @@ ProtectionsDFA::ProtectionsDFA(
  */
 void ProtectionsDFA::Compute(void)
 {
-    /* 
-     * Play god
-     */ 
-    _initializeUniverse();
+  /* 
+   * Play god
+   */ 
+  _initializeUniverse();
 
 
-    /*
-     * Apply the Address Checking for Data Custody (AC/DC) DFA
-     */
-    auto DFE = N->getDataFlowEngine();
+  /*
+   * Apply the Address Checking for Data Custody (AC/DC) DFA
+   */
+  auto DFE = N->getDataFlowEngine();
 
-    TheResult = DFE.applyForward(
-        F, 
-        _computeGEN(), 
-        _computeKILL(), 
-        _initializeIN(), 
-        _initializeOUT(), 
-        _computeIN(), 
-        _computeOUT()
-    );
+  TheResult = DFE.applyForward(
+      F, 
+      _computeGEN(), 
+      _computeKILL(), 
+      _initializeIN(), 
+      _initializeOUT(), 
+      _computeIN(), 
+      _computeOUT()
+      );
 
-    return;
+  return;
 }
 
 
 DataFlowResult *ProtectionsDFA::FetchResult(void)
 {
-    return this->TheResult;
+  return this->TheResult;
 }
 
 
@@ -80,230 +80,258 @@ DataFlowResult *ProtectionsDFA::FetchResult(void)
  */
 std::function<void (Instruction *I, DataFlowResult *Result)> ProtectionsDFA::_computeGEN(void)
 {
-    auto DFAGen = 
-        []
-        (Instruction *I, DataFlowResult *Result) -> void {
+  auto DFAGen = 
+    []
+    (Instruction *I, DataFlowResult *Result) -> void {
 
-        /*
-         * Handle memory instructions (stores and loads)
-         */
-        if (true
-            && (!isa<StoreInst>(I))
-            && (!isa<LoadInst>(I))) return;
+      /*
+       * Handle memory instructions (stores and loads)
+       */
+      if (true
+          && (!isa<StoreInst>(I))
+          && (!isa<LoadInst>(I))) return;
 
 
-        /*
-         * Find pointer to guard
-         */ 
-        Value *PointerToGuard = nullptr;
-        if (true 
-            && STORE_GUARD
-            && isa<StoreInst>(I))
-        {
-            StoreInst *Store = cast<StoreInst>(I);
-            PointerToGuard = Store->getPointerOperand();
-        } 
-        else if (LOAD_GUARD)
-        {
-            LoadInst *Load = cast<LoadInst>(I);
-            PointerToGuard = Load->getPointerOperand();
+      /*
+       * Find pointer to guard
+       */ 
+      Value *PointerToGuard = nullptr;
+      if (true 
+          && STORE_GUARD
+          && isa<StoreInst>(I))
+      {
+        StoreInst *Store = cast<StoreInst>(I);
+        PointerToGuard = Store->getPointerOperand();
+      } 
+      else if (LOAD_GUARD)
+      {
+        LoadInst *Load = cast<LoadInst>(I);
+        PointerToGuard = Load->getPointerOperand();
+      }
+
+
+      /*
+       * If no pointer is found, do nothing
+       */
+      if (!PointerToGuard) return;
+
+
+      /*
+       * Fetch the GEN[I] set.
+       */
+      auto &InstGen = Result->GEN(I);
+
+
+      /*
+       * Add the pointer to guard in the GEN[I] set.
+       */
+      InstGen.insert(PointerToGuard);
+      auto PTGVal = PointerToGuard;
+      while(1){
+        if(!PTGVal){
+          break;
+        }
+        BitCastInst *BCI = dyn_cast<BitCastInst>(PTGVal);
+        if (BCI) {
+          PTGVal = BCI->getOperand(0);
+          InstGen.insert(PTGVal);
+          continue;
         }
 
-
         /*
-         * If no pointer is found, do nothing
-         */
-        if (!PointerToGuard) return;
+         * Attempt to fetch the operand as a bitcast operator
+         */ 
+        BitCastOperator *BCO = dyn_cast<BitCastOperator>(PTGVal);
+        if (BCO) {
+          PTGVal = BCO->getOperand(0);
+          InstGen.insert(PTGVal);
+          continue;
+        }
 
-
-        /*
-         * Fetch the GEN[I] set.
-         */
-        auto &InstGen = Result->GEN(I);
-
-
-        /*
-         * Add the pointer to guard in the GEN[I] set.
-         */
-        InstGen.insert(PointerToGuard);
-
-
-        return;
+        GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(PTGVal);
+        if(GEPI && GEPI->isInBounds()){
+          PTGVal = GEPI->getPointerOperand();
+          InstGen.insert(PTGVal);
+          continue;
+        }
+        break;
+      }
+      return;
     };
 
 
-    return DFAGen;
+  return DFAGen;
 }
 
 
 std::function<void (Instruction *I, DataFlowResult *Result)> ProtectionsDFA::_computeKILL(void)
 {
-    /*
-     * TOP --- No concept of a KILL set in AC/DC???
-     */ 
-    auto DFAKill = 
-        []
-        (Instruction *I, DataFlowResult *Result) -> void {
-        return;
+  /*
+   * TOP --- No concept of a KILL set in AC/DC???
+   */ 
+  auto DFAKill = 
+    []
+    (Instruction *I, DataFlowResult *Result) -> void {
+      return;
     };
 
-    return DFAKill;
+  return DFAKill;
 }
 
 
 void ProtectionsDFA::_initializeUniverse(void)
 {
-    /*
-     * TOP --- Initialize IN and OUT sets, fetch ALL values
-     * used in @this->F excluding incoming basic blocks from
-     * PHINodes and possible external functions from pointers,
-     * indirect calls, etc.
-     */
-    for (auto &B : *F)
+  /*
+   * TOP --- Initialize IN and OUT sets, fetch ALL values
+   * used in @this->F excluding incoming basic blocks from
+   * PHINodes and possible external functions from pointers,
+   * indirect calls, etc.
+   */
+  for (auto &B : *F)
+  {
+    for (auto &I : B)
     {
-        for (auto &I : B)
-        {
-            /*
-             * Add all instructions to the universe
-             */
-            TheUniverse.insert(&I);
+      /*
+       * Add all instructions to the universe
+       */
+      TheUniverse.insert(&I);
 
 
-            /*
-             * Add all operand uses to the universe
-             */ 
-            for (auto Index = 0; 
-                 Index < I.getNumOperands(); 
-                 Index++)
-            {
-                Value *NextOperand = I.getOperand(Index);
+      /*
+       * Add all operand uses to the universe
+       */ 
+      for (auto Index = 0; 
+          Index < I.getNumOperands(); 
+          Index++)
+      {
+        Value *NextOperand = I.getOperand(Index);
 
-                /*
-                 * Ignore basic block and function operands
-                 */  
-                if (false
-                    || (isa<Function>(NextOperand))
-                    || (isa<BasicBlock>(NextOperand))) continue;
-   
-                TheUniverse.insert(NextOperand);
-            }
-        }
+        /*
+         * Ignore basic block and function operands
+         */  
+        if (false
+            || (isa<Function>(NextOperand))
+            || (isa<BasicBlock>(NextOperand))) continue;
+
+        TheUniverse.insert(NextOperand);
+      }
     }
+  }
 
 
-    /*
-     * Save arguments as well
-     */  
-    for (auto &Arg : F->args()) TheUniverse.insert(&Arg);
-    
+  /*
+   * Save arguments as well
+   */  
+  for (auto &Arg : F->args()) TheUniverse.insert(&Arg);
 
-    /*
-     * Set state needed for analysis
-     */ 
-    Entry = &*F->begin();
-    First = &*Entry->begin();
-    
 
-    return;
+  /*
+   * Set state needed for analysis
+   */ 
+  Entry = &*F->begin();
+  First = &*Entry->begin();
+
+
+  return;
 }
 
 
 std::function<void (Instruction *inst, std::set<Value *> &IN)> ProtectionsDFA::_initializeIN(void)
 {
-    /*
-     * TOP --- initialize the IN set to the universe of 
-     * values available in @this->F
-     */ 
-    auto InitIn = 
-        [this] 
-        (Instruction *I, std::set<Value *> &IN) -> void {
-        if (I == First) { return; }
-        IN = TheUniverse;
-        return;
+  /*
+   * TOP --- initialize the IN set to the universe of 
+   * values available in @this->F
+   */ 
+  auto InitIn = 
+    [this] 
+    (Instruction *I, std::set<Value *> &IN) -> void {
+      if (I == First) { return; }
+      IN = TheUniverse;
+      return;
     };
 
 
-    return InitIn;
+  return InitIn;
 }
 
 
 std::function<void (Instruction *inst, std::set<Value *> &OUT)> ProtectionsDFA::_initializeOUT(void)
 {
-    /*
-     * TOP --- initialize the OUT set to the universe of 
-     * values available in @this->F
-     */ 
-    auto InitOut = 
-        [this]
-        (Instruction *I, std::set<Value *> &OUT) -> void {
-        OUT = TheUniverse;
-        return ;
+  /*
+   * TOP --- initialize the OUT set to the universe of 
+   * values available in @this->F
+   */ 
+  auto InitOut = 
+    [this]
+    (Instruction *I, std::set<Value *> &OUT) -> void {
+      OUT = TheUniverse;
+      return ;
     };
 
-    return InitOut;
+  return InitOut;
 }
 
 
 std::function<void (Instruction *inst, std::set<Value *> &IN, Instruction *predecessor, DataFlowResult *df)> ProtectionsDFA::_computeIN(void)
 {
-    /*
-     * Define the IN set
-     */
-    auto ComputeIn = 
-        [] 
-        (Instruction *I, std::set<Value *> &IN, Instruction *Pred, DataFlowResult *DF) -> void {
-        
-        auto &OUTPred = DF->OUT(Pred);
+  /*
+   * Define the IN set
+   */
+  auto ComputeIn = 
+    [] 
+    (Instruction *I, std::set<Value *> &IN, Instruction *Pred, DataFlowResult *DF) -> void {
 
-        std::set<Value *> tmpIN{};
-        std::set_intersection(
-            IN.begin(), 
-            IN.end(), 
-            OUTPred.begin(), 
-            OUTPred.end(),  
-            std::inserter(tmpIN, tmpIN.begin())
-        );
-        
-        IN = tmpIN;
+      auto &OUTPred = DF->OUT(Pred);
 
-        return ;
+      std::set<Value *> tmpIN{};
+      std::set_intersection(
+          IN.begin(), 
+          IN.end(), 
+          OUTPred.begin(), 
+          OUTPred.end(),  
+          std::inserter(tmpIN, tmpIN.begin())
+          );
+
+      IN = tmpIN;
+
+      return ;
 
     };
 
 
-    return ComputeIn;
+  return ComputeIn;
 }
 
 
 std::function<void (Instruction *inst, std::set<Value *> &OUT, DataFlowResult *df)> ProtectionsDFA::_computeOUT(void)
 {
-    auto ComputeOUT = 
-        [] 
-        (Instruction *inst, std::set<Value *> &OUT, DataFlowResult *DF) -> void {
+  auto ComputeOUT = 
+    [] 
+    (Instruction *inst, std::set<Value *> &OUT, DataFlowResult *DF) -> void {
 
-        /*
-         * Fetch the IN[inst] set.
-         */
-        auto &IN = DF->IN(inst);
-
-
-        /*
-         * Fetch the GEN[inst] set.
-         */
-        auto &GEN = DF->GEN(inst);
+      /*
+       * Fetch the IN[inst] set.
+       */
+      auto &IN = DF->IN(inst);
 
 
-        /*
-         * Set the OUT[inst] set.
-         */
-        OUT = IN;
-        OUT.insert(GEN.begin(), GEN.end());
+      /*
+       * Fetch the GEN[inst] set.
+       */
+      auto &GEN = DF->GEN(inst);
 
-        return ;
+
+      /*
+       * Set the OUT[inst] set.
+       */
+      OUT = IN;
+      OUT.insert(GEN.begin(), GEN.end());
+
+      return ;
     };
 
 
-    return ComputeOUT;
+  return ComputeOUT;
 }
 
 #endif
