@@ -1320,7 +1320,7 @@ static inline rt_thread *round_robin_remove_aperiodic(rt_scheduler *s, rt_thread
 static inline uint64_t get_random()
 {
     uint64_t t;
-    // nk_get_rand_bytes((uint8_t *)&t,sizeof(t));
+    nk_get_rand_bytes((uint8_t *)&t,sizeof(t));
     return t;
 }
 

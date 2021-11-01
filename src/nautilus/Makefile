@@ -66,6 +66,7 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	doprnt.o \
 	naut_string.o \
 	spinlock.o \
+	random.o \
 	smp.o \
 	thread.o \
 	waitqueue.o \

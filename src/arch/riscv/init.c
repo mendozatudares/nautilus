@@ -29,6 +29,7 @@
 #include <nautilus/percpu.h>
 #include <nautilus/errno.h>
 #include <nautilus/devicetree.h>
+#include <nautilus/random.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
 #include <nautilus/gdb-stub.h>
@@ -149,6 +150,7 @@ void init (int hartid, void* fdt) {
 
 	long x = 0;
 	printk("x: %llx, fdt: %llx\n", x, fdt);
+    if (!fdt) panic("Invalid FDT\n");
 
     // Get necessary information from SBI
     sbi_early_init();
@@ -202,6 +204,8 @@ void init (int hartid, void* fdt) {
     sysinfo_init(&(naut->sys));
 
     nk_wait_queue_init();
+
+    nk_rand_init(naut->sys.cpus[hartid]);
 
     nk_sched_init(&sched_cfg);
 

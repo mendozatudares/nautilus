@@ -48,7 +48,7 @@
 
 // turn this on to have a sanity check run before and after each
 // malloc and free
-#define SANITY_CHECK_PER_OP 0
+#define SANITY_CHECK_PER_OP 1
 
 #define KMEM_DEBUG(fmt, args...) DEBUG_PRINT("KMEM: " fmt, ##args)
 #define KMEM_ERROR(fmt, args...) ERROR_PRINT("KMEM: " fmt, ##args)
