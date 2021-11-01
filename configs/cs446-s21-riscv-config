@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 #Nautilus: 
-# Tue Oct 12 18:04:45 2021
+# Sun Oct 31 17:35:50 2021
 #
 
 #
@@ -107,8 +107,8 @@ NAUT_CONFIG_DEBUG_PRINTS=y
 NAUT_CONFIG_DEBUG_BOOTMEM=y
 # NAUT_CONFIG_DEBUG_CMDLINE is not set
 # NAUT_CONFIG_DEBUG_TESTS is not set
-# NAUT_CONFIG_DEBUG_BUDDY is not set
-# NAUT_CONFIG_DEBUG_KMEM is not set
+NAUT_CONFIG_DEBUG_BUDDY=y
+NAUT_CONFIG_DEBUG_KMEM=y
 # NAUT_CONFIG_DEBUG_FPU is not set
 NAUT_CONFIG_DEBUG_SMP=y
 # NAUT_CONFIG_DEBUG_SHELL is not set

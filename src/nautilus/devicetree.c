@@ -40,23 +40,23 @@ struct prop* device_tree_node_get_prop(struct device_tree_node *n, char* name) {
 void device_tree_node_set_prop(struct device_tree_node *n, char* name, int vlen, void *value) {
   struct prop* p = device_tree_node_get_prop(n, name);
   if (p == 0) {
-    p = mm_boot_alloc(sizeof(*p));
+    p = malloc(sizeof(*p));
     p->name = name;
     p->vlen = vlen;
   }
 
-  p->values = mm_boot_alloc(sizeof(uint8_t) * vlen);
+  p->values = malloc(sizeof(uint8_t) * vlen);
   for (int i = 0; i < vlen; i++) {
     p->values[i] = ((uint8_t *)value)[i];
   }
 }
 
 struct device_tree_node *device_tree_node_spawn(struct device_tree_node *n, char *name) {
-  struct device_tree_node *nn = mm_boot_alloc(sizeof(*nn));
+  struct device_tree_node *nn = malloc(sizeof(*nn));
   nn->name = name;
   nn->parent = n;
 
-  struct child *c = mm_boot_alloc(sizeof(*c));
+  struct child *c = malloc(sizeof(*c));
   list_add_tail(&c->node, &n->children);
   return n;
 }
@@ -325,7 +325,7 @@ static int get_fdt_prop_type(const char *c) {
 }
 
 void device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt) {
-  dt->fdt = (struct dtb_fdt_header *)mm_boot_alloc(bswap32(fdt->totalsize));
+  dt->fdt = (struct dtb_fdt_header *)malloc(bswap32(fdt->totalsize));
   memcpy(fdt, dt->fdt, bswap32(fdt->totalsize));
 
   uint32_t *sp = (uint32_t *)((off_t)fdt + bswap32(fdt->off_dt_struct));
@@ -334,7 +334,7 @@ void device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt) {
 
   struct device_tree_node *node = &dt->root;
 
-  while (*sp != FDT_END) {
+  while (bswap32(*sp) != FDT_END) {
     uint32_t op = bswap32(*sp);
     /* sp points to the next word */
     sp++;

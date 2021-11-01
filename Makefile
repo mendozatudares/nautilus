@@ -81,7 +81,7 @@ endif
 # In both cases the working directory must be the root of the kernel src.
 # 1) O=
 # Use "make O=dir/to/store/output/files/"
-#
+# 
 # 2) Set KBUILD_OUTPUT
 # Set the environment variable KBUILD_OUTPUT to point to the directory
 # where the output files shall be placed.
@@ -153,7 +153,7 @@ export srctree objtree VPATH TOPDIR
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
 # line overrides the setting of ARCH below.  If a native build is happening,
-# then ARCH is assigned, getting whatever value it gets normally, and
+# then ARCH is assigned, getting whatever value it gets normally, and 
 # SUBARCH is subsequently ignored.
 
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/  )
@@ -178,7 +178,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/  )
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 
 ARCH		?= $(SUBARCH)
-CROSS_COMPILE	?=
+CROSS_COMPILE	?= 
 #CROSS_COMPILE	?= /home/kyle/opt/cross/bin/x86_64-elf-
 
 # Architecture as present in compile.h
@@ -237,7 +237,7 @@ export KBUILD_CHECKSRC KBUILD_SRC KBUILD_EXTMOD
 #         cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 #
 # If $(quiet) is empty, the whole command will be printed.
-# If it is set to "quiet_", only the short version will be printed.
+# If it is set to "quiet_", only the short version will be printed. 
 # If it is set to "silent_", nothing wil be printed at all, since
 # the variable $(silent_cmd_cc_o_c) doesn't exist.
 #
@@ -403,14 +403,14 @@ endif
 
 CXXFLAGS := $(COMMON_FLAGS) \
 			-fno-exceptions \
-			-fno-rtti
+			-fno-rtti 
 
 CFLAGS:=   $(COMMON_FLAGS) \
 		   -Wall \
 		   -Wno-unused-function \
 		   -Wno-unused-variable \
 		   -fno-common \
-		   -Wstrict-overflow=5
+		   -Wstrict-overflow=5 
 
 #                   -Wextra \
 #                   -Wpedantic \
@@ -420,7 +420,7 @@ CFLAGS:=   $(COMMON_FLAGS) \
 ifdef NAUT_CONFIG_USE_GCC
 CFLAGS += -std=gnu99 \
 		  -Wno-frame-address \
-		  $(call cc-option, -Wno-unused-but-set-variable,)
+		  $(call cc-option, -Wno-unused-but-set-variable,) 
 endif
 
 ifeq ($(call cc-option-yn, -fgnu89-inline),y)
@@ -433,7 +433,7 @@ endif
 # go off the rails for the Grub multiboot setup because the linker
 # does strange things...
 LDFLAGS         := -z max-page-size=0x1000
-AFLAGS		:=
+AFLAGS		:= 
 
 # Read KERNELRELEASE from .kernelrelease (if it exists)
 #KERNELRELEASE = $(shell cat .kernelrelease 2> /dev/null)
@@ -482,7 +482,7 @@ endif
 # catch them early, and hand them over to scripts/kconfig/Makefile
 # It is allowed to specify more targets when calling make, including
 # mixing *config targets and build targets.
-# For example 'make oldconfig all'.
+# For example 'make oldconfig all'. 
 # Detect when mixed targets is specified, and make a second invocation
 # of make so .config is not included in this case either (for *config).
 
@@ -550,7 +550,7 @@ scripts_basic: include/autoconf.h
 
 # Objects we will link into Nautilus / subdirs we need to visit
 core-y          := src/
-libs-y		    := lib/
+libs-y		    := lib/ 
 
 
 ifeq ($(dot-config),1)
@@ -595,13 +595,13 @@ CFLAGS += -fno-optimize-sibling-calls
 endif
 
 #
-# Update libs, etc based on NAUT_CONFIG_TOOLCHAIN_ROOT
+# Update libs, etc based on NAUT_CONFIG_TOOLCHAIN_ROOT 
 #
 #
 ifneq ($(NAUT_CONFIG_CXX_SUPPORT)a,a)
 ifeq ($(NAUT_CONFIG_TOOLCHAIN_ROOT)a,""a)
 ifeq ($(CROSS_COMPILE)a, a)
-# guess where the std libs are
+# guess where the std libs are 
   libs-y += `locate libstdc++.a | head -1`
 else
   libs-y += $(CROSS_COMPILE)/../lib64/libstdc++.a
@@ -616,7 +616,7 @@ endif
 endif # NAUT_CONFIG_CXX_SUPPORT
 
                            #$(NAUT_CONF_TOOLCHAIN_ROOT)/lib64/libstdc++.a
-			   #-lstdc++
+			   #-lstdc++ 
                            #/usr/lib64/libstdc++.a \
 			   #/home/kyle/opt/cross/lib/gcc/x86_64-elf/4.8.0/libgcc.a \
 			   #/usr/lib64/libsupc++.a \
@@ -681,7 +681,7 @@ libs-y		:= $(patsubst %/, %/built-in.o, $(libs-y))
 # in the kernel tree, others are specified in Makefile.
 # Ordering when linking is important, and $(nautilus-init) must be first.
 #
-# Nautilus
+# Nautilus 
 #   ^
 #   |
 #   +--< $(nautilus)
@@ -689,11 +689,11 @@ libs-y		:= $(patsubst %/, %/built-in.o, $(libs-y))
 #
 
 
-nautilus := $(core-y) $(libs-y)
+nautilus := $(core-y) $(libs-y) 
 
 ifdef NAUT_CONFIG_XEON_PHI
 LD_SCRIPT:=link/nautilus.ld.xeon_phi
-else
+else 
 ifdef NAUT_CONFIG_HVM_HRT
 LD_SCRIPT:=link/nautilus.ld.hrt
 else
@@ -737,7 +737,7 @@ quiet_cmd_nautilus_version = GEN     .version
 	fi;
 
 
-# Link of nautilus
+# Link of nautilus 
 # If CONFIG_KALLSYMS is set .version is already updated
 # Generate System.map and verify that the content is consistent
 # Use + in front of the nautilus rule to silent warning with make -j2
@@ -781,7 +781,7 @@ uImage:
 # New function to run a Python script which generates Lua test code,
 # addition of a separate flag (LUA_BUILD_FLAG) which is set to indicate
 # that the debug symbols we need for wrapping Nautilus functions will
-# be available during the second build (which we need to generate appropriate
+# be available during the second build (which we need to generate appropriate 
 # function wrappers)
 define lua__
 	@python scripts/parse_gdb.py
@@ -794,7 +794,7 @@ endef
 #
 
 quiet_cmd_isoimage = MKISO   $(ISO_NAME)
-define cmd_isoimage
+define cmd_isoimage 
 	mkdir -p .iso/boot/grub && \
 	cp configs/grub.cfg .iso/boot/grub && \
 	cp $(BIN_NAME) $(SYM_NAME) $(SEC_NAME) .iso/boot && \
@@ -818,7 +818,7 @@ bitcode: $(BIN_NAME)
 	llvm-dis $(BC_NAME) -o $(LL_NAME)
 
 ifdef NAUT_CONFIG_USE_WLLVM_WHOLE_OPT
-whole_opt: $(BIN_NAME)
+whole_opt: $(BIN_NAME)  
 	extract-bc $(BIN_NAME) -o $(BC_NAME)
 	opt -strip-debug $(BC_NAME)
 	clang $(CFLAGS) -c $(BC_NAME) -o .nautilus.o
@@ -827,7 +827,7 @@ whole_opt: $(BIN_NAME)
 endif
 
 endif
-# The actual objects are generated when descending,
+# The actual objects are generated when descending, 
 # make sure no implicit rule kicks in
 $(sort  $(nautilus)) : $(nautilus-dirs) ;
 
@@ -857,7 +857,7 @@ PHONY += prepare-all
 # prepare3 is used to check if we are building in a separate output directory,
 # and if so do:
 # 1) Check that make has not been executed in the kernel src $(srctree)
-prepare3:
+prepare3: 
 ifneq ($(KBUILD_SRC),)
 	@echo '  Using $(srctree) as source for kernel'
 	$(Q)if [ -f $(srctree)/.config ]; then \
@@ -910,7 +910,7 @@ CLEAN_FILES +=	 nautilus.asm $(SYM_NAME) $(SEC_NAME) $(ISO_NAME) $(BIN_NAME) \
                  .tmp_version .tmp_nautilus*
 
 # Directories & files removed with 'make mrproper'
-MRPROPER_DIRS  += include/config
+MRPROPER_DIRS  += include/config 
 MRPROPER_FILES += .config .config.old  .version .old_version \
                   include/autoconf.h  \
 		  tags TAGS cscope*
@@ -1130,7 +1130,7 @@ target-dir = $(dir $@)
 	$(build)=$(build-dir) $(@:.ko=.o)
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
 
-# FIXME Should go into a make.lib or something
+# FIXME Should go into a make.lib or something 
 # ===========================================================================
 
 quiet_cmd_rmdirs = $(if $(wildcard $(rm-dirs)),CLEAN   $(wildcard $(rm-dirs)))

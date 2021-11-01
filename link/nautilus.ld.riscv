@@ -40,6 +40,12 @@ SECTIONS
     *(.rodata .rodata.*)
   }
 
+  .cmdline_flags ALIGN(0x1000) : {
+    __start_flags = .;
+    *(.cmdline_flags*);
+    __stop_flags = .;
+  }
+
   _loadEnd = .;
 
   .bss ALIGN(0x1000) : AT(ALIGN(ADDR(.data)+SIZEOF(.data),0x1000)) {

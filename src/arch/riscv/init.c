@@ -26,8 +26,32 @@
 #include <nautilus/spinlock.h>
 #include <nautilus/mb_utils.h>
 #include <nautilus/cpu.h>
+#include <nautilus/smp.h>
+#include <nautilus/thread.h>
+#include <nautilus/waitqueue.h>
+#include <nautilus/task.h>
+#include <nautilus/future.h>
+#include <nautilus/group.h>
+#include <nautilus/group_sched.h>
+#include <nautilus/timer.h>
+#include <nautilus/semaphore.h>
+#include <nautilus/msg_queue.h>
+#include <nautilus/idle.h>
 #include <nautilus/percpu.h>
 #include <nautilus/errno.h>
+#include <nautilus/random.h>
+#include <nautilus/mm.h>
+#include <nautilus/libccompat.h>
+#include <nautilus/barrier.h>
+#include <nautilus/dev.h>
+#include <nautilus/chardev.h>
+#include <nautilus/blkdev.h>
+#include <nautilus/netdev.h>
+#include <nautilus/gpudev.h>
+#include <nautilus/fs.h>
+#include <nautilus/linker.h>
+#include <nautilus/prog.h>
+#include <nautilus/cmdline.h>
 #include <nautilus/devicetree.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
@@ -37,8 +61,18 @@
 #include <arch/riscv/riscv.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/plic.h>
-#include <arch/riscv/memlayout.h>
+#include <arch/riscv/trap.h>
 
+
+#define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
+
+struct nk_sched_config sched_cfg = {
+    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT*10000ULL, // convert percent to 10^-6 units
+    .sporadic_reservation =  NAUT_CONFIG_SPORADIC_RESERVATION*10000ULL, // ..
+    .aperiodic_reservation = NAUT_CONFIG_APERIODIC_RESERVATION*10000ULL, // ..
+    .aperiodic_quantum = QUANTUM_IN_NS,
+    .aperiodic_default_priority = QUANTUM_IN_NS,
+};
 
 
 static int
@@ -74,16 +108,69 @@ out_err:
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-void trap_init(void);
-void uart_init(void);
-int uart_getchar(void);
+extern uint8_t secondary_core_startup_sbi[];
+extern uint64_t secondary_core_stack;
+extern int uart_getchar(void);
 
-void init (int hartid, void* fdt) {
+bool second_done = false;
 
-		long x = 0;
-		printk("x: %llx, fdt: %llx\n", x, fdt);
+void secondary_entry(int hartid) {
+    
+    printk("RISCV: Hart %d started!\n", hartid);
 
-    if (!fdt) panic("reboot");
+    struct naut_info * naut = &nautilus_info;
+
+    w_sscratch(r_tp());
+
+    w_tp((uint64_t)naut->sys.cpus[hartid]);
+
+    /* Initialize the platform level interrupt controller for this HART */
+    plic_init_hart();
+
+    // Write supervisor trap vector location
+    trap_init_hart();
+
+    /* set the timer with sbi :) */
+    // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
+
+    second_done = true;
+
+    sti();
+
+    while (1) {
+    }
+}
+
+int start_secondary(void) {
+    for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
+        if (i == my_cpu_id()) continue;
+
+        secondary_core_stack = (uint64_t)malloc(2 * 4096);
+        secondary_core_stack += 2 * 4096;
+
+        second_done = false;
+        __sync_synchronize();
+
+        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, secondary_core_startup_sbi, 0);
+        if (ret.error != SBI_SUCCESS) {
+            continue;
+        }
+
+        printk("RISCV: Hart %d trying to start hart %d\n", my_cpu_id(), i);
+
+        // while (second_done != true) {
+        //     __sync_synchronize();
+        // }
+
+        printk("RISCV: Hart %d successfully started hart %d\n", my_cpu_id(), i);
+    }
+
+    return 0;
+}
+
+void init (unsigned long hartid, unsigned long fdt) {
+
+    if (!fdt) panic("Invalid FDT\n");
 
     // Get necessary information from SBI
     sbi_early_init();
@@ -91,22 +178,29 @@ void init (int hartid, void* fdt) {
     // M-Mode passes scratch struct through tp. Move it to sscratch
     w_sscratch(r_tp());
 
-    // Zero out tp for now until tls is set up
+    // Zero out tp for now until cls is set up
     w_tp(0);
 
     struct naut_info * naut = &nautilus_info;
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
     naut->sys.bsp_id = hartid;
-    naut->sys.dtb = fdt;
+    naut->sys.dtb = (struct dtb_fdt_header *) fdt;
 
-	
-    dtb_parse((struct dtb_fdt_header *) fdt);
+    if (!dtb_parse((struct dtb_fdt_header *)fdt)) {
+        ERROR_PRINT("Problem parsing devicetree header\n");
+    }
 
-    printk(NAUT_WELCOME);
+    nk_dev_init();
+    nk_char_dev_init();
+    nk_block_dev_init();
+    nk_net_dev_init();
+    nk_gpu_dev_init();
+
+    nk_vc_print(NAUT_WELCOME);
 
     // Setup the temporary boot-time allocator
-    mm_boot_init((ulong_t) fdt);
+    mm_boot_init(fdt);
 
     // Enumate CPUs and initialize them
     smp_early_init(naut);
@@ -125,7 +219,7 @@ void init (int hartid, void* fdt) {
     mm_boot_kmem_init();
 
     // Write supervisor trap vector location
-    trap_init();
+    trap_init_hart();
 
     // Initialize platform level interrupt controller for this HART
     plic_init();
@@ -134,13 +228,36 @@ void init (int hartid, void* fdt) {
 
     /* from this point on, we can use percpu macros (even if the APs aren't up) */
 
+    sbi_init();
+
     sysinfo_init(&(naut->sys));
 
+    nk_wait_queue_init();
+
+    nk_future_init();
+
+    nk_timer_init();
+
+    nk_rand_init(naut->sys.cpus[hartid]);
+
+    nk_semaphore_init();
+
+    nk_msg_queue_init();
+
+    nk_sched_init(&sched_cfg);
+
+    nk_thread_group_init();
+    nk_group_sched_init();
+
     mm_boot_kmem_cleanup();
+
+    // nk_sched_start();
 
     sti();
 
     /* interrupts are now on */
+
+    // start_secondary();
 
     while(1) {
         int c = uart_getchar();
@@ -148,28 +265,5 @@ void init (int hartid, void* fdt) {
             if (c == 13) printk("\n");
             else printk("%c", c);
         }
-    }
-}
-
-
-void secondary_entry(int hartid) {
-
-    struct naut_info * naut = &nautilus_info;
-
-    w_sscratch(r_tp());
-    w_tp((uint64_t)naut->sys.cpus[hartid]);
-
-    /* Initialize the platform level interrupt controller for this HART */
-    plic_init_hart();
-
-    /* Write supervisor trap vector location */
-    trap_init();
-
-    /* set the timer with sbi :) */
-    // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
-
-    sti();
-
-    while (1) {
     }
 }

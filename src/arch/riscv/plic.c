@@ -1,11 +1,9 @@
 #include <nautilus/naut_types.h>
-#include <arch/riscv/riscv.h>
-#include <arch/riscv/memlayout.h>
-#include <arch/riscv/sbi.h>
-#include <arch/riscv/cpu.h>
-#include <arch/riscv/plic.h>
+#include <nautilus/cpu.h>
 #include <nautilus/percpu.h>
 #include <nautilus/devicetree.h>
+#include <arch/riscv/sbi.h>
+#include <arch/riscv/plic.h>
 
 addr_t plic_addr;
 #define PLIC plic_addr
@@ -81,4 +79,23 @@ plic_enable(int irq, int priority) {
 void
 plic_disable(int irq) {
     *(uint32_t*)PLIC_SENABLE(my_cpu_id()) &= ~(1 << irq);
+}
+
+/* Some fakery to get the scheduler working */
+uint64_t apic_cycles_to_realtime(struct apic_dev *apic, uint64_t cycles)
+{
+    return 1000ULL*(cycles/1);
+    // return 1000ULL*(cycles/(apic->cycles_per_us));
+}
+
+uint32_t apic_realtime_to_ticks(struct apic_dev *apic, uint64_t ns)
+{
+    return ((ns*1000ULL)/1);
+    // return ((ns*1000ULL)/apic->ps_per_tick);
+}
+
+void apic_update_oneshot_timer(struct apic_dev *apic, uint32_t ticks,
+			       nk_timer_condition_t cond)
+{
+    return;
 }

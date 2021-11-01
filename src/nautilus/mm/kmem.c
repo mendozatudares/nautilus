@@ -48,7 +48,7 @@
 
 // turn this on to have a sanity check run before and after each
 // malloc and free
-#define SANITY_CHECK_PER_OP 0
+#define SANITY_CHECK_PER_OP 1
 
 #define KMEM_DEBUG(fmt, args...) DEBUG_PRINT("KMEM: " fmt, ##args)
 #define KMEM_ERROR(fmt, args...) ERROR_PRINT("KMEM: " fmt, ##args)
@@ -985,7 +985,7 @@ handle_meminfo (char * buf, void * priv)
     uint64_t i;
 
     if (!s) { 
-        MM_PRINT("Failed to allocate space for mem info\n");
+        nk_vc_printf("Failed to allocate space for mem info\n");
         return 0;
     }
 
@@ -994,7 +994,7 @@ handle_meminfo (char * buf, void * priv)
     kmem_stats(s);
 
     for (i=0;i<s->num_pools;i++) { 
-        MM_PRINT("pool %lu %p-%p %lu blks free %lu bytes free\n  %lu bytes min %lu bytes max\n", 
+        nk_vc_printf("pool %lu %p-%p %lu blks free %lu bytes free\n  %lu bytes min %lu bytes max\n", 
                 i,
                 s->pool_stats[i].start_addr,
                 s->pool_stats[i].end_addr,
@@ -1004,8 +1004,8 @@ handle_meminfo (char * buf, void * priv)
                 s->pool_stats[i].max_alloc_size);
     }
 
-    MM_PRINT("%lu pools %lu blks free %lu bytes free\n", s->total_num_pools, s->total_blocks_free, s->total_bytes_free);
-    MM_PRINT("  %lu bytes min %lu bytes max\n", s->min_alloc_size, s->max_alloc_size);
+    nk_vc_printf("%lu pools %lu blks free %lu bytes free\n", s->total_num_pools, s->total_blocks_free, s->total_bytes_free);
+    nk_vc_printf("  %lu bytes min %lu bytes max\n", s->min_alloc_size, s->max_alloc_size);
 
     free(s);
 
@@ -1032,21 +1032,21 @@ handle_mem (char * buf, void * priv)
             (size=8, sscanf(buf, "mem %lx %lu", &addr, &len)==2)) { 
         uint64_t i,j,k;
         for (i=0;i<len;i+=BYTES_PER_LINE) {
-            MM_PRINT("%016lx :",addr+i);
+            nk_vc_printf("%016lx :",addr+i);
             for (j=0;j<BYTES_PER_LINE && (i+j)<len; j+=size) {
-                MM_PRINT(" ");
+                nk_vc_printf(" ");
                 for (k=0;k<size;k++) { 
-                    MM_PRINT("%02x", *(uint8_t*)(addr+i+j+k));
+                    nk_vc_printf("%02x", *(uint8_t*)(addr+i+j+k));
                 }
             }
-            MM_PRINT(" ");
+            nk_vc_printf(" ");
             for (j=0;j<BYTES_PER_LINE && (i+j)<len; j+=size) {
                 for (k=0;k<size;k++) { 
-                    MM_PRINT("%c", isalnum(*(uint8_t*)(addr+i+j+k)) ? 
+                    nk_vc_printf("%c", isalnum(*(uint8_t*)(addr+i+j+k)) ? 
                             *(uint8_t*)(addr+i+j+k) : '.');
                 }
             }
-            MM_PRINT("\n");
+            nk_vc_printf("\n");
         }	      
 
         return 0;
@@ -1076,28 +1076,28 @@ handle_peek (char * buf, void * priv)
         switch (bwdq) { 
             case 'b': 
                 data = *(uint8_t*)addr;       
-                MM_PRINT("Mem[0x%016lx] = 0x%02lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%02lx\n",addr,data);
                 break;
             case 'w': 
                 data = *(uint16_t*)addr;       
-                MM_PRINT("Mem[0x%016lx] = 0x%04lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%04lx\n",addr,data);
                 break;
             case 'd': 
                 data = *(uint32_t*)addr;       
-                MM_PRINT("Mem[0x%016lx] = 0x%08lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%08lx\n",addr,data);
                 break;
             case 'q': 
                 data = *(uint64_t*)addr;       
-                MM_PRINT("Mem[0x%016lx] = 0x%016lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%016lx\n",addr,data);
                 break;
             default:
-                MM_PRINT("Unknown size requested\n",bwdq);
+                nk_vc_printf("Unknown size requested\n",bwdq);
                 break;
         }
         return 0;
     }
 
-    MM_PRINT("invalid poke command\n");
+    nk_vc_printf("invalid poke command\n");
 
     return 0;
 }
@@ -1123,28 +1123,28 @@ handle_poke (char * buf, void * priv)
         switch (bwdq) { 
             case 'b': 
                 *(uint8_t*)addr = data; clflush_unaligned((void*)addr,1);
-                MM_PRINT("Mem[0x%016lx] = 0x%02lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%02lx\n",addr,data);
                 break;
             case 'w': 
                 *(uint16_t*)addr = data; clflush_unaligned((void*)addr,2);
-                MM_PRINT("Mem[0x%016lx] = 0x%04lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%04lx\n",addr,data);
                 break;
             case 'd': 
                 *(uint32_t*)addr = data; clflush_unaligned((void*)addr,4);
-                MM_PRINT("Mem[0x%016lx] = 0x%08lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%08lx\n",addr,data);
                 break;
             case 'q': 
                 *(uint64_t*)addr = data; clflush_unaligned((void*)addr,8);
-                MM_PRINT("Mem[0x%016lx] = 0x%016lx\n",addr,data);
+                nk_vc_printf("Mem[0x%016lx] = 0x%016lx\n",addr,data);
                 break;
             default:
-                MM_PRINT("Unknown size requested\n");
+                nk_vc_printf("Unknown size requested\n");
                 break;
         }
         return 0;
     }
 
-    MM_PRINT("invalid poke command\n");
+    nk_vc_printf("invalid poke command\n");
 
     return 0;
 }

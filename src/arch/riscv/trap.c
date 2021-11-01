@@ -1,20 +1,16 @@
-
-#include <nautilus/naut_types.h>
-#include <nautilus/spinlock.h>
+#include <nautilus/printk.h>
 #include <arch/riscv/riscv.h>
-#include <arch/riscv/memlayout.h>
 #include <arch/riscv/plic.h>
 
 void kernel_vec();
 
 // set up to take exceptions and traps while in the kernel.
 void
-trap_init(void)
+trap_init_hart(void)
 {
     w_stvec((uint64_t)kernel_vec);
 }
 
-void printk(char *fmt, ...);
 void uart_intr(void);
 
 int
@@ -55,8 +51,6 @@ dev_intr(void)
         return 0;
     }
 }
-
-void panic(char *s);
 
 /* Supervisor Trap Function */
 void

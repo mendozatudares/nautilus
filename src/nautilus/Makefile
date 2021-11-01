@@ -61,15 +61,46 @@ obj-y += \
 endif
 
 obj-$(NAUT_CONFIG_RISCV_HOST) += \
-	naut_string.o \
-	spinlock.o \
+	fmtout.o \
 	printk.o \
 	doprnt.o \
-	dtoa.o \
-	devicetree.o \
-	mm/ \
+	queue.o \
+	naut_string.o \
+	spinlock.o \
+	rwlock.o \
+	condvar.o \
+	semaphore.o \
+	msg_queue.o \
+	hashtable.o \
+	rbtree.o \
+	random.o \
 	smp.o \
+	idle.o \
+	thread.o \
+		task.o \
+		future.o \
+	waitqueue.o \
+	group.o \
+		timer.o \
+		scheduler.o \
+	group_sched.o \
 	barrier.o \
+	libccompat.o \
+	mm/ \
+	dev.o \
+	chardev.o \
+	blkdev.o \
+	netdev.o \
+	gpudev.o \
+		fs.o \
+	fprintk.o \
+		dtoa.o \
+	devicetree.o \
+	module.o \
+	linker.o \
+	prog.o \
+	getopt.o \
+	cmdline.o
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o

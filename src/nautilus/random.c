@@ -29,6 +29,7 @@
 #include <nautilus/spinlock.h>
 #include <nautilus/random.h>
 #include <nautilus/mm.h>
+#include <arch/riscv/riscv.h>
 #include <dev/apic.h>
 
 
@@ -80,7 +81,11 @@ get_rand_byte (void)
 
 
     for (i = 0; i < 8; i++) {
+        #ifdef NAUT_CONFIG_RISCV_HOST
+        val = r_sip() ^ (rand->seed & 0xffffffff);
+        #else
         val = apic_read(apic, APIC_GET_IRR(i)) ^ (rand->seed & 0xffffffff);
+        #endif
         b ^= ~(_AB(val, 0) ^
                _AB(val, 1) ^
                _AB(val, 2) ^

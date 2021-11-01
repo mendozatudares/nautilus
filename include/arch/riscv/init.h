@@ -2,6 +2,6 @@
 #define __INIT_H__
 
 
-void init(int hartid, void *fdt);
+void init(unsigned long hartid, unsigned long fdt);
 
 #endif

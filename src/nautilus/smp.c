@@ -89,7 +89,6 @@ init_ap_area (struct ap_init_area * ap_area,
               struct naut_info * naut,
               int core_num)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     memset((void*)ap_area, 0, sizeof(struct ap_init_area));
 
     /* setup pointer to this CPUs stack */
@@ -112,11 +111,10 @@ init_ap_area (struct ap_init_area * ap_area,
     ap_area->gdt64[2]    = 0x00af92000000ffff;
 
     /* pointer to BSP's PML4 */
-    ap_area->cr3         = read_cr3();
+    // ap_area->cr3         = read_cr3();
 
     /* pointer to our entry routine */
     ap_area->entry       = smp_ap_entry;
-#endif
 
     return 0;
 }
@@ -141,7 +139,6 @@ smp_wait_for_ap (struct naut_info * naut, unsigned int core_num)
 int
 smp_bringup_aps (struct naut_info * naut)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     struct ap_init_area * ap_area;
 
     addr_t boot_target     = (addr_t)&init_smp_boot;
@@ -158,6 +155,7 @@ smp_bringup_aps (struct naut_info * naut)
         return 0;
     }
 
+    #ifndef NAUT_CONFIG_RISCV_HOST
     maxlvt = apic_get_maxlvt(apic);
 
     SMP_DEBUG("Passing target page num %x to SIPI\n", target_vec);
@@ -265,7 +263,7 @@ smp_bringup_aps (struct naut_info * naut)
     cpu_info_ready = 1;
 
     return (status|err);
-#endif
+    #endif
     return 0;
 }
 
@@ -279,13 +277,11 @@ static int xcall_handler(excp_entry_t * e, excp_vec_t v, void *state);
 static int
 smp_xcall_init_queue (struct cpu * core)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     core->xcall_q = nk_queue_create();
     if (!core->xcall_q) {
         ERROR_PRINT("Could not allocate xcall queue on cpu %u\n", core->id);
         return -1;
     }
-#endif
 
     return 0;
 }
@@ -294,10 +290,10 @@ smp_xcall_init_queue (struct cpu * core)
 int
 smp_setup_xcall_bsp (struct cpu * core)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     SMP_PRINT("Setting up cross-core IPI event queue\n");
     smp_xcall_init_queue(core);
 
+#ifndef NAUT_CONFIG_RISCV_HOST
     if (register_int_handler(IPI_VEC_XCALL, xcall_handler, NULL) != 0) {
         ERROR_PRINT("Could not assign interrupt handler for XCALL on core %u\n", core->id);
         return -1;
