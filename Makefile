@@ -771,7 +771,7 @@ $(SEC_NAME): $(BIN_NAME)
 nautilus: $(BIN_NAME) $(SYM_NAME) $(SEC_NAME)
 
 
-uImage: $(BIN_NAME)
+uImage:
 	$(CROSS_COMPILE)objcopy -O binary $(BIN_NAME) Image
 	mkimage -A riscv -O linux -T kernel -C none \
 		-a 0x80100000 -e 0x80100000 -n "Nautilus" \
