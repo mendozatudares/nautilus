@@ -29,9 +29,29 @@
 #include <nautilus/smp.h>
 #include <nautilus/thread.h>
 #include <nautilus/waitqueue.h>
+#include <nautilus/task.h>
+#include <nautilus/future.h>
+#include <nautilus/group.h>
+#include <nautilus/group_sched.h>
+#include <nautilus/timer.h>
+#include <nautilus/semaphore.h>
+#include <nautilus/msg_queue.h>
+#include <nautilus/idle.h>
 #include <nautilus/percpu.h>
 #include <nautilus/errno.h>
 #include <nautilus/random.h>
+#include <nautilus/mm.h>
+#include <nautilus/libccompat.h>
+#include <nautilus/barrier.h>
+#include <nautilus/dev.h>
+#include <nautilus/chardev.h>
+#include <nautilus/blkdev.h>
+#include <nautilus/netdev.h>
+#include <nautilus/gpudev.h>
+#include <nautilus/fs.h>
+#include <nautilus/linker.h>
+#include <nautilus/prog.h>
+#include <nautilus/cmdline.h>
 #include <nautilus/devicetree.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
@@ -150,8 +170,6 @@ int start_secondary(void) {
 
 void init (unsigned long hartid, unsigned long fdt) {
 
-	long x = 0;
-	printk("x: %llx, fdt: %llx\n", x, fdt);
     if (!fdt) panic("Invalid FDT\n");
 
     // Get necessary information from SBI
@@ -160,7 +178,7 @@ void init (unsigned long hartid, unsigned long fdt) {
     // M-Mode passes scratch struct through tp. Move it to sscratch
     w_sscratch(r_tp());
 
-    // Zero out tp for now until tls is set up
+    // Zero out tp for now until cls is set up
     w_tp(0);
 
     struct naut_info * naut = &nautilus_info;
@@ -169,13 +187,20 @@ void init (unsigned long hartid, unsigned long fdt) {
     naut->sys.bsp_id = hartid;
     naut->sys.dtb = (struct dtb_fdt_header *) fdt;
 
-	
-    dtb_parse((struct dtb_fdt_header *) fdt);
+    if (!dtb_parse((struct dtb_fdt_header *)fdt)) {
+        ERROR_PRINT("Problem parsing devicetree header\n");
+    }
 
-    printk(NAUT_WELCOME);
+    nk_dev_init();
+    nk_char_dev_init();
+    nk_block_dev_init();
+    nk_net_dev_init();
+    nk_gpu_dev_init();
+
+    nk_vc_print(NAUT_WELCOME);
 
     // Setup the temporary boot-time allocator
-    mm_boot_init((ulong_t) fdt);
+    mm_boot_init(fdt);
 
     // Enumate CPUs and initialize them
     smp_early_init(naut);
@@ -203,19 +228,32 @@ void init (unsigned long hartid, unsigned long fdt) {
 
     /* from this point on, we can use percpu macros (even if the APs aren't up) */
 
+    sbi_init();
+
     sysinfo_init(&(naut->sys));
 
     nk_wait_queue_init();
 
+    nk_future_init();
+
+    nk_timer_init();
+
     nk_rand_init(naut->sys.cpus[hartid]);
+
+    nk_semaphore_init();
+
+    nk_msg_queue_init();
 
     nk_sched_init(&sched_cfg);
 
+    nk_thread_group_init();
+    nk_group_sched_init();
+
     mm_boot_kmem_cleanup();
 
-    sti();
+    // nk_sched_start();
 
-    sbi_init();
+    sti();
 
     /* interrupts are now on */
 
