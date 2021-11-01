@@ -25,8 +25,8 @@
 #include <arch/riscv/init.h>
 
 void
-main (int hartid,
-      void* fdt)
+main (unsigned long hartid,
+      unsigned long fdt)
 {
     init(hartid, fdt);
 }

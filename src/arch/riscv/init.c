@@ -26,10 +26,13 @@
 #include <nautilus/spinlock.h>
 #include <nautilus/mb_utils.h>
 #include <nautilus/cpu.h>
+#include <nautilus/smp.h>
+#include <nautilus/thread.h>
+#include <nautilus/waitqueue.h>
 #include <nautilus/percpu.h>
 #include <nautilus/errno.h>
-#include <nautilus/devicetree.h>
 #include <nautilus/random.h>
+#include <nautilus/devicetree.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
 #include <nautilus/gdb-stub.h>
@@ -38,7 +41,6 @@
 #include <arch/riscv/riscv.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/plic.h>
-#include <arch/riscv/memlayout.h>
 #include <arch/riscv/trap.h>
 
 
@@ -146,7 +148,7 @@ int start_secondary(void) {
     return 0;
 }
 
-void init (int hartid, void* fdt) {
+void init (unsigned long hartid, unsigned long fdt) {
 
 	long x = 0;
 	printk("x: %llx, fdt: %llx\n", x, fdt);
@@ -165,7 +167,7 @@ void init (int hartid, void* fdt) {
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
     naut->sys.bsp_id = hartid;
-    naut->sys.dtb = fdt;
+    naut->sys.dtb = (struct dtb_fdt_header *) fdt;
 
 	
     dtb_parse((struct dtb_fdt_header *) fdt);

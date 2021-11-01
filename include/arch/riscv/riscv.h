@@ -1,6 +1,8 @@
 #ifndef __RISCV_H__
 #define __RISCV_H__
 
+#include <nautilus/naut_types.h>
+
 /* Macros for pointer/register sizes */
 #define PTRLOG 3
 #define SZREG 8

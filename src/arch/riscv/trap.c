@@ -1,9 +1,5 @@
-
-#include <nautilus/percpu.h>
-#include <nautilus/naut_types.h>
-#include <nautilus/spinlock.h>
+#include <nautilus/printk.h>
 #include <arch/riscv/riscv.h>
-#include <arch/riscv/memlayout.h>
 #include <arch/riscv/plic.h>
 
 void kernel_vec();
@@ -64,7 +60,7 @@ kernel_trap()
     uint64_t sepc = r_sepc();
     uint64_t sstatus = r_sstatus();
     uint64_t scause = r_scause();
-    printk("\n+++ Kernel Trap +++\nCPU: %d\nscause: %p\nsepc:   %p\nstval:  %p\n", my_cpu_id(), scause, sepc, r_stval());
+    printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());
 
     if ((sstatus & SSTATUS_SPP) == 0) {
         // printk("\n+++ Kernel Trap +++\nscause: %p\nsepc:   %p\nstval:  %p\n", scause, sepc, r_stval());

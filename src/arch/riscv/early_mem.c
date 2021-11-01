@@ -26,8 +26,6 @@
 #include <nautilus/mb_utils.h>
 #include <nautilus/macros.h>
 #include <nautilus/multiboot2.h>
-
-#include <arch/riscv/memlayout.h>
 #include <nautilus/devicetree.h>
 
 extern char * mem_region_types[6];

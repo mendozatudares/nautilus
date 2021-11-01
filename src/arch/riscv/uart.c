@@ -2,7 +2,6 @@
 #include <nautilus/spinlock.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/riscv.h>
-#include <arch/riscv/memlayout.h>
 
 // the UART control registers are memory-mapped
 // at address UART0. this macro returns the

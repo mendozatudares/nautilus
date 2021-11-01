@@ -1,11 +1,9 @@
 #include <nautilus/naut_types.h>
-#include <arch/riscv/riscv.h>
-#include <arch/riscv/memlayout.h>
-#include <arch/riscv/sbi.h>
-#include <arch/riscv/cpu.h>
-#include <arch/riscv/plic.h>
+#include <nautilus/cpu.h>
 #include <nautilus/percpu.h>
 #include <nautilus/devicetree.h>
+#include <arch/riscv/sbi.h>
+#include <arch/riscv/plic.h>
 
 addr_t plic_addr;
 #define PLIC plic_addr
