@@ -48,10 +48,9 @@ SECTIONS
 
   _loadEnd = .;
 
+  _bssStart = .;
   .bss ALIGN(0x1000) : AT(ALIGN(ADDR(.data)+SIZEOF(.data),0x1000)) {
-    
     . = ALIGN(16);
-    _bssStart = .;
     *(.sbss .sbss.*) /* do not need to distinguish this from .bss */
     . = ALIGN(16);
     *(.bss .bss.*)

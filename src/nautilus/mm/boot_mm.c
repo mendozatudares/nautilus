@@ -184,6 +184,8 @@ mm_boot_init (ulong_t mbd)
 
     BMM_PRINT("Setting up boot memory allocator\n");
 
+		memset(&mm_info, 0, sizeof(mm_info));
+
     /* parse the multiboot2 memory map, filing in 
      * some global data that we will subsequently use here  */
     detect_mem_map(mbd);
@@ -192,7 +194,7 @@ mm_boot_init (ulong_t mbd)
     npages = mm_info.last_pfn + 1;
     pm_len = (npages/BITS_PER_LONG + !!(npages%BITS_PER_LONG)) * sizeof(long);
 
-    BMM_PRINT("Detected %llu.%llu MB (%lu pages) of usable System RAM\n", mm_info.usable_ram/(1024*1024), mm_info.usable_ram%(1024*1024), npages);
+    BMM_PRINT("Detected %llu bytes (%lu pages) of usable System RAM\n", mm_info.usable_ram, npages);
 
     mem->page_map = (ulong_t*)pm_start;
     mem->npages   = npages;
@@ -255,6 +257,8 @@ mm_boot_free_mem (addr_t start, ulong_t size)
     uint32_t start_page = PADDR_TO_PAGE(start);
     uint32_t npages     = (size+PAGE_SIZE-1) / PAGE_SIZE; // what if this is smaller than a page?
     boot_mem_info_t * bm = &bootmem;
+
+		// memset((void*)start, 0, size);
 
     if (unlikely(boot_mm_inactive)) {
         panic("Invalid attempt to use boot memory allocator\n");

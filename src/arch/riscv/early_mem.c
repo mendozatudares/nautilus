@@ -84,7 +84,7 @@ arch_detect_mem_map (mmap_info_t * mm_info,
 
     BMM_PRINT("Parsing RISC-V virt machine memory map\n");
 
-    ulong_t start, end;
+    unsigned long long start, end;
 
     start = round_up(dtb_ram_start, PAGE_SIZE_4KB);
     end   = round_down(dtb_ram_start + dtb_ram_size, PAGE_SIZE_4KB);
@@ -93,10 +93,11 @@ arch_detect_mem_map (mmap_info_t * mm_info,
     memory_map[0].len  = end-start;
     memory_map[0].type = MULTIBOOT_MEMORY_AVAILABLE;
 
-    BMM_PRINT("Memory map[%d] - [%p - %p] <%s>\n", 
+    BMM_PRINT("Memory map[%d] - [%p - %p] sz:%llu <%s>\n", 
         0, 
         start,
         end,
+				end - start,
         mem_region_types[memory_map[0].type]);
     
     mm_info->usable_ram += end-start;

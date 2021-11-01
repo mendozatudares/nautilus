@@ -168,12 +168,31 @@ int start_secondary(void) {
     return 0;
 }
 
+extern int _bssStart[];
+extern int _bssEnd[];
+
+
+
+#define read_csr(name)                         \
+  ({                                           \
+    uint64_t x;                             \
+    asm volatile("csrr %0, " #name : "=r"(x)); \
+    x;                                         \
+  })
+
+
 void init (unsigned long hartid, unsigned long fdt) {
 
     if (!fdt) panic("Invalid FDT\n");
 
+
+
+
+		memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
+
     // Get necessary information from SBI
     sbi_early_init();
+
 
     // M-Mode passes scratch struct through tp. Move it to sscratch
     w_sscratch(r_tp());
@@ -190,6 +209,12 @@ void init (unsigned long hartid, unsigned long fdt) {
     if (!dtb_parse((struct dtb_fdt_header *)fdt)) {
         ERROR_PRINT("Problem parsing devicetree header\n");
     }
+
+
+
+		printk("[%d] mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
+		printk("[%d] marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
+		printk("[%d] mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
 
     nk_dev_init();
     nk_char_dev_init();

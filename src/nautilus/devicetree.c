@@ -207,7 +207,8 @@ void dump_dtb(struct dtb_node *node, int depth) {
 }
 
 int dtb_parse(struct dtb_fdt_header *fdt) {
-  printk("fdt at %llx\n", fdt);
+	uint64_t f = (uint64_t)fdt;
+  printk("fdt at %llx %llx %llx\n", fdt, (f & 0xFFFFFFFF) == f, (f >> 32) & 0xFFFFFFFF);
   global_fdt_header = fdt;
 
   printk("  magic: %p\n", bswap32(fdt->magic));
