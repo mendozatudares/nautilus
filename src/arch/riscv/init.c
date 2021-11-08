@@ -58,7 +58,6 @@
 #include <nautilus/gdb-stub.h>
 #endif
 
-#include <arch/riscv/riscv.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/plic.h>
 #include <arch/riscv/trap.h>
@@ -108,9 +107,13 @@ out_err:
 " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
 "+===============================================+  \n\n"
 
-extern uint8_t secondary_core_startup_sbi[];
+extern addr_t init_smp_boot;
 extern uint64_t secondary_core_stack;
+extern uint64_t _bssStart[];
+extern uint64_t _bssEnd[];
+
 extern int uart_getchar(void);
+extern struct naut_info * smp_ap_stack_switch(uint64_t, uint64_t, struct naut_info*);
 
 bool second_done = false;
 
@@ -141,9 +144,9 @@ void secondary_entry(int hartid) {
     }
 }
 
-int start_secondary(void) {
+int start_secondary(struct sys_info * sys) {
     for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
-        if (i == my_cpu_id()) continue;
+        if (i == my_cpu_id() || !sys->cpus[i] || !sys->cpus[i]->enabled) continue;
 
         secondary_core_stack = (uint64_t)malloc(2 * 4096);
         secondary_core_stack += 2 * 4096;
@@ -151,48 +154,32 @@ int start_secondary(void) {
         second_done = false;
         __sync_synchronize();
 
-        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, secondary_core_startup_sbi, 0);
+        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
         if (ret.error != SBI_SUCCESS) {
             continue;
         }
 
-        printk("RISCV: Hart %d trying to start hart %d\n", my_cpu_id(), i);
+        printk("RISCV: Hart %d is trying to start Hart %d\n", my_cpu_id(), i);
 
-        // while (second_done != true) {
-        //     __sync_synchronize();
-        // }
+        while (second_done != true) {
+            __sync_synchronize();
+        }
 
-        printk("RISCV: Hart %d successfully started hart %d\n", my_cpu_id(), i);
+        printk("RISCV: Hart %d successfully started Hart %d\n", my_cpu_id(), i);
     }
 
     return 0;
 }
 
-extern int _bssStart[];
-extern int _bssEnd[];
-
-
-
-#define read_csr(name)                         \
-  ({                                           \
-    uint64_t x;                             \
-    asm volatile("csrr %0, " #name : "=r"(x)); \
-    x;                                         \
-  })
-
 
 void init (unsigned long hartid, unsigned long fdt) {
 
-    if (!fdt) panic("Invalid FDT\n");
+    if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
-
-
-
-		memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
+    nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
 
     // Get necessary information from SBI
     sbi_early_init();
-
 
     // M-Mode passes scratch struct through tp. Move it to sscratch
     w_sscratch(r_tp());
@@ -203,6 +190,8 @@ void init (unsigned long hartid, unsigned long fdt) {
     struct naut_info * naut = &nautilus_info;
     nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
+    nk_vc_print(NAUT_WELCOME);
+
     naut->sys.bsp_id = hartid;
     naut->sys.dtb = (struct dtb_fdt_header *) fdt;
 
@@ -210,11 +199,9 @@ void init (unsigned long hartid, unsigned long fdt) {
         ERROR_PRINT("Problem parsing devicetree header\n");
     }
 
-
-
-		printk("[%d] mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
-		printk("[%d] marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
-		printk("[%d] mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
+    INFO_PRINT("HART %d: mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
+    INFO_PRINT("HART %d: marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
+    INFO_PRINT("HART %d: mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
 
     nk_dev_init();
     nk_char_dev_init();
@@ -222,7 +209,6 @@ void init (unsigned long hartid, unsigned long fdt) {
     nk_net_dev_init();
     nk_gpu_dev_init();
 
-    nk_vc_print(NAUT_WELCOME);
 
     // Setup the temporary boot-time allocator
     mm_boot_init(fdt);
@@ -274,16 +260,20 @@ void init (unsigned long hartid, unsigned long fdt) {
     nk_thread_group_init();
     nk_group_sched_init();
 
+    /* we now switch away from the boot-time stack */
+    naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
+
     mm_boot_kmem_cleanup();
 
-    // nk_sched_start();
+    start_secondary(&(naut->sys)); 
+
+    nk_sched_start();
 
     sti();
 
     /* interrupts are now on */
 
-    // start_secondary();
-
+    // test to see if we got here
     while(1) {
         int c = uart_getchar();
         if (c != -1) {

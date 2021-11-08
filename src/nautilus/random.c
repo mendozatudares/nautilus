@@ -29,7 +29,6 @@
 #include <nautilus/spinlock.h>
 #include <nautilus/random.h>
 #include <nautilus/mm.h>
-#include <arch/riscv/riscv.h>
 #include <dev/apic.h>
 
 

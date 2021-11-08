@@ -1,5 +1,5 @@
+#include <nautilus/cpu.h>
 #include <nautilus/printk.h>
-#include <arch/riscv/riscv.h>
 #include <arch/riscv/plic.h>
 
 void kernel_vec();

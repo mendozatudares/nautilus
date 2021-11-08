@@ -2,6 +2,7 @@
 #include <nautilus/naut_types.h>
 #include <arch/riscv/sbi.h>
 
+#include <nautilus/intrinsics.h>
 
 // bitmap of locally detected SBI extensions
 enum sbi_extension {
@@ -28,7 +29,7 @@ bool_t sbi_probe_extension(unsigned long extension) {
 
 void sbi_set_timer(uint64_t stime_value) {
   // use the new IPI extension
-  if (__builtin_expect(sbi_ext_present(SBI_EXTENSION_TIMER),1)) {
+  if (likely(sbi_ext_present(SBI_EXTENSION_TIMER))) {
     sbi_call(SBI_EXT_TIMER_SIG, 0, stime_value);
   } else {
     sbi_call(SBI_SET_TIMER, stime_value);
@@ -37,7 +38,7 @@ void sbi_set_timer(uint64_t stime_value) {
 
 void sbi_send_ipis(const unsigned long *hart_mask) {
   // use the new IPI extension
-  if (__builtin_expect(sbi_ext_present(SBI_EXTENSION_IPI),1)) {
+  if (likely(sbi_ext_present(SBI_EXTENSION_IPI))) {
     sbi_call(SBI_EXT_IPI_SIG, 0, *hart_mask, -1);
   } else {
     // legacy ipi call

@@ -96,26 +96,6 @@ main_ptr: .quad main
 secondary_core_stack:
     .quad 0
 
-GLOBAL(secondary_core_startup_sbi)
-
-    ld sp, secondary_core_stack
-
-    # disable supervisor address translation and protection (paging), since we'd identity map anyways
-    csrw    satp, 0
-    # flush tlb and whatnot
-    sfence.vma zero, zero
-
-    #	enable supervisor interrupts
-    li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
-    csrs    sie, t0
-
-    la      t0, second_entry_ptr
-    REG_L   t0, 0(t0)
-    jr      t0
-
-.balign 8
-second_entry_ptr: .quad secondary_entry
-
 .section .text
 
 # When the processor gets an interrupt or traps, it jumps here and sets some CSRs

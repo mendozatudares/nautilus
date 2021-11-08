@@ -9,7 +9,7 @@ if [[ "$TOOLCHAIN_OVERRIDE" != "" ]]; then
 	CROSS_COMPILE=$TOOLCHAIN_OVERRIDE
 fi
 
-ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j V=1
+ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j #V=1
 
 if [[ "$*" == *"qemu"* ]]; then
   echo 'Starting QEMU...'

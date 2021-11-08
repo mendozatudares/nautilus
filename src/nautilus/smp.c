@@ -165,6 +165,7 @@ smp_bringup_aps (struct naut_info * naut)
         apic_write(apic, APIC_REG_ESR, 0);
     }
     apic_read(apic, APIC_REG_ESR);
+    #endif
 
     SMP_DEBUG("Copying in page for SMP boot code at (%p)...\n", (void*)ap_trampoline);
     memcpy((void*)ap_trampoline, (void*)boot_target, smp_code_sz);
@@ -196,18 +197,23 @@ smp_bringup_aps (struct naut_info * naut)
         }
 
 
+        #ifdef NAUT_CONFIG_RISCV_HOST
+        #else
         /* Send the INIT sequence */
         SMP_DEBUG("sending INIT to remote APIC (0x%x)\n", naut->sys.cpus[i]->lapic_id);
         apic_send_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
         /* wait for status to update */
         status = apic_wait_for_send(apic);
+        #endif
 
         mbarrier();
 
         /* 10ms delay */
         udelay(10000);
 
+        #ifdef NAUT_CONFIG_RISCV_HOST
+        #else
         /* deassert INIT IPI (level-triggered) */
         apic_deinit_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
@@ -240,6 +246,7 @@ smp_bringup_aps (struct naut_info * naut)
             }
 
         }
+        #endif
 
         if (status) {
             ERROR_PRINT("APIC wasn't delivered!\n");
@@ -263,8 +270,6 @@ smp_bringup_aps (struct naut_info * naut)
     cpu_info_ready = 1;
 
     return (status|err);
-    #endif
-    return 0;
 }
 
 
@@ -423,7 +428,6 @@ extern void idle(void* in, void**out);
 void 
 smp_ap_entry (struct cpu * core) 
 { 
-#ifndef NAUT_CONFIG_RISCV_HOST
     struct cpu * my_cpu;
     SMP_DEBUG("Core %u starting up\n", core->id);
     if (smp_ap_setup(core) < 0) {
@@ -456,7 +460,6 @@ smp_ap_entry (struct cpu * core)
     sti();
 
     idle(NULL, NULL);
-#endif
 }
 
 
