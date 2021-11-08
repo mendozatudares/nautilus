@@ -115,7 +115,7 @@ secondary_core_stack:
 GLOBAL(kernel_vec)
 
     // make room to save registers.
-    addi sp, sp, -256
+    addi sp, sp, -288 # 38 registers
 
     // save the registers.
     sd ra, 0(sp)
@@ -151,6 +151,7 @@ GLOBAL(kernel_vec)
     sd t6, 240(sp)
 
     // call the C trap handler in idt.c
+		move a0, sp /* arg0 <- trapframe */
     call kernel_trap
 
     // restore registers.

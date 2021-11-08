@@ -22,90 +22,98 @@
  */
 #define __NAUTILUS_MAIN__
 
-#include <nautilus/nautilus.h>
-#include <nautilus/spinlock.h>
-#include <nautilus/mb_utils.h>
+#include <nautilus/barrier.h>
+#include <nautilus/blkdev.h>
+#include <nautilus/chardev.h>
+#include <nautilus/cmdline.h>
 #include <nautilus/cpu.h>
-#include <nautilus/smp.h>
-#include <nautilus/thread.h>
-#include <nautilus/waitqueue.h>
-#include <nautilus/task.h>
+#include <nautilus/dev.h>
+#include <nautilus/devicetree.h>
+#include <nautilus/errno.h>
+#include <nautilus/fs.h>
 #include <nautilus/future.h>
+#include <nautilus/gpudev.h>
 #include <nautilus/group.h>
 #include <nautilus/group_sched.h>
-#include <nautilus/timer.h>
-#include <nautilus/semaphore.h>
-#include <nautilus/msg_queue.h>
 #include <nautilus/idle.h>
-#include <nautilus/percpu.h>
-#include <nautilus/errno.h>
-#include <nautilus/random.h>
-#include <nautilus/mm.h>
 #include <nautilus/libccompat.h>
-#include <nautilus/barrier.h>
-#include <nautilus/dev.h>
-#include <nautilus/chardev.h>
-#include <nautilus/blkdev.h>
-#include <nautilus/netdev.h>
-#include <nautilus/gpudev.h>
-#include <nautilus/fs.h>
 #include <nautilus/linker.h>
+#include <nautilus/mb_utils.h>
+#include <nautilus/mm.h>
+#include <nautilus/msg_queue.h>
+#include <nautilus/nautilus.h>
+#include <nautilus/netdev.h>
+#include <nautilus/percpu.h>
 #include <nautilus/prog.h>
-#include <nautilus/cmdline.h>
-#include <nautilus/devicetree.h>
+#include <nautilus/random.h>
+#include <nautilus/semaphore.h>
+#include <nautilus/smp.h>
+#include <nautilus/spinlock.h>
+#include <nautilus/task.h>
+#include <nautilus/thread.h>
+#include <nautilus/timer.h>
+#include <nautilus/waitqueue.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
 #include <nautilus/gdb-stub.h>
 #endif
 
-#include <arch/riscv/sbi.h>
 #include <arch/riscv/plic.h>
+#include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
 
+// TODO: abstract this.. its copied in trap.c
+#define RISCV_CLOCKS_PER_SECOND 10000000
+#define TICK_INTERVAL (RISCV_CLOCKS_PER_SECOND / NAUT_CONFIG_HZ)
 
-#define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
+static inline uint64_t get_time() {
+  uint64_t x;
+  asm volatile("csrr %0, time" : "=r"(x));
+  return x;
+}
+
+#define QUANTUM_IN_NS (1000000000ULL / NAUT_CONFIG_HZ)
 
 struct nk_sched_config sched_cfg = {
-    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT*10000ULL, // convert percent to 10^-6 units
-    .sporadic_reservation =  NAUT_CONFIG_SPORADIC_RESERVATION*10000ULL, // ..
-    .aperiodic_reservation = NAUT_CONFIG_APERIODIC_RESERVATION*10000ULL, // ..
+    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT *
+		  10000ULL,  // convert percent to 10^-6 units
+    .sporadic_reservation = NAUT_CONFIG_SPORADIC_RESERVATION * 10000ULL,  // ..
+    .aperiodic_reservation =
+	NAUT_CONFIG_APERIODIC_RESERVATION * 10000ULL,  // ..
     .aperiodic_quantum = QUANTUM_IN_NS,
     .aperiodic_default_priority = QUANTUM_IN_NS,
 };
 
+static int sysinfo_init(struct sys_info *sys) {
+  sys->core_barrier = (nk_barrier_t *)malloc(sizeof(nk_barrier_t));
+  if (!sys->core_barrier) {
+    ERROR_PRINT("Could not allocate core barrier\n");
+    return -1;
+  }
+  memset(sys->core_barrier, 0, sizeof(nk_barrier_t));
 
-static int
-sysinfo_init (struct sys_info * sys)
-{
-    sys->core_barrier = (nk_barrier_t*)malloc(sizeof(nk_barrier_t));
-    if (!sys->core_barrier) {
-        ERROR_PRINT("Could not allocate core barrier\n");
-        return -1;
-    }
-    memset(sys->core_barrier, 0, sizeof(nk_barrier_t));
+  if (nk_barrier_init(sys->core_barrier, sys->num_cpus) != 0) {
+    ERROR_PRINT("Could not create core barrier\n");
+    goto out_err;
+  }
 
-    if (nk_barrier_init(sys->core_barrier, sys->num_cpus) != 0) {
-        ERROR_PRINT("Could not create core barrier\n");
-        goto out_err;
-    }
-
-    return 0;
+  return 0;
 
 out_err:
-    free(sys->core_barrier);
-    return -EINVAL;
+  free(sys->core_barrier);
+  return -EINVAL;
 }
 
-#define NAUT_WELCOME \
-"Welcome to                                         \n" \
-"    _   __               __   _  __                \n" \
-"   / | / /____ _ __  __ / /_ (_)/ /__  __ _____    \n" \
-"  /  |/ // __ `// / / // __// // // / / // ___/    \n" \
-" / /|  // /_/ // /_/ // /_ / // // /_/ /(__  )     \n" \
-"/_/ |_/ \\__,_/ \\__,_/ \\__//_//_/ \\__,_//____/  \n" \
-"+===============================================+  \n" \
-" Kyle C. Hale (c) 2014 | Northwestern University   \n" \
-"+===============================================+  \n\n"
+#define NAUT_WELCOME                                      \
+  "Welcome to                                         \n" \
+  "    _   __               __   _  __                \n" \
+  "   / | / /____ _ __  __ / /_ (_)/ /__  __ _____    \n" \
+  "  /  |/ // __ `// / / // __// // // / / // ___/    \n" \
+  " / /|  // /_/ // /_/ // /_ / // // /_/ /(__  )     \n" \
+  "/_/ |_/ \\__,_/ \\__,_/ \\__//_//_/ \\__,_//____/  \n" \
+  "+===============================================+  \n" \
+  " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
+  "+===============================================+  \n\n"
 
 extern addr_t init_smp_boot;
 extern uint64_t secondary_core_stack;
@@ -113,172 +121,199 @@ extern uint64_t _bssStart[];
 extern uint64_t _bssEnd[];
 
 extern int uart_getchar(void);
-extern struct naut_info * smp_ap_stack_switch(uint64_t, uint64_t, struct naut_info*);
+extern struct naut_info *smp_ap_stack_switch(uint64_t, uint64_t,
+					     struct naut_info *);
 
 bool second_done = false;
 
 void secondary_entry(int hartid) {
-    
-    printk("RISCV: Hart %d started!\n", hartid);
+  printk("RISCV: Hart %d started!\n", hartid);
 
-    struct naut_info * naut = &nautilus_info;
+  struct naut_info *naut = &nautilus_info;
 
-    w_sscratch(r_tp());
+  w_sscratch(r_tp());
 
-    w_tp((uint64_t)naut->sys.cpus[hartid]);
+  w_tp((uint64_t)naut->sys.cpus[hartid]);
 
-    /* Initialize the platform level interrupt controller for this HART */
-    plic_init_hart();
+  /* Initialize the platform level interrupt controller for this HART */
+  plic_init_hart();
 
-    // Write supervisor trap vector location
-    trap_init_hart();
+  // Write supervisor trap vector location
+  trap_init_hart();
 
-    /* set the timer with sbi :) */
-    // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
+  /* set the timer with sbi :) */
+  // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
 
-    second_done = true;
+  second_done = true;
 
-    sti();
+  sti();
 
-    while (1) {
-    }
+  while (1) {
+  }
 }
 
-int start_secondary(struct sys_info * sys) {
-    for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
-        if (i == my_cpu_id() || !sys->cpus[i] || !sys->cpus[i]->enabled) continue;
+int start_secondary(struct sys_info *sys) {
+  for (int i = 0; i < NAUT_CONFIG_MAX_CPUS; i++) {
+    if (i == my_cpu_id() || !sys->cpus[i] || !sys->cpus[i]->enabled) continue;
 
-        secondary_core_stack = (uint64_t)malloc(2 * 4096);
-        secondary_core_stack += 2 * 4096;
+    secondary_core_stack = (uint64_t)malloc(2 * 4096);
+    secondary_core_stack += 2 * 4096;
 
-        second_done = false;
-        __sync_synchronize();
+    second_done = false;
+    __sync_synchronize();
 
-        struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
-        if (ret.error != SBI_SUCCESS) {
-            continue;
-        }
-
-        printk("RISCV: Hart %d is trying to start Hart %d\n", my_cpu_id(), i);
-
-        while (second_done != true) {
-            __sync_synchronize();
-        }
-
-        printk("RISCV: Hart %d successfully started Hart %d\n", my_cpu_id(), i);
+    struct sbiret ret =
+	sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
+    if (ret.error != SBI_SUCCESS) {
+      continue;
     }
 
-    return 0;
+    printk("RISCV: Hart %d is trying to start Hart %d\n", my_cpu_id(), i);
+
+    while (second_done != true) {
+      /*
+      struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i);
+      switch(ret.value) {
+	      case SBI_HSM_HART_STATUS_STARTED:
+		      printk("started\n");
+		      break;
+	      case SBI_HSM_HART_STATUS_STOPPED:
+		      printk("stopped\n");
+		      break;
+	      case SBI_HSM_HART_STATUS_START_PENDING:
+		      printk("start pending\n");
+		      break;
+	      case SBI_HSM_HART_STATUS_STOP_PENDING:
+		      printk("stop pending\n");
+		      break;
+      }
+      */
+      __sync_synchronize();
+    }
+
+    printk("RISCV: Hart %d successfully started Hart %d\n", my_cpu_id(), i);
+  }
+
+  return 0;
 }
 
+void init(unsigned long hartid, unsigned long fdt) {
+  if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
-void init (unsigned long hartid, unsigned long fdt) {
+  nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
 
-    if (!fdt) panic("Invalid FDT: %p\n", fdt);
+  // Get necessary information from SBI
+  sbi_early_init();
 
-    nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
+  // M-Mode passes scratch struct through tp. Move it to sscratch
+  w_sscratch(r_tp());
 
-    // Get necessary information from SBI
-    sbi_early_init();
+  // Zero out tp for now until cls is set up
+  w_tp(0);
 
-    // M-Mode passes scratch struct through tp. Move it to sscratch
-    w_sscratch(r_tp());
+  struct naut_info *naut = &nautilus_info;
+  nk_low_level_memset(naut, 0, sizeof(struct naut_info));
 
-    // Zero out tp for now until cls is set up
-    w_tp(0);
+  nk_vc_print(NAUT_WELCOME);
 
-    struct naut_info * naut = &nautilus_info;
-    nk_low_level_memset(naut, 0, sizeof(struct naut_info));
+  naut->sys.bsp_id = hartid;
+  naut->sys.dtb = (struct dtb_fdt_header *)fdt;
 
-    nk_vc_print(NAUT_WELCOME);
+  if (!dtb_parse((struct dtb_fdt_header *)fdt)) {
+    ERROR_PRINT("Problem parsing devicetree header\n");
+  }
 
-    naut->sys.bsp_id = hartid;
-    naut->sys.dtb = (struct dtb_fdt_header *) fdt;
+  INFO_PRINT("HART %d: mvendorid: %llx\n", hartid,
+	     sbi_call(SBI_GET_MVENDORID).value);
+  INFO_PRINT("HART %d: marchid:   %llx\n", hartid,
+	     sbi_call(SBI_GET_MARCHID).value);
+  INFO_PRINT("HART %d: mimpid:    %llx\n", hartid,
+	     sbi_call(SBI_GET_MIMPID).value);
 
-    if (!dtb_parse((struct dtb_fdt_header *)fdt)) {
-        ERROR_PRINT("Problem parsing devicetree header\n");
+  nk_dev_init();
+  nk_char_dev_init();
+  nk_block_dev_init();
+  nk_net_dev_init();
+  nk_gpu_dev_init();
+
+  // Setup the temporary boot-time allocator
+  mm_boot_init(fdt);
+
+  // Enumate CPUs and initialize them
+  smp_early_init(naut);
+
+  /* this will populate NUMA-related structures */
+  arch_numa_init(&naut->sys);
+
+  // Setup the main kernel memory allocator
+  nk_kmem_init();
+
+  // Setup per-core area for BSP
+  w_tp((uint64_t)naut->sys.cpus[hartid]);
+
+  /* now we switch to the real kernel memory allocator, pages
+   * allocated in the boot mem allocator are kept reserved */
+  mm_boot_kmem_init();
+
+  // Write supervisor trap vector location
+  trap_init_hart();
+
+
+  // Initialize platform level interrupt controller for this HART
+  plic_init();
+
+  plic_init_hart();
+
+  /* from this point on, we can use percpu macros (even if the APs aren't up) */
+
+  sbi_init();
+
+  sysinfo_init(&(naut->sys));
+
+  nk_wait_queue_init();
+
+  nk_future_init();
+
+  nk_timer_init();
+
+  nk_rand_init(naut->sys.cpus[hartid]);
+
+  nk_semaphore_init();
+
+  nk_msg_queue_init();
+
+  nk_sched_init(&sched_cfg);
+
+  nk_thread_group_init();
+  nk_group_sched_init();
+
+  /* we now switch away from the boot-time stack */
+  naut =
+      smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
+
+  mm_boot_kmem_cleanup();
+
+
+  sti();
+  /* set the timer with sbi :) */
+  sbi_set_timer(get_time() + TICK_INTERVAL);
+
+  start_secondary(&(naut->sys));
+
+
+
+  nk_sched_start();
+
+  /* interrupts are now on */
+
+  // test to see if we got here
+  while (1) {
+    int c = uart_getchar();
+    if (c != -1) {
+      if (c == 13)
+	printk("\n");
+      else
+	printk("%c", c);
     }
-
-    INFO_PRINT("HART %d: mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
-    INFO_PRINT("HART %d: marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
-    INFO_PRINT("HART %d: mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
-
-    nk_dev_init();
-    nk_char_dev_init();
-    nk_block_dev_init();
-    nk_net_dev_init();
-    nk_gpu_dev_init();
-
-
-    // Setup the temporary boot-time allocator
-    mm_boot_init(fdt);
-
-    // Enumate CPUs and initialize them
-    smp_early_init(naut);
-
-    /* this will populate NUMA-related structures */
-    arch_numa_init(&naut->sys);
-
-    // Setup the main kernel memory allocator
-    nk_kmem_init();
-
-    // Setup per-core area for BSP
-    w_tp((uint64_t)naut->sys.cpus[hartid]);
-
-    /* now we switch to the real kernel memory allocator, pages
-     * allocated in the boot mem allocator are kept reserved */
-    mm_boot_kmem_init();
-
-    // Write supervisor trap vector location
-    trap_init_hart();
-
-    // Initialize platform level interrupt controller for this HART
-    plic_init();
-
-    plic_init_hart();
-
-    /* from this point on, we can use percpu macros (even if the APs aren't up) */
-
-    sbi_init();
-
-    sysinfo_init(&(naut->sys));
-
-    nk_wait_queue_init();
-
-    nk_future_init();
-
-    nk_timer_init();
-
-    nk_rand_init(naut->sys.cpus[hartid]);
-
-    nk_semaphore_init();
-
-    nk_msg_queue_init();
-
-    nk_sched_init(&sched_cfg);
-
-    nk_thread_group_init();
-    nk_group_sched_init();
-
-    /* we now switch away from the boot-time stack */
-    naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
-
-    mm_boot_kmem_cleanup();
-
-    start_secondary(&(naut->sys)); 
-
-    nk_sched_start();
-
-    sti();
-
-    /* interrupts are now on */
-
-    // test to see if we got here
-    while(1) {
-        int c = uart_getchar();
-        if (c != -1) {
-            if (c == 13) printk("\n");
-            else printk("%c", c);
-        }
-    }
+  }
 }
