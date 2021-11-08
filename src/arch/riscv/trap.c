@@ -8,46 +8,6 @@ void kernel_vec();
 // set up to take exceptions and traps while in the kernel.
 void trap_init_hart(void) { w_stvec((uint64_t)kernel_vec); }
 
-void uart_intr(void);
-
-int dev_intr(void) {
-  uint64_t scause = r_scause();
-
-  if ((scause & 0x8000000000000000L) && (scause & 0xff) == 9) {
-    // this is a supervisor external interrupt, via PLIC.
-
-    // irq indicates which device interrupted.
-    int irq = plic_claim();
-
-    if (irq == UART0_IRQ) {
-      uart_intr();
-    } else if (irq) {
-      printk("Unexpected interrupt IRQ=%d\n", irq);
-    }
-
-    // the PLIC allows each device to raise at most one
-    // interrupt at a time; tell the PLIC the device is
-    // now allowed to interrupt again.
-    if (irq) plic_complete(irq);
-
-    return 1;
-  } else if (scause == 0x8000000000000001L) {
-    // software interrupt from a machine-mode timer interrupt,
-    // forwarded by timervec in kernelvec.S.
-
-    printk("\n+++ Timer Interrupt +++\nsepc: %p\ntime: %p\n", r_sepc(),
-	   r_time());
-
-    // acknowledge the software interrupt by clearing
-    // the SSIP bit in sip.
-    w_sip(r_sip() & ~2);
-
-    return 2;
-  } else {
-    return 0;
-  }
-}
-
 /* Supervisor Trap Function */
 void kernel_trap(struct nk_regs *regs) {
 	static unsigned long ticks = 0;
