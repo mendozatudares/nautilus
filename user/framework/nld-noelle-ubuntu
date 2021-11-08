@@ -53,7 +53,7 @@ if [[ $* != *-nokarat* ]]; then
   llvm-dis ${BLOB_BC}
 
   # Run LICM, normalize code for Noelle + pass (NOTE --- noelle-enable normalizes automatically)
-  opt -O1 ${BLOB_BC} -o ${BLOB_BC}
+  opt -O3 --disable-slp-vectorization ${BLOB_BC} -o ${BLOB_BC}
   ${NORM} ${BLOB_BC} -o ${BLOB_SIMPLIFY_BC}
   noelle-enable ${BLOB_SIMPLIFY_BC} ${BLOB_SIMPLIFY_BC} -noelle-disable-inliner -noelle-disable-scev-simplification -noelle-disable-loop-distribution -noelle-disable-whilifier
 

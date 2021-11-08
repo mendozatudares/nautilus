@@ -157,19 +157,29 @@ void ProtectionsInjector::visitCallInst(CallInst &I)
     return;
   }
 
+  // If the call is a tail call, the function is a part of the current (already checked) stack frame and does not require a check.
+  if(I.isTailCall()){
+    return;
+  }
+
+
 
   /*
    * If the callee of @I has already been instrumented and 
    * all stack locations are at the top of the entry basic
    * block (@this->AllocaOutsideEntry), then nothing else 
    * needs to be done --- return
-   */ 
+   *
+     */
   if (true
       && !AllocaOutsideEntry
       && (Callee)
-      && (InstrumentedFunctions[Callee])) { 
+      && ((InstrumentedFunctions[Callee]))
+      ) {
     return;
   }
+  
+  errs() << "Callee failed: " << I << ", " << !AllocaOutsideEntry << ", " << Callee << ", " << InstrumentedFunctions[Callee] << "\n";
 
 
   /*
@@ -1956,6 +1966,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
           /*
            * <Step 2a.>
            */
+/* LOOP INVARIANCE BEGIN
           Guarded |= 
             _optimizeForLoopInvariance(
                 NestedLoop,
@@ -1967,7 +1978,7 @@ bool ProtectionsInjector::_optimizeForSCEVAnalysis(
           if (Guarded) {
             errs() << "Success LI! " << F->getName() << "\n";
           }
-
+LOOP INVARIANCE END*/
           /*
            * <Step 2b.>
            */

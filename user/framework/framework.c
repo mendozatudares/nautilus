@@ -197,7 +197,6 @@ void _results(void)
 
 __attribute__((noinline, used, annotate("nocarat")))
 void nk_carat_guard_address(void *address, int is_write) {
-  return;  
   BACKSTOP;
    
 #if USER_REGION_CHECK
