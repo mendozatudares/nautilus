@@ -62,24 +62,12 @@
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
 
-// TODO: abstract this.. its copied in trap.c
-#define RISCV_CLOCKS_PER_SECOND 10000000
-#define TICK_INTERVAL (RISCV_CLOCKS_PER_SECOND / NAUT_CONFIG_HZ)
-
-static inline uint64_t get_time() {
-  uint64_t x;
-  asm volatile("csrr %0, time" : "=r"(x));
-  return x;
-}
-
 #define QUANTUM_IN_NS (1000000000ULL / NAUT_CONFIG_HZ)
 
 struct nk_sched_config sched_cfg = {
-    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT *
-		  10000ULL,  // convert percent to 10^-6 units
+    .util_limit = NAUT_CONFIG_UTILIZATION_LIMIT * 10000ULL,  // convert percent to 10^-6 units
     .sporadic_reservation = NAUT_CONFIG_SPORADIC_RESERVATION * 10000ULL,  // ..
-    .aperiodic_reservation =
-	NAUT_CONFIG_APERIODIC_RESERVATION * 10000ULL,  // ..
+    .aperiodic_reservation = NAUT_CONFIG_APERIODIC_RESERVATION * 10000ULL,  // ..
     .aperiodic_quantum = QUANTUM_IN_NS,
     .aperiodic_default_priority = QUANTUM_IN_NS,
 };
@@ -219,16 +207,13 @@ void init(unsigned long hartid, unsigned long fdt) {
   naut->sys.bsp_id = hartid;
   naut->sys.dtb = (struct dtb_fdt_header *)fdt;
 
-  if (!dtb_parse((struct dtb_fdt_header *)fdt)) {
+  if (!dtb_parse(naut->sys.dtb)) {
     ERROR_PRINT("Problem parsing devicetree header\n");
   }
 
-  INFO_PRINT("HART %d: mvendorid: %llx\n", hartid,
-	     sbi_call(SBI_GET_MVENDORID).value);
-  INFO_PRINT("HART %d: marchid:   %llx\n", hartid,
-	     sbi_call(SBI_GET_MARCHID).value);
-  INFO_PRINT("HART %d: mimpid:    %llx\n", hartid,
-	     sbi_call(SBI_GET_MIMPID).value);
+  INFO_PRINT("HART %d: mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
+  INFO_PRINT("HART %d: marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
+  INFO_PRINT("HART %d: mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
 
   nk_dev_init();
   nk_char_dev_init();
@@ -257,7 +242,6 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   // Write supervisor trap vector location
   trap_init_hart();
-
 
   // Initialize platform level interrupt controller for this HART
   plic_init();
@@ -288,19 +272,15 @@ void init(unsigned long hartid, unsigned long fdt) {
   nk_group_sched_init();
 
   /* we now switch away from the boot-time stack */
-  naut =
-      smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
+  naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
 
   mm_boot_kmem_cleanup();
 
-
   sti();
   /* set the timer with sbi :) */
-  sbi_set_timer(get_time() + TICK_INTERVAL);
+  sbi_set_timer(r_time() + TICK_INTERVAL);
 
-  start_secondary(&(naut->sys));
-
-
+  // start_secondary(&(naut->sys));
 
   nk_sched_start();
 

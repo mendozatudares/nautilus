@@ -23,38 +23,45 @@
 #ifdef __CPU_H__
 
 struct nk_regs {
-  /*   0 */ ulong_t zero;
-  /*   8 */ ulong_t ra;
-  /*  16 */ ulong_t sp;
-  /*  24 */ ulong_t gp;
-  /*  32 */ ulong_t tp;
-  /*  40 */ ulong_t t0;
-  /*  48 */ ulong_t t1;
-  /*  56 */ ulong_t t2;
-  /*  64 */ ulong_t s0;
-  /*  72 */ ulong_t s1;
-  /*  80 */ ulong_t a0;
-  /*  88 */ ulong_t a1;
-  /*  96 */ ulong_t a2;
-  /* 104 */ ulong_t a3;
-  /* 112 */ ulong_t a4;
-  /* 120 */ ulong_t a5;
-  /* 128 */ ulong_t a6;
-  /* 136 */ ulong_t a7;
-  /* 144 */ ulong_t s2;
-  /* 152 */ ulong_t s3;
-  /* 160 */ ulong_t s4;
-  /* 168 */ ulong_t s5;
-  /* 176 */ ulong_t s6;
-  /* 184 */ ulong_t s7;
-  /* 192 */ ulong_t s8;
-  /* 200 */ ulong_t s9;
-  /* 208 */ ulong_t s10;
-  /* 216 */ ulong_t s11;
-  /* 224 */ ulong_t t3;
-  /* 232 */ ulong_t t4;
-  /* 240 */ ulong_t t5;
-  /* 248 */ ulong_t t6;
+  uint64_t ra; /* x1: Return address */
+  uint64_t sp; /* x2: Stack pointer */
+  uint64_t gp; /* x3: Global pointer */
+  uint64_t tp; /* x4: Thread Pointer */
+  uint64_t t0; /* x5: Temp 0 */
+  uint64_t t1; /* x6: Temp 1 */
+  uint64_t t2; /* x7: Temp 2 */
+  uint64_t s0; /* x8: Saved register / Frame Pointer */
+  uint64_t s1; /* x9: Saved register */
+  uint64_t a0; /* Arguments, you get it :) */
+  uint64_t a1;
+  uint64_t a2;
+  uint64_t a3;
+  uint64_t a4;
+  uint64_t a5;
+  uint64_t a6;
+  uint64_t a7;
+  uint64_t s2; /* More Saved registers... */
+  uint64_t s3;
+  uint64_t s4;
+  uint64_t s5;
+  uint64_t s6;
+  uint64_t s7;
+  uint64_t s8;
+  uint64_t s9;
+  uint64_t s10;
+  uint64_t s11;
+  uint64_t t3; /* More temporaries */
+  uint64_t t4;
+  uint64_t t5;
+  uint64_t t6;
+
+  /* Exception PC */
+  uint64_t sepc;    /* 31 */
+  uint64_t status;  /* 32 */
+  uint64_t tval;    /* 33 */
+  uint64_t cause;   /* 34 */
+  uint64_t scratch; /* 35 */
+  /* Missing floating point registers in the kernel trap frame */
 };
 
 #define pause()       asm volatile("nop");
@@ -592,5 +599,8 @@ static inline void sfence_vma()
   // the zero, zero means flush all TLB entries.
   asm volatile("sfence.vma zero, zero");
 }
+
+#define RISCV_CLOCKS_PER_SECOND 1000000
+#define TICK_INTERVAL (RISCV_CLOCKS_PER_SECOND / NAUT_CONFIG_HZ)
 
 #endif
