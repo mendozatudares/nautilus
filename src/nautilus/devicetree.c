@@ -1,3 +1,4 @@
+#include <nautilus/nautilus.h>
 #include <nautilus/devicetree.h>
 #include <nautilus/naut_types.h>
 #include <nautilus/list.h>
@@ -207,20 +208,19 @@ void dump_dtb(struct dtb_node *node, int depth) {
 }
 
 int dtb_parse(struct dtb_fdt_header *fdt) {
-	uint64_t f = (uint64_t)fdt;
-  printk("fdt at %llx %llx %llx\n", fdt, (f & 0xFFFFFFFF) == f, (f >> 32) & 0xFFFFFFFF);
+  INFO_PRINT("SBI gave FDT at %p\n", fdt);
   global_fdt_header = fdt;
 
-  printk("  magic: %p\n", bswap32(fdt->magic));
-  printk("  totalsize: %d\n", bswap32(fdt->totalsize));
-  printk("  off_dt_struct: %p\n", bswap32(fdt->off_dt_struct));
-  printk("  off_dt_strings: %p\n", bswap32(fdt->off_dt_strings));
-  printk("  off_mem_rsvmap: %p\n", bswap32(fdt->off_mem_rsvmap));
-  printk("  version: %d\n", bswap32(fdt->version));
-  printk("  last_comp_version: %d\n", bswap32(fdt->last_comp_version));
-  printk("  boot_cpuid_phys: %p\n", bswap32(fdt->boot_cpuid_phys));
-  printk("  size_dt_strings: %p\n", bswap32(fdt->size_dt_strings));
-  printk("  size_dt_struct: %p\n", bswap32(fdt->size_dt_struct));
+  DEBUG_PRINT("  magic: %p\n", bswap32(fdt->magic));
+  DEBUG_PRINT("  totalsize: %d\n", bswap32(fdt->totalsize));
+  DEBUG_PRINT("  off_dt_struct: %p\n", bswap32(fdt->off_dt_struct));
+  DEBUG_PRINT("  off_dt_strings: %p\n", bswap32(fdt->off_dt_strings));
+  DEBUG_PRINT("  off_mem_rsvmap: %p\n", bswap32(fdt->off_mem_rsvmap));
+  DEBUG_PRINT("  version: %d\n", bswap32(fdt->version));
+  DEBUG_PRINT("  last_comp_version: %d\n", bswap32(fdt->last_comp_version));
+  DEBUG_PRINT("  boot_cpuid_phys: %p\n", bswap32(fdt->boot_cpuid_phys));
+  DEBUG_PRINT("  size_dt_strings: %p\n", bswap32(fdt->size_dt_strings));
+  DEBUG_PRINT("  size_dt_struct: %p\n", bswap32(fdt->size_dt_struct));
 
 	next_device = 0;
 
@@ -292,6 +292,7 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
     }
   }
 
+  INFO_PRINT("Dumping Parsed DTB:\n");
   dump_dtb(node, 0);
   return next_device;
 }

@@ -61,6 +61,7 @@
 #include <arch/riscv/plic.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
+#include <arch/riscv/sifive.h>
 
 #define QUANTUM_IN_NS (1000000000ULL / NAUT_CONFIG_HZ)
 
@@ -108,14 +109,13 @@ extern uint64_t secondary_core_stack;
 extern uint64_t _bssStart[];
 extern uint64_t _bssEnd[];
 
-extern int uart_getchar(void);
 extern struct naut_info *smp_ap_stack_switch(uint64_t, uint64_t,
 					     struct naut_info *);
 
 bool second_done = false;
 
 void secondary_entry(int hartid) {
-  printk("RISCV: Hart %d started!\n", hartid);
+  printk("RISCV: hart %d started!\n", hartid);
 
   struct naut_info *naut = &nautilus_info;
 
@@ -156,7 +156,7 @@ int start_secondary(struct sys_info *sys) {
       continue;
     }
 
-    printk("RISCV: Hart %d is trying to start Hart %d\n", my_cpu_id(), i);
+    printk("RISCV: hart %d is trying to start hart %d\n", my_cpu_id(), i);
 
     while (second_done != true) {
       /*
@@ -179,13 +179,18 @@ int start_secondary(struct sys_info *sys) {
       __sync_synchronize();
     }
 
-    printk("RISCV: Hart %d successfully started Hart %d\n", my_cpu_id(), i);
+    printk("RISCV: hart %d successfully started hart %d\n", my_cpu_id(), i);
   }
 
   return 0;
 }
 
 void init(unsigned long hartid, unsigned long fdt) {
+
+  while(1) {
+    my_monitor_entry();
+  }
+
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
   nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
@@ -211,9 +216,11 @@ void init(unsigned long hartid, unsigned long fdt) {
     ERROR_PRINT("Problem parsing devicetree header\n");
   }
 
-  INFO_PRINT("HART %d: mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
-  INFO_PRINT("HART %d: marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
-  INFO_PRINT("HART %d: mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
+  sifive_uart_init();
+
+  printk("RISCV: hart %d mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
+  printk("RISCV: hart %d marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
+  printk("RISCV: hart %d mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
 
   nk_dev_init();
   nk_char_dev_init();
@@ -277,12 +284,13 @@ void init(unsigned long hartid, unsigned long fdt) {
   mm_boot_kmem_cleanup();
 
   sti();
+
   /* set the timer with sbi :) */
   sbi_set_timer(r_time() + TICK_INTERVAL);
 
   // start_secondary(&(naut->sys));
 
-  nk_sched_start();
+  // nk_sched_start();
 
   /* interrupts are now on */
 
@@ -296,4 +304,50 @@ void init(unsigned long hartid, unsigned long fdt) {
 	printk("%c", c);
     }
   }
+}
+
+/* Faking some vc stuff */
+
+inline int nk_vc_is_active()
+{
+  return 0;
+}
+
+#include <nautilus/printk.h>
+#include <stdarg.h>
+
+int nk_vc_print(char *s)
+{
+    printk(s);
+    return 0;
+}
+
+#define PRINT_MAX 1024
+
+int nk_vc_printf(char *fmt, ...)
+{
+  char buf[PRINT_MAX];
+
+  va_list args;
+  int i;
+
+  va_start(args, fmt);
+  i=vsnprintf(buf,PRINT_MAX,fmt,args);
+  va_end(args);
+  nk_vc_print(buf);
+  return i;
+}
+
+int nk_vc_log(char *fmt, ...)
+{
+  char buf[PRINT_MAX];
+
+  va_list args;
+  int i;
+  
+  va_start(args, fmt);
+  i=vsnprintf(buf,PRINT_MAX,fmt,args);
+  va_end(args);
+  
+  return i;
 }
