@@ -187,10 +187,6 @@ int start_secondary(struct sys_info *sys) {
 
 void init(unsigned long hartid, unsigned long fdt) {
 
-  while(1) {
-    my_monitor_entry();
-  }
-
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
   nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
@@ -216,7 +212,9 @@ void init(unsigned long hartid, unsigned long fdt) {
     ERROR_PRINT("Problem parsing devicetree header\n");
   }
 
+  // We now have serial output without SBI
   sifive_uart_init();
+
 
   printk("RISCV: hart %d mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
   printk("RISCV: hart %d marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
@@ -285,6 +283,12 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   sti();
 
+  /* interrupts are now on */
+
+  while(1) {
+    my_monitor_entry();
+  }
+
   /* set the timer with sbi :) */
   sbi_set_timer(r_time() + TICK_INTERVAL);
 
@@ -292,18 +296,6 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   // nk_sched_start();
 
-  /* interrupts are now on */
-
-  // test to see if we got here
-  while (1) {
-    int c = uart_getchar();
-    if (c != -1) {
-      if (c == 13)
-	printk("\n");
-      else
-	printk("%c", c);
-    }
-  }
 }
 
 /* Faking some vc stuff */

@@ -41,6 +41,7 @@
 #include <nautilus/naut_types.h>
 #include <nautilus/devicetree.h>
 #include <arch/riscv/sbi.h>
+#include <arch/riscv/sifive.h>
 
 /*
  * Config macros
@@ -160,18 +161,13 @@ void uart_putchar(char ch) {
     }
 }
 
-int uart_getchar_wait(uint8_t wait) {
+int uart_getchar(void) {
     if (!uart_inited) {
-        struct sbiret ret;
-        do {
-            ret = sbi_call(SBI_CONSOLE_GETCHAR);
-        } while (!wait || ret.error != -1);
+        struct sbiret ret = sbi_call(SBI_CONSOLE_GETCHAR);
         return ret.error == -1 ? -1 : ret.value;
     } else {
         union rx_data data;
-        do {
-            data.val = regs()->rxdata.val;
-        } while (!wait || data.isEmpty);
+        data.val = regs()->rxdata.val;
         return data.isEmpty ? -1 : data.data;
     }
 }

@@ -112,6 +112,7 @@ static void print(char *b)
         uart_putchar(*b);
         b++;
     }
+    uart_putchar('\n');
 }
 
 // Keyboard stuff repeats here to be self-contained
@@ -378,19 +379,19 @@ get_next_word(char *s)
 
 static int execute_quit(char command[])
 {
-  uart_puts("quit executed");
+  print("quit executed");
   return 1;
 }
 
 static int execute_help(char command[])
 {
-  uart_puts("commands:");
-  uart_puts("  quit");
-  uart_puts("  help");
-  // uart_puts("  paging_on");
-  uart_puts("  pf");
-  uart_puts("  test");
-  uart_puts("  pwrstats");
+  print("commands:");
+  print("  quit");
+  print("  help");
+  // print("  paging_on");
+  print("  pf");
+  print("  test");
+  print("  pwrstats");
   return 0;
 }
 
@@ -641,7 +642,7 @@ static int execute_potential_command(char command[])
   }
   else /* default: */
   {
-    uart_puts("command not recognized");
+    print("command not recognized");
   }
   // vga_attr = vga_make_color(COLOR_PROMPT_FOREGROUND, COLOR_PROMPT_BACKGROUND);
   return quit;
@@ -722,7 +723,7 @@ int my_monitor_entry()
     uint8_t intr_flags = monitor_init();
     
     // vga_attr = vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND);
-    uart_puts("My monitor Entered");
+    print("My monitor Entered");
     // vga_attr = vga_make_color(COLOR_PROMPT_FOREGROUND, COLOR_PROMPT_BACKGROUND);
     
     nk_monitor_loop();
