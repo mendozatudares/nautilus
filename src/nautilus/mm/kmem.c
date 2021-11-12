@@ -48,7 +48,7 @@
 
 // turn this on to have a sanity check run before and after each
 // malloc and free
-#define SANITY_CHECK_PER_OP 1
+#define SANITY_CHECK_PER_OP 0
 
 #define KMEM_DEBUG(fmt, args...) DEBUG_PRINT("KMEM: " fmt, ##args)
 #define KMEM_ERROR(fmt, args...) ERROR_PRINT("KMEM: " fmt, ##args)
@@ -569,7 +569,7 @@ _kmem_malloc (size_t size, int cpu, int zero)
 	// attempt to get memory back by reaping threads now...
 	if (first) {
 	    KMEM_DEBUG("malloc initially failed for size %lu order %lu attempting reap\n",size,order);
-	    // nk_sched_reap(1);
+	    nk_sched_reap(1);
 	    first=0;
 	    goto retry;
 	}

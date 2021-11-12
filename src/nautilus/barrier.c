@@ -308,7 +308,7 @@ nk_core_barrier_wait (void)
     }
 
     while (barrier->remaining != 0) {
-        // nk_yield();
+        nk_yield();
     }
 
     return 0;
@@ -341,7 +341,7 @@ nk_core_barrier_arrive (void)
     atomic_dec(barrier->remaining);
 
     while (barrier->notify != 1) {
-        // nk_yield();
+        nk_yield();
     }
 
     return 0;
@@ -386,8 +386,8 @@ void nk_barrier_test(void)
     }
 
     nk_barrier_init(b, 3);
-    // nk_thread_start(barrier_func1, b, NULL, 1, TSTACK_DEFAULT, NULL, 1);
-    // nk_thread_start(barrier_func2, b, NULL, 1, TSTACK_DEFAULT, NULL, 2);
+    nk_thread_start(barrier_func1, b, NULL, 1, TSTACK_DEFAULT, NULL, 1);
+    nk_thread_start(barrier_func2, b, NULL, 1, TSTACK_DEFAULT, NULL, 2);
 
     nk_barrier_wait(b);
 
