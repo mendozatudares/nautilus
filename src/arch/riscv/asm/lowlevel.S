@@ -151,7 +151,7 @@ GLOBAL(kernel_vec)
     sd t6, 240(sp)
 
     // call the C trap handler in idt.c
-		move a0, sp /* arg0 <- trapframe */
+	move a0, sp /* arg0 <- trapframe */
     call kernel_trap
 
     // restore registers.

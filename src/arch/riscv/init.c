@@ -22,6 +22,7 @@
  */
 #define __NAUTILUS_MAIN__
 
+#include <nautilus/nautilus.h>
 #include <nautilus/barrier.h>
 #include <nautilus/blkdev.h>
 #include <nautilus/chardev.h>
@@ -41,7 +42,6 @@
 #include <nautilus/mb_utils.h>
 #include <nautilus/mm.h>
 #include <nautilus/msg_queue.h>
-#include <nautilus/nautilus.h>
 #include <nautilus/netdev.h>
 #include <nautilus/percpu.h>
 #include <nautilus/prog.h>
@@ -291,11 +291,13 @@ void init(unsigned long hartid, unsigned long fdt) {
   }
 
   /* set the timer with sbi :) */
-  sbi_set_timer(r_time() + TICK_INTERVAL);
+  // sbi_set_timer(r_time() + TICK_INTERVAL);
 
   // start_secondary(&(naut->sys));
 
   // nk_sched_start();
+
+  while (1);
 }
 
 /* Faking some vc stuff */

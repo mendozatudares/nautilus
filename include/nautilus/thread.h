@@ -267,6 +267,7 @@ put_cur_thread (nk_thread_t * t)
 
 #endif /* !__ASSEMBLER */
 
+#ifndef NAUT_CONFIG_RISCV_HOST
 #define SAVE_GPRS() \
     movq %rax, -8(%rsp); \
     movq %rbx, -16(%rsp); \
@@ -302,6 +303,7 @@ put_cur_thread (nk_thread_t * t)
     movq 104(%rsp), %rbx; \
     movq 112(%rsp), %rax; \
     addq $120, %rsp; 
+#endif
 
 #ifdef __cplusplus
 }

@@ -4299,11 +4299,13 @@ void nk_sched_start()
 
     DEBUG("Scheduler startup - %s\n", my_cpu->is_bsp ? "bsp" : "ap");
 
+#ifndef NAUT_CONFIG_RISCV_HOST
     // barrier for all the schedulers
     __sync_fetch_and_add(&sync_count,1);
     while (sync_count < num_cpus) {
 	// spin
     }
+#endif
     cur_cycles = rdtsc();
     if (my_cpu->is_bsp) { 
 	// everyone has started their local tsc at 0
