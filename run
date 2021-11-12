@@ -14,6 +14,6 @@ ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j #V=1
 if [[ "$*" == *"qemu"* ]]; then
   echo 'Starting QEMU...'
   printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' _
-  qemu-system-riscv64 -nographic -machine sifive_u -bios default -kernel nautilus.bin -gdb tcp::1234
+  qemu-system-riscv64 -nographic -machine sifive_u -m 2G -bios default -kernel nautilus.bin -gdb tcp::1234
 fi
 

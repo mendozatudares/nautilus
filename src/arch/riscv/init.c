@@ -185,6 +185,8 @@ int start_secondary(struct sys_info *sys) {
   return 0;
 }
 
+void my_monitor_entry(void);
+
 void init(unsigned long hartid, unsigned long fdt) {
 
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
@@ -209,12 +211,11 @@ void init(unsigned long hartid, unsigned long fdt) {
   naut->sys.dtb = (struct dtb_fdt_header *)fdt;
 
   if (!dtb_parse(naut->sys.dtb)) {
-    ERROR_PRINT("Problem parsing devicetree header\n");
+    panic("Problem parsing devicetree header\n");
   }
 
   // We now have serial output without SBI
   sifive_uart_init();
-
 
   printk("RISCV: hart %d mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
   printk("RISCV: hart %d marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
@@ -295,7 +296,6 @@ void init(unsigned long hartid, unsigned long fdt) {
   // start_secondary(&(naut->sys));
 
   // nk_sched_start();
-
 }
 
 /* Faking some vc stuff */

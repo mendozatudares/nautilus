@@ -723,7 +723,7 @@ int my_monitor_entry()
     uint8_t intr_flags = monitor_init();
     
     // vga_attr = vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND);
-    print("My monitor Entered");
+    print("+++ Boot into Monitor +++");
     // vga_attr = vga_make_color(COLOR_PROMPT_FOREGROUND, COLOR_PROMPT_BACKGROUND);
     
     nk_monitor_loop();

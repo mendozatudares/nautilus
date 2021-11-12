@@ -4578,16 +4578,17 @@ struct burner_args {
 static void 
 burner (void * in, void ** out)
 {
-    #ifndef NAUT_CONFIG_RISCV_HOST
     uint64_t start, end, dur;
     struct burner_args *a = (struct burner_args *)in;
 
     nk_thread_name(get_cur_thread(),a->name);
 
+#ifndef NAUT_CONFIG_RISCV_HOST
     if (nk_bind_vc(get_cur_thread(), a->vc)) { 
         ERROR_PRINT("Cannot bind virtual console for burner %s\n",a->name);
         return;
     }
+#endif
 
     nk_vc_printf("%s (tid %llu) attempting to promote itself\n", a->name, get_cur_thread()->tid);
 #if 1
@@ -4615,7 +4616,6 @@ burner (void * in, void ** out)
             a->size_ns -= dur;
         }
     }
-    #endif
 }
 
 
@@ -4625,7 +4625,6 @@ launch_aperiodic_burner (char * name,
                          uint32_t tpr, 
                          uint64_t priority)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     nk_thread_id_t tid;
     struct burner_args *a;
 
@@ -4649,7 +4648,6 @@ launch_aperiodic_burner (char * name,
     } else {
         return 0;
     }
-#endif
 }
 
 static int 
