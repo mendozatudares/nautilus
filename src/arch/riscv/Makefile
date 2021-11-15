@@ -1,11 +1,12 @@
 obj-y += asm/ \
 	 init.o \
 	 main.o \
+	 numa.o \
 	 smp.o \
 	 early_mem.o \
-	 trap.o \
 	 sbi.o \
+	 sifive.o \
+	 trap.o \
 	 plic.o \
-	 numa.o \
 	 monitor.o \
-	 sifive.o
+	 paging.o

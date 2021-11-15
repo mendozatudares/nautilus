@@ -23,6 +23,7 @@
 #define __NAUTILUS_MAIN__
 
 #include <nautilus/nautilus.h>
+#include <nautilus/paging.h>
 #include <nautilus/barrier.h>
 #include <nautilus/blkdev.h>
 #include <nautilus/chardev.h>
@@ -235,6 +236,9 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   /* this will populate NUMA-related structures */
   arch_numa_init(&naut->sys);
+
+  /* this will finish up the identity map */
+  nk_paging_init(&(naut->sys.mem), fdt);
 
   // Setup the main kernel memory allocator
   nk_kmem_init();

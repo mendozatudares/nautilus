@@ -36,233 +36,86 @@
 #include <lib/bitmap.h>
 #include <nautilus/percpu.h>
 
-#ifdef NAUT_CONFIG_XEON_PHI
-#include <nautilus/sfi.h>
-#endif
-
-#ifdef NAUT_CONFIG_HVM_HRT
-#include <arch/hrt/hrt.h>
-#endif
-
-#ifdef NAUT_CONFIG_ASPACES
-#include <nautilus/aspace.h>
-#endif
-
 #ifndef NAUT_CONFIG_DEBUG_PAGING
 #undef DEBUG_PRINT
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
-#include <arch/riscv/riscv.h>
-#include <arch/riscv/memlayout.h>
+#define PGSHIFT 12  // bits of offset within a page
 
-extern uint8_t boot_mm_inactive;
+#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
+#define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))
 
-extern ulong_t kernel_page_table;
+#define PTE_V (1L << 0) // valid
+#define PTE_R (1L << 1)
+#define PTE_W (1L << 2)
+#define PTE_X (1L << 3)
+#define PTE_U (1L << 4) // 1 -> user can access
 
-extern ulong_t etext;
+// shift a physical address to the right place for a PTE.
+#define PA2PTE(pa) ((((uint64_t)pa) >> 12) << 10)
 
+#define PTE2PA(pte) (((pte) >> 10) << 12)
 
-static char * ps2str[3] = {
-    [PS_4K] = "4KB",
-    [PS_2M] = "2MB",
-    [PS_1G] = "1GB",
-};
+#define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
+// extract the three 9-bit page table indices from a virtual address.
+#define PXMASK          0x1FF // 9 bits
+#define PXSHIFT(level)  (PGSHIFT+(9*(level)))
+#define PX(level, va) ((((uint64_t) (va)) >> PXSHIFT(level)) & PXMASK)
 
-extern uint8_t cpu_info_ready;
+// one beyond the highest possible virtual address.
+// MAXVA is actually one bit less than the max allowed by
+// Sv39, to avoid having to sign-extend virtual addresses
+// that have the high bit set.
+#define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
-/*
- * align_addr
- *
- * align addr *up* to the nearest align boundary
- *
- * @addr: address to align
- * @align: power of 2 to align to
- *
- * returns the aligned address
- *
- */
-static inline ulong_t
-align_addr (ulong_t addr, ulong_t align)
-{
-    ASSERT(!(align & (align-1)));
-    return (~(align - 1)) & (addr + align);
-}
-
-
-static inline int
-gig_pages_supported (void)
-{
-    return 0;
-}
-
-
-static page_size_t
-largest_page_size (void)
-{
-    if (gig_pages_supported()) {
-        return PS_1G;
-    }
-
-    return PS_2M;
-}
-
-
-static ulong_t *
-walk(ulong_t * pml, addr_t addr, int alloc)
-{
-    if(addr >= MAXVA) {
-        panic("walk");
-    }
-
-    for(int level = 2; level > 0; level--) {
-        pte_t *pte = &pml[PX(level, addr)];
-        if(*pte & PTE_V) {
-            pml = (ulong_t *) PTE2PA(*pte);
-        } else {
-            if(!alloc || (pml = (ulong_t*) mm_boot_alloc_aligned(PAGE_SIZE_4KB, PAGE_SIZE_4KB)) == 0)
-                return 0;
-            memset(pml, 0, PGSIZE);
-            *pte = PA2PTE(pml) | PTE_V;
-        }
-    }
-    return &pml[PX(0, addr)];
-}
-
-
-int
-map_page_range (ulong_t * pml, addr_t vaddr, addr_t paddr, uint64_t size, uint64_t flags)
-{
-    uint64_t a, last;
-    ulong_t *pte;
-
-    a = PGROUNDDOWN(vaddr);
-    last = PGROUNDDOWN(vaddr + size - 1);
-    for (;;) {
-        if((pte = walk(pml, a, 1)) == 0)
-            return -1;
-        if(*pte & PTE_V)
-            panic("remap");
-        *pte = PA2PTE(paddr) | flags | PTE_V;
-        if(a == last)
-            break;
-        a += PGSIZE;
-        paddr += PGSIZE;
-    }
-    return 0;
-}
-
+#define SATP_FLAG  8ULL
+#define SATP_SHIFT 60
+#define SATP_MODE (SATP_FLAG << SATP_SHIFT)
+#define MAKE_SATP(page_table) (SATP_MODE | (((uint64_t)page_table) >> 12))
 
 static void
-construct_ident_map (ulong_t * pml, ulong_t bytes)
+__construct_tables_1g (pml4e_t * pml, ulong_t bytes)
 {
-    // uart registers
-    map_page_range(pml, UART0, UART0, PAGE_SIZE_4KB, PTE_R | PTE_W);
+    ulong_t npages = (bytes + PAGE_SIZE_1GB - 1)/PAGE_SIZE_1GB;
+    ulong_t filled_pgs = 0;
+    unsigned i;
+    ulong_t addr = 0;
 
-    // virtio mmio disk interface
-    map_page_range(pml, VIRTIO0, VIRTIO0, PAGE_SIZE_4KB, PTE_R | PTE_W);
+    for (i = 0; i < NUM_PML4_ENTRIES && filled_pgs < npages; i++) {
+        pte_t * pte = (pte_t*)(pml + i);
 
-    // PLIC
-    map_page_range(pml, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+        *pte = PA2PTE(addr) | PTE_R | PTE_W | PTE_X | PTE_V;
+        printk("pte[%d] at %p = %llx\n", i, pte, *pte);
 
-    uint64_t kernend = (uint64_t)&etext;
-
-    // map kernel text executable, writable, and readable.
-    map_page_range(pml, KERNBASE, KERNBASE, kernend-KERNBASE, PTE_R | PTE_X | PTE_W);
-
-    // map kernel data and the physical RAM we'll make use of.
-    map_page_range(pml, kernend, kernend, PHYSTOP-kernend, PTE_R | PTE_X | PTE_W);
+        ++filled_pgs;
+        addr += PAGE_SIZE_1GB;
+    }
 }
 
-
-/*
- * nk_pf_handler
- *
- * page fault handler
- *
-int
-nk_pf_handler (excp_entry_t * excp,
-               excp_vec_t     vector,
-               void         * state)
+static void
+construct_ident_map (pml4e_t * pml, page_size_t ptype, ulong_t bytes)
 {
-
-    cpu_id_t id = cpu_info_ready ? my_cpu_id() : 0xffffffff;
-    uint64_t fault_addr = read_cr2();
-
-#ifdef NAUT_CONFIG_HVM_HRT
-    if (excp->error_code == UPCALL_MAGIC_ERROR) {
-        return nautilus_hrt_upcall_handler(NULL, 0);
+    if (ptype != PS_1G) {
+        ERROR_PRINT("Expected page type PS_1G (received %u)\n", ptype);
+        return;
     }
-#endif
+    ulong_t ps = ps_type_to_size(ptype);
 
-#ifdef NAUT_CONFIG_ASPACES
-    if (!nk_aspace_exception(excp,vector,state)) {
-	return 0;
-    }
-#endif
-
-#ifdef NAUT_CONFIG_ENABLE_MONITOR
-    int nk_monitor_excp_entry(excp_entry_t * excp,
-			      excp_vec_t vector,
-			      void *state);
-
-    return nk_monitor_excp_entry(excp, vector, state);
-#endif
-
-    printk("\n+++ Page Fault +++\n"
-            "RIP: %p    Fault Address: 0x%llx \n"
-            "Error Code: 0x%x    (core=%u)\n",
-            (void*)excp->rip,
-            fault_addr,
-            excp->error_code,
-            id);
-
-    struct nk_regs * r = (struct nk_regs*)((char*)excp - 128);
-    nk_print_regs(r);
-    backtrace(r->rbp);
-
-    panic("+++ HALTING +++\n");
-    return 0;
+    __construct_tables_1g(pml, bytes);
 }
- */
-
-
-/*
- * nk_gpf_handler
- *
- * general protection fault handler
- *
-int
-nk_gpf_handler (excp_entry_t * excp,
-		excp_vec_t     vector,
-		void         * state)
-{
-
-    cpu_id_t id = cpu_info_ready ? my_cpu_id() : 0xffffffff;
-
-#ifdef NAUT_CONFIG_ASPACES
-    if (!nk_aspace_exception(excp,vector,state)) {
-	return 0;
-    }
-#endif
-
-    // if monitor is active, we will fall through to it
-    // by calling null_excp_handler
-    return null_excp_handler(excp,vector,state);
-}
- */
 
 static uint64_t default_satp;
 
 /*
  * Identity map all of physical memory using
- * the largest pages possible
+ * the largest pages possible (1GB)
  */
 static void
-kern_ident_map (struct nk_mem_info * mem, ulong_t mbd)
+kern_ident_map (struct nk_mem_info * mem, ulong_t fdt)
 {
-    page_size_t lps  = PS_4K;
+    page_size_t lps  = PS_1G;
     ulong_t last_pfn = mm_boot_last_pfn();
     ulong_t ps       = ps_type_to_size(lps);
     pml4e_t * pml    = NULL;
@@ -270,31 +123,22 @@ kern_ident_map (struct nk_mem_info * mem, ulong_t mbd)
     /* create a new PML4 */
     pml = mm_boot_alloc_aligned(PAGE_SIZE_4KB, PAGE_SIZE_4KB);
     if (!pml) {
-        ERROR_PRINT("Could not allocate new PML4\n");
+        ERROR_PRINT("Could not allocate new PML4");
         return;
     }
     memset(pml, 0, PAGE_SIZE_4KB);
 
-    printk("Remapping phys mem [%p - %p] with %s pages\n",
+    printk("Remapping phys mem [%p - %p] with 1G pages\n",
             (void*)0,
-            (void*)(last_pfn<<PAGE_SHIFT),
-            ps2str[lps]);
+            (void*)(last_pfn<<PAGE_SHIFT));
+    
+    construct_ident_map(pml, lps, last_pfn<<PAGE_SHIFT_2MB);
 
-    construct_ident_map(pml, last_pfn<<PAGE_SHIFT);
+    default_satp = (ulong_t)MAKE_SATP(pml);
 
-    kernel_page_table = (ulong_t) pml;
-
-    default_satp = (ulong_t) MAKE_SATP(pml);
-
-    /* install the new tables, this will also flush the TLB */
-    w_satp(MAKE_SATP(pml));
+    /* intall the new table, we should also flush the tlb */
+    write_csr(satp, default_satp);
     sfence_vma();
-
-}
-
-uint64_t nk_paging_default_page_size()
-{
-    return ps_type_to_size(largest_page_size());
 }
 
 uint64_t nk_paging_default_satp()
@@ -302,9 +146,8 @@ uint64_t nk_paging_default_satp()
     return default_satp;
 }
 
-
 void
-nk_paging_init (struct nk_mem_info * mem, ulong_t mbd)
+nk_paging_init (struct nk_mem_info * mem, ulong_t fdt)
 {
-    kern_ident_map(mem, mbd);
+    kern_ident_map(mem, fdt);
 }

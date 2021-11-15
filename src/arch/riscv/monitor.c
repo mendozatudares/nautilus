@@ -27,12 +27,23 @@
 #define ITERATIONS 100
 #define NUM_READINGS 100.0
 
+#define read_csr(name)                         \
+  ({                                           \
+    uint64_t x;                             \
+    asm volatile("csrr %0, " #name : "=r"(x)); \
+    x;                                         \
+  })
+
+#define write_csr(csr, val)                                             \
+  ({                                                                    \
+    unsigned long __v = (unsigned long)(val);                           \
+    __asm__ __volatile__("csrw " #csr ", %0" : : "rK"(__v) : "memory"); \
+  })
+
 static inline uint64_t __attribute__((always_inline))
 rdtsc (void)
 {
-    uint64_t x;
-    asm volatile("csrr %0, time" : "=r" (x) );
-    return x;
+    return read_csr(time);
 }
 
 static char * long_to_string(long x)
@@ -388,18 +399,41 @@ static int execute_help(char command[])
   print("commands:");
   print("  quit");
   print("  help");
-  // print("  paging_on");
+  print("  paging");
   print("  pf");
   print("  test");
   print("  pwrstats");
   return 0;
 }
 
-// void paging_on();
+static inline void
+tlb_flush (void)
+{
+    asm volatile("sfence.vma zero, zero");
+}
+
+extern uint64_t nk_paging_default_satp();
+static void paging_on(void)
+{
+  write_csr(satp, nk_paging_default_satp());
+  tlb_flush();
+}
+
+static void paging_off(void)
+{
+  write_csr(satp, 0);
+  tlb_flush();
+}
+
 static int execute_paging(char command[])
 {
-  // paging_on();
-  print("paging is on now\n\r");
+  if (!read_csr(satp)) {
+    paging_on();
+    print("paging is on now\n\r");
+  } else {
+    paging_off();
+    print("paging if off now\n\r");
+  }
   return 0;
 }
 
@@ -418,25 +452,6 @@ static int execute_rapl(char command[])
   // pwrstat_init();
   return 0;
 }
-
-static inline void
-tlb_flush (void)
-{
-    asm volatile("sfence.vma zero, zero");
-}
-
-#define csr_write(csr, val)                                             \
-  ({                                                                    \
-    unsigned long __v = (unsigned long)(val);                           \
-    __asm__ __volatile__("csrw " #csr ", %0" : : "rK"(__v) : "memory"); \
-  })
-
-
-#define csr_read(csr, val)                                               \
-  ({                                                                    \
-    unsigned long __v = (unsigned long)(val);                           \
-    __asm__ __volatile__("csrs " #csr ", %0" : : "rK"(__v) : "memory"); \
-  })
 
 
 static long low_locality()   // 128 accesses, all from different pages
@@ -496,6 +511,7 @@ static int execute_test(char command[])
   unsigned long avg_sum = 0;
 
   print("========================== PAGING OFF ==========================\n\r");
+  paging_off();
   for (int i=0; i<NUM_READINGS; i++)
   {
     unsigned long t1 = rdtsc();
@@ -549,7 +565,7 @@ static int execute_test(char command[])
   print("\n\n\n\r");
 
   print("========================== PAGING ON ==========================\n\r");
-  // paging_on();
+  paging_on();
   
   avg_cycles = 0;
   avg_sum = 0;
@@ -624,7 +640,7 @@ static int execute_potential_command(char command[])
   {
     quit = execute_help(command);
   }
-  else if (my_strcmp(word, "paging_on") == 0)
+  else if (my_strcmp(word, "paging") == 0)
   {
     quit = execute_paging(command);
   }
