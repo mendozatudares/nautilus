@@ -53,6 +53,7 @@
 #include <nautilus/task.h>
 #include <nautilus/thread.h>
 #include <nautilus/timer.h>
+#include <nautilus/vc.h>
 #include <nautilus/waitqueue.h>
 
 #ifdef NAUT_CONFIG_ENABLE_REMOTE_DEBUGGING
@@ -62,7 +63,8 @@
 #include <arch/riscv/plic.h>
 #include <arch/riscv/sbi.h>
 #include <arch/riscv/trap.h>
-#include <arch/riscv/sifive.h>
+
+#include <dev/sifive.h>
 
 #define QUANTUM_IN_NS (1000000000ULL / NAUT_CONFIG_HZ)
 
@@ -216,7 +218,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   }
 
   // We now have serial output without SBI
-  sifive_uart_init();
+  serial_init();
 
   printk("RISCV: hart %d mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
   printk("RISCV: hart %d marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
@@ -286,9 +288,25 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   mm_boot_kmem_cleanup();
 
+  nk_sched_start();
+
   sti();
 
   /* interrupts are now on */
+
+  // nk_vc_init();
+
+  nk_fs_init();
+
+  // nk_linker_init(naut);
+  // nk_prog_init(naut);
+
+  // nk_loader_init();
+
+  // nk_pmc_init();
+
+  nk_cmdline_init(naut);
+  // nk_test_init(naut);
 
   /* set the timer with sbi :) */
   // sbi_set_timer(r_time() + TICK_INTERVAL);
@@ -299,53 +317,17 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   // start_secondary(&(naut->sys));
 
-  // nk_sched_start();
+  printk("Nautilus boot thread yielding (indefinitely)\n");
 
-  while (1);
+  idle(NULL, NULL);
 }
 
 /* Faking some vc stuff */
 
-inline int nk_vc_is_active()
+uint16_t 
+vga_make_entry (char c, uint8_t color)
 {
-  return 0;
-}
-
-#include <nautilus/printk.h>
-#include <stdarg.h>
-
-int nk_vc_print(char *s)
-{
-    printk(s);
-    return 0;
-}
-
-#define PRINT_MAX 1024
-
-int nk_vc_printf(char *fmt, ...)
-{
-  char buf[PRINT_MAX];
-
-  va_list args;
-  int i;
-
-  va_start(args, fmt);
-  i=vsnprintf(buf,PRINT_MAX,fmt,args);
-  va_end(args);
-  nk_vc_print(buf);
-  return i;
-}
-
-int nk_vc_log(char *fmt, ...)
-{
-  char buf[PRINT_MAX];
-
-  va_list args;
-  int i;
-  
-  va_start(args, fmt);
-  i=vsnprintf(buf,PRINT_MAX,fmt,args);
-  va_end(args);
-  
-  return i;
+    uint16_t c16 = c;
+    uint16_t color16 = color;
+    return c16 | color16 << 8;
 }

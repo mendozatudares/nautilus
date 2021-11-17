@@ -22,7 +22,7 @@
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
 
-#include <arch/riscv/sifive.h>
+#include <dev/sifive.h>
 
 #define ITERATIONS 100
 #define NUM_READINGS 100.0
@@ -109,8 +109,8 @@ int my_strcmp (const char * s1, const char * s2)
     }
 }
 
-#define DB(x) uart_putchar(x)
-#define DHN(x) uart_putchar(((x & 0xF) >= 10) ? (((x & 0xF) - 10) + 'a') : ((x & 0xF) + '0'))
+#define DB(x) serial_putchar(x)
+#define DHN(x) serial_putchar(((x & 0xF) >= 10) ? (((x & 0xF) - 10) + 'a') : ((x & 0xF) + '0'))
 #define DHB(x) DHN(x >> 4) ; DHN(x);
 #define DHW(x) DHB(x >> 8) ; DHB(x);
 #define DHL(x) DHW(x >> 16) ; DHW(x);
@@ -120,10 +120,10 @@ int my_strcmp (const char * s1, const char * s2)
 static void print(char *b)
 {
     while (b && *b) {
-        uart_putchar(*b);
+        serial_putchar(*b);
         b++;
     }
-    uart_putchar('\n');
+    serial_putchar('\n');
 }
 
 // Keyboard stuff repeats here to be self-contained
@@ -153,7 +153,7 @@ static void wait_for_command(char *buf, int buffer_size)
   int curr = 0;
   while (1)
   {
-    key = uart_getchar();
+    key = serial_getchar();
     // key = ps2_wait_for_key();
     // uint16_t key_encoded = kbd_translate_monitor(key);
     //vga_clear_screen(vga_make_entry(key, vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND)));
@@ -170,7 +170,7 @@ static void wait_for_command(char *buf, int buffer_size)
 
       if (curr < buffer_size - 1)
       {
-        uart_putchar(key_char);
+        serial_putchar(key_char);
         buf[curr] = key_char;
         curr++;
       }
@@ -678,7 +678,7 @@ static int nk_monitor_loop()
   while (!done) {
     DS("monitor> ");
     wait_for_command(buffer, buffer_size);
-    uart_putchar('\n');
+    serial_putchar('\n');
     done = execute_potential_command(buffer);
   };
   return 0;

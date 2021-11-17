@@ -5,11 +5,13 @@ obj-y += apic.o \
 	 ps2.o \
 	 pci.o \
          vga.o
-endif
 
 ifndef NAUT_CONFIG_XEON_PHI
 obj-y += serial.o
 endif
+endif
+
+obj-$(NAUT_CONFIG_RISCV_HOST) += sifive.o
 
 obj-$(NAUT_CONFIG_HPET) += hpet.o
 

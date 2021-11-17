@@ -2232,8 +2232,15 @@ struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
     int yielding = rt_c->status==YIELDING;
     int idle = rt_c->thread->is_idle;
     int timed_out = scheduler->tsc.set_time < now;  
+#ifdef NAUT_CONFIG_RISCV_HOST
+    extern int in_timer_interrupt;
+    extern int in_kick_interrupt;
+    int apic_timer = in_timer_interrupt;
+    int apic_kick = in_kick_interrupt;
+#else
     int apic_timer = apic->in_timer_interrupt;
     int apic_kick = apic->in_kick_interrupt;
+#endif
 
     // "SPECIAL" means the current task is not to be enqueued
 #define CUR_IS_SPECIAL (going_to_sleep || going_to_exit || changing)
@@ -4299,6 +4306,7 @@ void nk_sched_start()
 
     DEBUG("Scheduler startup - %s\n", my_cpu->is_bsp ? "bsp" : "ap");
 
+    // TODO: multicore scheduling for RISC-V port
 #ifndef NAUT_CONFIG_RISCV_HOST
     // barrier for all the schedulers
     __sync_fetch_and_add(&sync_count,1);

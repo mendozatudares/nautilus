@@ -5,7 +5,6 @@ obj-y += asm/ \
 	 smp.o \
 	 early_mem.o \
 	 sbi.o \
-	 sifive.o \
 	 trap.o \
 	 plic.o \
 	 monitor.o \

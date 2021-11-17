@@ -1289,7 +1289,11 @@ nk_scancode_t nk_vc_get_scancode(int wait)
 
 static int enqueue_scancode_as_keycode(struct nk_virtual_console *__cur_vc, uint8_t scan)
 {
+#ifndef NAUT_CONFIG_RISCV_HOST
   nk_keycode_t key = kbd_translate(scan);
+#else
+  nk_keycode_t key = scan;
+#endif
   if(key != NO_KEY) {
     nk_enqueue_keycode(__cur_vc, key);
   }

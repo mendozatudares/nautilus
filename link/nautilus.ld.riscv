@@ -46,6 +46,12 @@ SECTIONS
     __stop_flags = .;
   }
 
+  .shell_cmds ALIGN(0x1000) : {
+    __start_shell_cmds = .;
+    *(.shell_cmds*);
+    __stop_shell_cmds = .;
+  }
+
   _loadEnd = .;
 
   _bssStart = .;

@@ -64,6 +64,7 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	fmtout.o \
 	printk.o \
 	doprnt.o \
+	vc.o \
 	queue.o \
 	naut_string.o \
 	spinlock.o \
@@ -93,6 +94,7 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	netdev.o \
 	gpudev.o \
 		fs.o \
+		shell.o \
 	fprintk.o \
 		dtoa.o \
 	devicetree.o \

@@ -28,11 +28,18 @@
 #define __CPU_STATE
 
 #ifdef NAUT_CONFIG_RISCV_HOST
+
+//
+// This code assumes that tp is pointing to
+// the struct cpu of the running cpu and it assumes the
+// specific layout of struct cpu
+//
+
 static inline void *__cpu_state_get_cpu()
 {
-    uint64_t x;
-    asm volatile("mv %0, tp" : "=r" (x) );
-    return (void *) x;
+    uint64_t tp;
+    asm volatile("mv %0, tp" : "=r" (tp) );
+    return (void *) tp;
 }
 #else
 #include <nautilus/msr.h>
@@ -54,13 +61,10 @@ static inline void *__cpu_state_get_cpu()
 
 
 #define INL_OFFSET 8
-#define PREEMPT_DISABLE_OFFSET 10
-
 #ifdef NAUT_CONFIG_RISCV_HOST
-#undef INL_OFFSET
-#define INL_OFFSET 8
-#undef PREEMPT_DISABLE_OFFSET
 #define PREEMPT_DISABLE_OFFSET 12
+#else
+#define PREEMPT_DISABLE_OFFSET 10
 #endif
 
 static inline void preempt_disable() 
