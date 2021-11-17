@@ -85,7 +85,7 @@ static uint64_t timer_count = 0;
 
 uint32_t apic_realtime_to_ticks(struct apic_dev *apic, uint64_t ns)
 {
-    return ((ns*1000000000ULL)/RISCV_CLOCKS_PER_SECOND);
+    return ((ns*1000000ULL)/RISCV_CLOCKS_PER_SECOND);
 }
 
 uint64_t apic_cycles_to_realtime(struct apic_dev *apic, uint64_t cycles)
@@ -95,7 +95,7 @@ uint64_t apic_cycles_to_realtime(struct apic_dev *apic, uint64_t cycles)
 
 void apic_set_oneshot_timer(struct apic_dev *apic, uint32_t ticks) 
 {
-    printk("set timer for ticks=%d\n", ticks);
+    printk("\nSetting timer with ticks=%d...\n");
     if (!ticks) {
 	ticks=1; 
     }
@@ -166,5 +166,10 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
     }
 
     return 0;
+}
+
+void plic_timer_handler(void)
+{
+    apic_timer_handler(0,0,0);
 }
 

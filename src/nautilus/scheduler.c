@@ -3405,7 +3405,11 @@ static uint64_t cur_time()
 
 uint64_t nk_sched_get_realtime() 
 { 
+#ifdef NAUT_CONFIG_RISCV_HOST
+    return r_time();
+#else
     return cur_time();
+#endif
 }
 
 static void reset_state(rt_thread *thread)
