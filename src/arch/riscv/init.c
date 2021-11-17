@@ -288,7 +288,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   mm_boot_kmem_cleanup();
 
-  nk_sched_start();
+  // nk_sched_start();
 
   sti();
 
