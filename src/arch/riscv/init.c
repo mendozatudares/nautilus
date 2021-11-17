@@ -290,12 +290,12 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   /* interrupts are now on */
 
+  /* set the timer with sbi :) */
+  // sbi_set_timer(r_time() + TICK_INTERVAL);
+
   while(1) {
     my_monitor_entry();
   }
-
-  /* set the timer with sbi :) */
-  // sbi_set_timer(r_time() + TICK_INTERVAL);
 
   // start_secondary(&(naut->sys));
 

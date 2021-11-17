@@ -437,12 +437,15 @@ static int execute_paging(char command[])
   return 0;
 }
 
+#define PTE_V (1L << 0) // valid
+#define PTE2PA(pte) (((pte) >> 10) << 12)
+
 static int execute_pf(char command[])
 {
   print("executing test\n\r");
-  // __asm__ __volatile__("movl %cr3,%eax;\n"
- 	// 	       "andl $0xfffffffffffffffe, 0(%eax);\n"
-  // 		       "mov (0x3fffff), %eax;");
+  uint64_t * page_table = (uint64_t *)(nk_paging_default_satp() << 12);
+  page_table[3] &= ~PTE_V;
+  volatile uint64_t x = *((uint64_t *)PTE2PA(page_table[3]));
   print("test executed successfully\n\r");
   return 0;
 }

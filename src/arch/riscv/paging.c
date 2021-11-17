@@ -87,7 +87,7 @@ __construct_tables_1g (pml4e_t * pml, ulong_t bytes)
         pte_t * pte = (pte_t*)(pml + i);
 
         *pte = PA2PTE(addr) | PTE_R | PTE_W | PTE_X | PTE_V;
-        printk("pte[%d] at %p = %llx\n", i, pte, *pte);
+        DEBUG_PRINT("  pte[%d] at %p = %p\n", i, pte, *pte);
 
         ++filled_pgs;
         addr += PAGE_SIZE_1GB;
