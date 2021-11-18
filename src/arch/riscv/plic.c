@@ -85,21 +85,24 @@ static uint64_t timer_count = 0;
 
 uint32_t apic_realtime_to_ticks(struct apic_dev *apic, uint64_t ns)
 {
-    return ((ns*1000000ULL)/RISCV_CLOCKS_PER_SECOND);
+
+    return ((ns*1000000000ULL)/RISCV_CLOCKS_PER_SECOND);
 }
 
 uint64_t apic_cycles_to_realtime(struct apic_dev *apic, uint64_t cycles)
 {
-    return (cycles/RISCV_CLOCKS_PER_SECOND);
+    return 1000000000ULL*(cycles/RISCV_CLOCKS_PER_SECOND);
 }
 
 void apic_set_oneshot_timer(struct apic_dev *apic, uint32_t ticks) 
 {
-    printk("\nSetting timer with ticks=%d...\n");
     if (!ticks) {
-	ticks=1; 
-    }
+    sbi_set_timer(r_time() + 1);
+    } else if (ticks == -1 && current_ticks != -1) {
+    sbi_set_timer(-1);
+    } else {
     sbi_set_timer(r_time() + ticks);
+    }
     timer_set = 1;
     current_ticks = ticks;
 }

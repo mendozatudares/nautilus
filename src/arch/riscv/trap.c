@@ -27,7 +27,8 @@ void kernel_trap(struct nk_regs *regs) {
 		  // timer interrupt
 			// on nautilus, we don't actaully want to set a new timer yet, we just
 			// want to call into the scheduler, which schedules the next timer.
-      // plic_timer_handler();
+      // printk("tick %4d ", ++ticks);
+      plic_timer_handler();
 		} else if (nr == 9) {
       // supervisor external interrupt
       // first, we claim the irq from the PLIC

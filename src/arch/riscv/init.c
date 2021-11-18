@@ -288,7 +288,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   mm_boot_kmem_cleanup();
 
-  // nk_sched_start();
+  nk_sched_start();
 
   sti();
 
@@ -311,9 +311,9 @@ void init(unsigned long hartid, unsigned long fdt) {
   /* set the timer with sbi :) */
   // sbi_set_timer(r_time() + TICK_INTERVAL);
 
-  while(1) {
-    my_monitor_entry();
-  }
+  // while(1) {
+  //   my_monitor_entry();
+  // }
 
   // start_secondary(&(naut->sys));
 
