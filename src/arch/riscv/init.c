@@ -324,7 +324,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
 /* Faking some vc stuff */
 
-uint16_t 
+uint16_t
 vga_make_entry (char c, uint8_t color)
 {
     uint16_t c16 = c;

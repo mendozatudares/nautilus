@@ -1,15 +1,13 @@
 #!/bin/bash
-if [[ "$*" == *"clean"* ]]; then
-  make clean
-fi
 
-CROSS_COMPILE=riscv64-unknown-elf-
+ARCH=riscv
+CROSS_COMPILE=/opt/homebrew/bin/riscv64-unknown-elf-
 
 if [[ "$TOOLCHAIN_OVERRIDE" != "" ]]; then
-	CROSS_COMPILE=$TOOLCHAIN_OVERRIDE
+  CROSS_COMPILE=$TOOLCHAIN_OVERRIDE
 fi
 
-ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j #V=1
+ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j $* #V=1"
 
 if [[ "$*" == *"qemu"* ]]; then
   echo 'Starting QEMU...'
