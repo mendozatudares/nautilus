@@ -23,7 +23,7 @@
  */
 
 #include <dev/sifive.h>
-
+#include <arch/riscv/sbi.h>
 #define ITERATIONS 100
 #define NUM_READINGS 100.0
 
@@ -153,7 +153,16 @@ static void wait_for_command(char *buf, int buffer_size)
   int curr = 0;
   while (1)
   {
-    key = serial_getchar();
+
+
+		struct sbiret ret = sbi_call(SBI_CONSOLE_GETCHAR);
+		key = ret.error;
+
+		// printk("e: %d, v: %d\n", ret.error, ret.value);
+
+		// continue;
+
+    // key = serial_getchar();
     // key = ps2_wait_for_key();
     // uint16_t key_encoded = kbd_translate_monitor(key);
     //vga_clear_screen(vga_make_entry(key, vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND)));
@@ -170,9 +179,8 @@ static void wait_for_command(char *buf, int buffer_size)
 
       if (curr < buffer_size - 1)
       {
-        serial_putchar(key_char);
-        buf[curr] = key_char;
-        curr++;
+				printk("%c", key_char);
+        buf[curr++] = key_char;
       }
       else
       {
