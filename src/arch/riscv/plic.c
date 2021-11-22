@@ -94,7 +94,7 @@ uint64_t apic_cycles_to_realtime(struct apic_dev *apic, uint64_t cycles)
     return 1000000000ULL*(cycles/RISCV_CLOCKS_PER_SECOND);
 }
 
-void apic_set_oneshot_timer(struct apic_dev *apic, uint32_t ticks) 
+void apic_set_oneshot_timer(struct apic_dev *apic, uint32_t ticks)
 {
     if (!ticks) {
     sbi_set_timer(r_time() + 1);
@@ -149,7 +149,7 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
     // note that the low-level interrupt handler code in excp_early.S
     // takes care of invoking the scheduler if needed, and the scheduler
     // will in turn change the time after we leave - it may set the
-    // timer to expire earlier.  The scheduler can refer to 
+    // timer to expire earlier.  The scheduler can refer to
     // the apic to determine that it is being invoked in timer interrupt
     // context.   In this way, it can differentiate:
     //   1. invocation from a thread
@@ -159,9 +159,9 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
     // can fire before the expected elapsed time expires.  If the scheduler
     // doesn't reset the timer when this happens, the scheduler may be delayed
     // as far as the next interrupt or cooperative rescheduling request,
-    // breaking real-time semantics.  
+    // breaking real-time semantics.
 
-    if (time_to_next_ns == -1) { 
+    if (time_to_next_ns == -1) {
 	// indicates "infinite", which we turn into the maximum timer count
 	apic_set_oneshot_timer(apic,-1);
     } else {

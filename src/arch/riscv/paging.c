@@ -51,6 +51,8 @@
 #define PTE_W (1L << 2)
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // 1 -> user can access
+#define PTE_A (1L << 6)
+#define PTE_D (1L << 7)
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64_t)pa) >> 12) << 10)
@@ -86,7 +88,7 @@ __construct_tables_1g (pml4e_t * pml, ulong_t bytes)
     for (i = 0; i < NUM_PML4_ENTRIES && filled_pgs < npages; i++) {
         pte_t * pte = (pte_t*)(pml + i);
 
-        *pte = PA2PTE(addr) | PTE_R | PTE_W | PTE_X | PTE_V;
+        *pte = PA2PTE(addr) | PTE_R | PTE_W | PTE_X | PTE_V | PTE_A | PTE_D;
         DEBUG_PRINT("  pte[%d] at %p = %p\n", i, pte, *pte);
 
         ++filled_pgs;
@@ -131,7 +133,7 @@ kern_ident_map (struct nk_mem_info * mem, ulong_t fdt)
     printk("Remapping phys mem [%p - %p] with 1G pages\n",
             (void*)0,
             (void*)(last_pfn<<PAGE_SHIFT));
-    
+
     construct_ident_map(pml, lps, last_pfn<<PAGE_SHIFT_2MB);
 
     default_satp = (ulong_t)MAKE_SATP(pml);

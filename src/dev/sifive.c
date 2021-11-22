@@ -365,7 +365,7 @@ static int serial_do_read(void *state, uint8_t *dest)
 
     int uart_getchar()
 
-    
+
 
  out:
     spin_unlock_irq_restore(&s->input_lock, flags);
@@ -407,7 +407,7 @@ static void serial_putchar_early (uchar_t c)
     int flags = spin_lock_irq_save(&sifive_lock);
 
     if (c == '\n') {
-        
+
         /* wait for transmitter holding register ready */
         while (regs(sifive_io_addr)->txdata.isFull);
 

@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xstack.sandia.gov/hobbes
  *
  * Copyright (c) 2015, Kyle C. Hale <khale@cs.iit.edu>
- * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org> 
+ * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
@@ -69,7 +69,7 @@ struct nk_regs {
 #define PAUSE_WHILE(x) \
     while ((x)) { \
         pause(); \
-    } 
+    }
 
 #define mbarrier()    asm volatile("fence.i":::"memory")
 
@@ -176,7 +176,7 @@ rdtsc (void)
 
 #define rdtscp() rdtsc
 
-static inline uint64_t 
+static inline uint64_t
 read_rflags (void)
 {
     uint64_t x;
@@ -187,7 +187,7 @@ read_rflags (void)
 #define SSTATUS_SIE (1L << 1)
 #define RFLAGS_IF   SSTATUS_SIE
 
-static inline void 
+static inline void
 sti (void)
 {
     uint64_t x = read_rflags() | SSTATUS_SIE;
@@ -195,7 +195,7 @@ sti (void)
 }
 
 
-static inline void 
+static inline void
 cli (void)
 {
     uint64_t x = read_rflags() & ~SSTATUS_SIE;
@@ -203,13 +203,13 @@ cli (void)
 }
 
 static inline void
-halt (void) 
+halt (void)
 {
     asm volatile ("wfi");
 }
 
 
-static inline void 
+static inline void
 invlpg (unsigned long addr)
 {
 
@@ -217,7 +217,7 @@ invlpg (unsigned long addr)
 
 
 static inline void
-wbinvd (void) 
+wbinvd (void)
 {
 
 }
