@@ -286,7 +286,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   /* we now switch away from the boot-time stack */
   naut = smp_ap_stack_switch(get_cur_thread()->rsp, get_cur_thread()->rsp, naut);
 
-  mm_boot_kmem_cleanup();
+  /* mm_boot_kmem_cleanup(); */
 
   nk_sched_start();
 
@@ -294,7 +294,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   /* interrupts are now on */
 
-  // nk_vc_init();
+  /* nk_vc_init(); */
 
   nk_fs_init();
 

@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xtack.sandia.gov/hobbes
  *
  * Copyright (c) 2015, Kyle C. Hale <kh@u.northwestern.edu>
- * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org> 
+ * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
@@ -53,7 +53,7 @@ bool dtb_node_get_rsv_ram (struct dtb_node *n) {
     return true;
 }
 
-void 
+void
 arch_reserve_boot_regions (unsigned long mbd)
 {
     dtb_walk_devices(dtb_node_get_rsv_ram);
@@ -70,7 +70,7 @@ bool dtb_node_get_ram (struct dtb_node * n) {
 }
 
 void
-arch_detect_mem_map (mmap_info_t * mm_info, 
+arch_detect_mem_map (mmap_info_t * mm_info,
                      mem_map_entry_t * memory_map,
                      ulong_t fdt)
 {
@@ -93,13 +93,12 @@ arch_detect_mem_map (mmap_info_t * mm_info,
     memory_map[0].len  = end-start;
     memory_map[0].type = MULTIBOOT_MEMORY_AVAILABLE;
 
-    BMM_PRINT("Memory map[%d] - [%p - %p] sz:%llu <%s>\n", 
-        0, 
+    BMM_PRINT("Memory map[%d] - [%p - %p] sz:%llu <%s>\n",
+        0,
         start,
         end,
-				end - start,
+		end - start,
         mem_region_types[memory_map[0].type]);
-    
     mm_info->usable_ram += end-start;
 
     if (end > (mm_info->last_pfn << PAGE_SHIFT)) {

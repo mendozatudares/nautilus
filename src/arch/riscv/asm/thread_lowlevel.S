@@ -11,7 +11,7 @@
 
 #define CTX_SIZE (13 * SZREG)
 
-/* 
+/*
  * We come in like this:
  * ----------
  * thread_ptr
@@ -72,7 +72,7 @@ ENTRY(nk_thread_switch_intr_entry)
 // We also want to save the cost of any state saves
 // We should get here via a JUMP
 // Note that the first three instructions establish the new stack
-// and thread structure	
+// and thread structure
 ENTRY(nk_thread_switch_on_exit)
     REG_S a0,  ROFF(0, tp)       // make the thread pointer the current thread
     REG_L sp,  ROFF(0, a0)       // load its stack pointer
@@ -112,12 +112,12 @@ ENTRY(nk_thread_switch_exit_helper)
 	// reset preemption disable level
     li t0, 0
     sw t0, 12(tp)
-    
+
 	// note that interrupts are still off
 
 	// We now mark ourselves as toast for the reaper
     sw a2, ROFF(0,  a1)
-	
+
 	// At this point, we are racing with the reaper on a different core,
 	// which might take away our stack.  However, we have interrupts
 	// off locally, so as long as *we* don't use the stack, we should be OK

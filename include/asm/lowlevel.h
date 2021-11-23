@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xtack.sandia.gov/hobbes
  *
  * Copyright (c) 2015, Kyle C. Hale <kh@u.northwestern.edu>
- * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org> 
+ * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
@@ -23,6 +23,13 @@
 #ifndef __LOWLEVEL_H__
 #define __LOWLEVEL_H__
 
+
+#ifdef NAUT_CONFIG_RISCV_HOST
+#define ENTRY(x)   \
+    .globl x;      \
+    .align 4, 0x00,0x01;\
+    x:
+#else
 #define GEN_NOP(x) .byte x
 
 #define NOP_1BYTE 0x90
@@ -38,12 +45,13 @@
     .globl x;      \
     .align 4, 0x90;\
     x:
+#endif
 
 #define GLOBAL(x)  \
     .globl x;      \
     x:
 
 #define END(x) \
-    .size x, .-x 
+    .size x, .-x
 
 #endif
