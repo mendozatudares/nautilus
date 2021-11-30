@@ -33,7 +33,7 @@
 
 #if NAUT_CONFIG_USE_NOELLE
 
-#include "Noelle.hpp"
+#include "noelle/core/Noelle.hpp"
 
 
 #define STORE_GUARD 1
