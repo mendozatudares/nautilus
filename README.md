@@ -1,20 +1,24 @@
-![Nautilus Logo](http://cs.iit.edu/~khale/nautilus/img/nautilus_logo.png "Nautilus Logo")
+
+![Nautilus Logo](https://lh5.googleusercontent.com/8BkFSH-06MvfV9hqSk3D5VJQWPabgfMrlkZOcd6unP2AWYZi9ZOc5sgFtXMhyAHRPHJoMtv87jxwE9214Hx2YqmcFppPnYgpTvyau1wwwhHUee5YEn5Sl0to4LNFMg9D-Q=w1280 "Nautilus Logo")
 [![Build Status](https://travis-ci.com/HExSA-Lab/nautilus.svg?branch=master)](https://travis-ci.com/HExSA-Lab/nautilus)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/17390/badge.svg)](https://scan.coverity.com/projects/hexsa-lab-nautilus)
 [![CodeFactor](https://www.codefactor.io/repository/github/hexsa-lab/nautilus/badge)](https://www.codefactor.io/repository/github/hexsa-lab/nautilus)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/HExSA-Lab/nautilus.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/HExSA-Lab/nautilus/alerts/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Nautilus
-Nautilus is an example of an Aerokernel, a very thin kernel-layer exposed 
-(much like Unikernel) directly to a runtime system and/or application. 
-Aerokernels are suited particularly well for *parallel* runtimes that need fine-grained,
-explicit control of the machine to squeeze every bit of performance out of it. Note that
-an Aerokernel does not, by default, have a user-mode! There are several reasons for this, 
+# Nautilus w/ CARAT CAKE
+Nautilus is an example of an Aerokernel, a very thin kernel-layer exposed
+(much like Unikernel) directly to a runtime system and/or application.
+An Aerokernel does not, by default, have a user-mode! There are several reasons for this,
 simplicity and performance among the most important. Furthermore, there are no heavy-weight
-processes---only threads, all of which share an address space. Therefore, Nautilus is also an 
+processes---only threads, all of which share an address space. Therefore, Nautilus is also an
 example of a single address-space OS (SASOS). The *runtime* can implement user-mode features
 or address space isolation if this is required for its execution model.
+
+This version of Nautilus has been modified to accommodate running with a CARAT address space abstraction (CARAT CAKE).
+CARAT CAKE is an extension of work found in [PLDI '20](https://users.cs.northwestern.edu/~simonec/files/Research/papers/MODERN_PLDI_2020.pdf) with the paper describing this work appearing in [ASPLOS '22](https://asplos-conference.org/).
+
+The concept of CARAT CAKE is to replace paging with a system that can operate using only physical addresses. Doing this enables the underlying system to have significant energy savings as well as allow new performance minded optimizations in both the micro-architecture and in software.
 
 
 ## Table of Contents
@@ -25,8 +29,6 @@ or address space isolation if this is required for its execution model.
 - [Building](#building)
 - [Using QEMU](#using-qemu)
 - [Using BOCHS](#using-bochs)
-- [Using Gem5](#using-gem5)
-- [Rapid Development](#rapid-development)
 - [Resources](#resources)
 - [Maintainers](#maintainers)
 - [License](#license)
@@ -37,26 +39,28 @@ or address space isolation if this is required for its execution model.
 We call the combination of an Aerokernel and the runtime/application using it
 a Hybrid Runtime (HRT), in that it is both a runtime *and* a kernel, especially regarding its
 ability to use the full machine and determine the proper abstractions to the raw hardware
-(if the runtime developer sees a mismatch with his/her needs and the Aerokernel mechanisms, 
-they can be overridden). 
+(if the runtime developer sees a mismatch with his/her needs and the Aerokernel mechanisms,
+they can be overridden).
 
 If stronger isolation or more complete POSIX/Linux compatibility is required, it is useful
 to run the HRT in the context of a Hybrid Virtual Machine. An HVM allows a virtual machine
-to split the (virtual) hardware resources among a regular OS (ROS) and an HRT. The HRT portion of the 
-HVM can then be seen as a kind of software accelerator. Note that because of the simplicity 
+to split the (virtual) hardware resources among a regular OS (ROS) and an HRT. The HRT portion of the
+HVM can then be seen as a kind of software accelerator. Note that because of the simplicity
 of the hardware abstractions in a typical HRT, virtualization overheads are much, much less
-significant than in, e.g. a Linux guest. 
+significant than in, e.g. a Linux guest.
 
 ## Prerequisites
 
-- `gcc` cross compiler or `clang` (experimental) 
+- `clang/llvm 9.0+` (https://releases.llvm.org/download.html)
 - `grub` version >= ~2.02
 - `xorriso` (for creating ISO images)
 - `qemu` or `bochs` (for testing and debugging)
+- `NOELLE` (https://github.com/scampanoni/noelle)
+- `wllvm or gclang` (https://github.com/travitch/whole-program-llvm) (https://github.com/SRI-CSL/gllvm)
 
 ## Hardware Support
 
-Nautilus works with the following hardware:
+Nautilus w/ CARAT CAKE works with the following hardware:
 
 - x86_64 machines (AMD and Intel)
 - Intel Xeon Phi, both KNC and KNL using [Philix](http://philix.halek.co) for easy booting
@@ -69,23 +73,20 @@ environment using [Gem5](http://gem5.org/Main_Page)
 
 First, configure Nautilus by running either
 `make menuconfig` or `make defconfig`. The latter
-generates a default configuration for you. The former 
+generates a default configuration for you. The former
 allows you to customize your kernel build.
 
-Select any options you require, then 
-run `make` to build the HRT binary image. To make a bootable CD-ROM, 
-run `make isoimage`. If you see weird errors, chances are there
-is something wrong with your GRUB2 toolchain (namely, `grub-mkrescue`). Make sure `grub-mkrescue`
-knows where its libraries are, especially if you've installed the
-latest GRUB from source. Use `grub-mkrescue -d`. We've run into issues with naming of
-the GRUB2 binaries, in which case a workaround with symlinks was sufficient.
+For running CARAT CAKE, a pre-made configuration file has been created and is located in ./configs/karat.config
+The user can simply run the following command to be set up for a CARATized version of Nautilus from the root directory:
+`$> cp $./configs/karat.config ./.config`
 
-On newer systems, Grub 2 renamed the binaries, so you might want to symlink to
-them, e.g. as follows:
 
-```Shell
-$> ln -s /usr/bin/grub2-mkrescue /usr/bin/grub-mkrescue
-```
+Before running the next command, ensure that you have downloaded/installed/enabled the prerequisites (mainly clang, wllvm, and NOELLE).
+To compile a CARATized Nautilus, from the root directory run:
+
+`$> ./kernel_build_with_llvm_and_noelle.sh`
+
+
 
 
 ## Using QEMU
@@ -153,7 +154,7 @@ invocation attaches both a virtual e1000 fast ethernet card and a virtio
 network interface:
 
 ```Shell
-$> sudo qemu-system-x86_64 -smp 2 \ 
+$> sudo qemu-system-x86_64 -smp 2 \
                            -m 2048 \
                            -vga std \
                            -serial stdio \
@@ -169,10 +170,10 @@ $> sudo qemu-system-x86_64 -smp 2 \
 
 ## Using BOCHS
 
-While we recommend using QEMU, sometimes it is nice to use the native debugging 
+While we recommend using QEMU, sometimes it is nice to use the native debugging
 support in [BOCHS](http://bochs.sourceforge.net/). We've used BOCHS successfully with version 2.6.8. You must have
 a version of BOCHS that is built with x86_64 support, which does not seem to be the
-default in a lot of package repos. We had to build it manually. You probably also 
+default in a lot of package repos. We had to build it manually. You probably also
 want to enable the native debugger.
 
 Here is a BOCHS config file (`~/.bochsrc`) that we used successfully:
@@ -186,85 +187,9 @@ cpuid: level=6, mmx=1, level=6, x86_64=1, 1g_pages=1
 megs: 2048
 ```
 
-## Using Gem5
-
-You can configure and build Nautilus for execution in the [Gem5
-architectural simulator](http://gem5.org).  Note that Gem5 is very
-slow.  Simulated time is 2-3 orders of magnitude slower than
-real-time.  If you care about interaction, and not simulation
-accuracy, configure Nautilus to override the APIC timing calibration
-results, a suboption under the Gem5 target architecture.  Once you
-have built the kernel for the Gem5 target architecture, you can copy
-`nautilus.bin` to `~gem5/binaries`, and run it using Gem5's example full
-system configuration (`~gem5/configs/example/fs.py`), like this (for two
-cpus):
-
-```Shell
-$> cd ~gem5
-$> build/X86/gem5.opt -d run.out configs/example/fs.py -n 2
-```
-
-Nautilus on Gem5 follows Gem5's boot model for Linux.  If you don't
-want to change anything, just symlink `binaries/nautilus.bin` as the
-linux kernel executable the example config expects.  Alternatively,
-you can modify the config like this, or do something similar in your
-own config:
-
-```
-     test_sys = makeLinuxX86System(...)
-+++  test_sys.kernel = binary('nautilus.bin')
-```
-
-Once Gem5 is running, you can debug Nautilus in the following
-Gem5-standard ways:
-
-```Shell
-$> telnet localhost 3456  # access serial0 / com1
-```
-
-```GDB
-gdb binaries/nautilus.bin
-(gdb) target remote localhost:7000 # attach debugger to cpu 0
-(gdb) set architecture i386:x86-64
-(gdb) ...
-```
-
-Note that if you want to interact with Nautilus running on Gem5, you
-will need to use the virtual console on a char device (`serial0`) to
-do so.   If you don't want to interact, please see the `autoexec.bat`
-startup script feature in `src/arch/gem5/init.c`.
-
-## Rapid Development
-
-If you'd like to get started quickly with development, a good way is to use 
-[Vagrant](https://www.vagrantup.com/). We've provided a `Vagrantfile` in
-the top-level Nautilus directory for provisioning a Vagrant VM which has
-pretty much everything you need to develop and run Nautilus. This setup
-currently only works for VMWare Fusion/Desktop (which requires the paid Vagrant
-VMWare provider). We hope to get this working for VirtualBox, and perhaps AWS
-soon. If you already have Vagrant installed, to get started you can do the
-following from the top-level Nautilus directory:
-
-```Shell
-$> vagrant up
-```
-
-This will run for several minutes and provision a VM with all the required
-packages. It will automatically clone the latest version of Nautilus and build
-it. To connect to the VM, you can ssh into it, and immediately start running
-Nautilus. There is a demo put in the VM's nautilus directory which will boot
-Nautilus in QEMU with a virtual console on a serial port and the QEMU monitor in
-another `tmux` pane:
-
-```Shell
-$> vagrant ssh
-[vagrant@localhost] cd nautilus
-[vagrant@localhost] . ./demo
-```
-
 ## Resources
 
-You can find publications related to Nautilus and HRTs/HVMs at 
+You can find publications related to Nautilus and HRTs/HVMs at
 http://halek.co, http://pdinda.org, http://interweaving.org,
 and the lab websites below.
 
@@ -280,13 +205,20 @@ Our labs:
 
 ## Maintainers
 
+### CARAT CAKE
+Primary development done by:
+[Brian Suchy](http://briansuchy.com), [Souradip Ghosh](https://souradipghosh.com/), [Drew Kersnar](https://www.linkedin.com/in/dakersnar/), [Siyuan Chai](https://schai.me/), [Aaron Nelson](https://www.linkedin.com/in/a-r-n/), [Zhen Huang](https://www.linkedin.com/in/zhen-huang-9706/), [Michael Cuevas](https://mcuevas.org/), [Alex Bernat](https://github.com/alexbernat), [Gaurav Chaudhary](https://www.linkedin.com/in/gauravchaudhary1993/), [Nikos Hardavellas](https://users.cs.northwestern.edu/~hardav/), [Simone Campanoni](https://users.cs.northwestern.edu/~simonec/#gsc.tab=0), and [Peter Dinda](http://pdinda.org/)
+
+### Nautilus
 Primary development is done by [Kyle Hale](http://halek.co) and [Peter
-Dinda](http://pdinda.org). However, many people contribute to the development
+Dinda](http://pdinda.org).
+
+However, many people contribute to the development
 and maintenance of Nautilus. Please see [this
 page](http://cs.iit.edu/~khale/nautilus/) as well as comments in the headers
-and the commit logs for details.   
+and the commit logs for details.
 
-## License 
+## License
 [![MIT License](http://seawisphunter.com/minibuffer/api/MIT-License-transparent.png)](https://github.com/HExSA-Lab/nautilus/blob/master/LICENSE.txt)
 
 ## Acknowledgements
@@ -307,4 +239,4 @@ managed and operated by Sandia Corporation, a wholly owned subsidiary of
 Lockheed Martin Corporation, for the U.S. Department of Energy's [National
 Nuclear Security Administration](https://www.energy.gov/nnsa/national-nuclear-security-administration) under contract [DE-AC04-94AL85000](https://govtribe.com/award/federal-contract-award/definitive-contract-deac0494al85000).
 
-[Kyle C. Hale](http://halek.co) © 2018 
+[Kyle C. Hale](http://halek.co) © 2018
