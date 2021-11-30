@@ -87,6 +87,24 @@ To compile a CARATized Nautilus, from the root directory run:
 `$> ./kernel_build_with_llvm_and_noelle.sh`
 
 
+## Additional Artifact Availability Information for CARAT CAKE
+For artifact availability purposes, we have also included the benchmark suites, scripts, and
+and an empty file system image -- all of which were used to build and test CARAT CAKE.
+
+The benchmark suites are:
+- NAS, located in `./src/test/NAS`
+- Parsec, located in `./src/test/parsec-3.0`
+
+Please see the README files in both directories that log the minor changes
+required to the benchmarks so they are compatible with the CARAT CAKE/Nautilus
+compilation pipeline.
+
+Scripts used to build the benchmarks (with and without instrumentation from the CARAT 
+CAKE compiler) are located in `./parsec_and_nas_build_scripts`.
+
+Finally, an additional "run" script is included that runs Nautilus under QEMU with
+KVM enabled, serial output enabled, and debug output enabled. This script is in 
+`run_nautilus_qemu_kvm.sh`.
 
 
 ## Using QEMU
