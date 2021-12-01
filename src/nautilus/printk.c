@@ -49,6 +49,7 @@
 #define do_putchar(x) do { nk_vc_putchar(x);} while (0)
 #define do_puts(x)    do { nk_vc_puts(x); } while (0)
 #else
+#include <dev/sifive.h>
 // All output is handled via UART
 #define do_putchar(x) do { serial_putchar(x); } while (0)
 #define do_puts(x)    do { serial_write(x); serial_putchar('\n'); } while (0)
@@ -102,7 +103,7 @@ printk_char (char * arg, int c)
 }
 
 
-int 
+int
 vprintk (const char * fmt, va_list args)
 {
 	struct printk_state state;
@@ -123,7 +124,7 @@ vprintk (const char * fmt, va_list args)
 
 
  __attribute__((noreturn))
-void 
+void
 panic (const char * fmt, ...)
 {
 #ifdef NAUT_CONFIG_ENABLE_MONITOR
@@ -134,9 +135,9 @@ panic (const char * fmt, ...)
     va_start(mon_arg, fmt);
     vsprintf(buf,fmt, mon_arg);
     va_end(mon_arg);
-    
+
     nk_monitor_panic_entry(buf);
-    
+
 #endif
 
     va_list arg;
@@ -1016,14 +1017,14 @@ qualifier:
 	case 'F':
 	case 'G':
 	case 'E':
-	    if (spec->qualifier == 'L' || spec->qualifier == 'l') { 
+	    if (spec->qualifier == 'L' || spec->qualifier == 'l') {
 		spec->type = FORMAT_TYPE_DOUBLE;
 	    } else {
 		spec->type = FORMAT_TYPE_FLOAT;
 	    }
 	    spec->fp_fmt = *fmt;
 	    return ++fmt - start;
-	    
+
 	case 'c':
 		spec->type = FORMAT_TYPE_CHAR;
 		return ++fmt - start;
@@ -1239,7 +1240,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 		    char *c;
 		    int numdigits, prec;
 		    int k;
-		    
+
 		    if (spec.precision != -1) {
 			numdigits = spec.precision;
 		    } else {
@@ -1250,14 +1251,14 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 		    double d = (double) va_arg(args,double);
 
 		    dtoa_printf_helper(d,spec.fp_fmt,numdigits,prec,dbuf,160);
-		    
+
 		    for (c=dbuf ; *c && str<(end-1); str++, c++) {
 			*str = *c;
 		    }
 		    *str=0;
 		}
 		    break;
-		    
+
 
 		default:
 			switch (spec.type) {
@@ -1465,7 +1466,7 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 		if (!*fmt)
 			break;
 		++fmt;
-		
+
 		/* skip this conversion.
 		 * advance both strings to next white space
 		 */
@@ -1554,7 +1555,7 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 			break;
 		case '%':
 			/* looking for '%' in str */
-			if (*str++ != '%') 
+			if (*str++ != '%')
 				return num;
 			continue;
 		default:

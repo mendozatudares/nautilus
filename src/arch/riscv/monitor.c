@@ -1,29 +1,31 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xstack.sandia.gov/hobbes
  *
  * Copyright (c) 2020, Drew Kersnar <drewkersnar2021@u.northwestern.edu>
  * Copyright (c) 2020, The Interweaving Project <http://interweaving.org>
- *                     The V3VEE Project  <http://www.v3vee.org> 
+ *                     The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
  * Authors: Drew Kersnar <drewkersnar2021@u.northwestern.edu>
- *          
+ *
  * This is free software.  You are permitted to use,
  * redistribute, and modify it as specified in the file "LICENSE.txt".
  */
 
-#include <dev/sifive.h>
 #include <arch/riscv/sbi.h>
+#include <dev/sifive.h>
+
+
 #define ITERATIONS 100
 #define NUM_READINGS 100.0
 
@@ -76,7 +78,7 @@ static uint8_t inb (uint64_t addr)
 static void my_memset(void *b,uint8_t val, uint32_t count){
 	uint32_t i;
 	for(i=0;i<count;i++){
-	  ((uint8_t*)b)[i]=val;	
+	  ((uint8_t*)b)[i]=val;
 	}
 }
 
@@ -95,7 +97,7 @@ static int my_strlen(char *b)
   return count;
 }
 
-int my_strcmp (const char * s1, const char * s2) 
+int my_strcmp (const char * s1, const char * s2)
 {
     while (1) {
     int cmp = (*s1 - *s2);
@@ -132,7 +134,7 @@ static void print(char *b)
 // so we can indicate nonexistence (via -1)
 //
 // A "keycode" consists of the translated key (lower 8 bits)
-// combined with an upper byte that reflects status of the 
+// combined with an upper byte that reflects status of the
 // different modifier keys
 typedef uint16_t nk_keycode_t;
 typedef uint16_t nk_scancode_t;
@@ -172,14 +174,14 @@ static void wait_for_command(char *buf, int buffer_size)
       // return completed command
       buf[curr] = 0;
       return;
-    } 
-    
+    }
+
     if (key != -1) {
       char key_char = (char)key;
 
       if (curr < buffer_size - 1)
       {
-				printk("%c", key_char);
+        DB(key_char);
         buf[curr++] = key_char;
       }
       else
@@ -203,7 +205,7 @@ static int is_hex_addr(char *addr_as_str)
   if(str_len > 18) {
     return 0;
   }
-  
+
   if((addr_as_str[0] != '0') || (addr_as_str[1] != 'x')) {
     return 0;
   }
@@ -223,7 +225,7 @@ static int is_hex_addr(char *addr_as_str)
 
 static uint64_t get_hex_addr(char *addr_as_str)
 {
-  
+
   uint64_t addr = 0;
   int power_of_16 = 1;
   // iterate backwards from the end of the address to the beginning, stopping before 0x
@@ -231,7 +233,7 @@ static uint64_t get_hex_addr(char *addr_as_str)
     char curr = addr_as_str[i];
     if(curr >= '0' && curr <= '9')  {
       addr += (curr - '0')*power_of_16;
-    } 
+    }
     else if(curr >= 'A' && curr <= 'F') {
       addr += (curr - 'A' + 10)*power_of_16;
     }
@@ -241,7 +243,7 @@ static uint64_t get_hex_addr(char *addr_as_str)
       // something broken
       //ASSERT(false);
     }
-    
+
     power_of_16*=16;
   }
   return addr;
@@ -256,7 +258,7 @@ static int is_dec_addr(char *addr_as_str)
   // // 64 bit addresses can't be larger than 16 hex digits, 18 including 0x
   // if(str_len > 18) {
   //   return 0;
-  // } 
+  // }
   // TODO: check if dec_addr too big
 
   for(int i = 0; i < str_len; i++) {
@@ -283,7 +285,7 @@ static uint64_t get_dec_addr(char *addr_as_str)
       // something broken
       //ASSERT(false);
     }
-    
+
     power_of_10*=10;
   }
   return addr;
@@ -309,7 +311,7 @@ static int is_dr_num(char *addr_as_str)
 
 static uint64_t get_dr_num(char *num_as_str)
 {
-  
+
   uint64_t num = 0;
   int power_of_10 = 1;
   // iterate backwards from the end of the address to the beginning, stopping before 0x
@@ -321,7 +323,7 @@ static uint64_t get_dr_num(char *num_as_str)
       // something broken
       //ASSERT(false);
     }
-    
+
     power_of_10*=10;
   }
   return num;
@@ -577,7 +579,7 @@ static int execute_test(char command[])
 
   print("========================== PAGING ON ==========================\n\r");
   paging_on();
-  
+
   avg_cycles = 0;
   avg_sum = 0;
   for (int i=0; i<NUM_READINGS; i++)
@@ -678,7 +680,7 @@ static int execute_potential_command(char command[])
 
 static int nk_monitor_loop()
 {
-  int buffer_size = 80 * 2; 
+  int buffer_size = 80 * 2;
   char buffer[buffer_size];
 
   // Inner loop is indvidual keystrokes, outer loop handles commands
@@ -714,10 +716,10 @@ static uint8_t monitor_init(void)
 {
 
     monitor_init_lock();
-    
+
     // vga_copy_out(screen_saved, VGA_WIDTH*VGA_HEIGHT*2);
     // vga_get_cursor(&cursor_saved_x, &cursor_saved_y);
-    
+
     // vga_x = vga_y = 0;
     // vga_attr = vga_make_color(COLOR_PROMPT_FOREGROUND, COLOR_PROMPT_BACKGROUND);
     // vga_clear_screen(vga_make_entry(' ', vga_attr));
@@ -748,14 +750,14 @@ static void monitor_deinit(uint8_t intr_flags)
 int my_monitor_entry()
 {
     uint8_t intr_flags = monitor_init();
-    
+
     // vga_attr = vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND);
     print("+++ Boot into Monitor +++");
     // vga_attr = vga_make_color(COLOR_PROMPT_FOREGROUND, COLOR_PROMPT_BACKGROUND);
-    
+
     nk_monitor_loop();
-    
+
     monitor_deinit(intr_flags);
-    
+
     return 0;
 }

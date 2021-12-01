@@ -29,21 +29,10 @@ ENTRY(nk_thread_switch)
     REG_S sp,  ROFF(0, sp)      // save sp
 
     addi sp, sp, -SZREG
-    li t1, KERNEL_SS
-    REG_S t1,  ROFF(0, sp)      // save SS
-
-    addi sp, sp, -SZREG
     csrr t1, sstatus
     REG_S t1,  ROFF(0, sp)      // save sstatus
 
-    addi sp, sp, -SZREG
-    li t1, KERNEL_CS
-    REG_S t1, ROFF(0, sp)       // push CS seg sel
-
-    addi sp, sp, -2*SZREG
-    REG_S zero, ROFF(0, sp)     // push fake intr number
-
-    addi sp, sp, -CTX_SIZE      // SAVE_GRPS()
+    addi sp, sp, -CTX_SIZE      // SAVE_GRPS(), 13 registers
     REG_S ra,  ROFF(0,  sp)
     REG_S s0,  ROFF(1,  sp)
     REG_S s1,  ROFF(2,  sp)
@@ -62,9 +51,9 @@ ENTRY(nk_thread_switch)
     addi t0, t0, 1              // pretend we are doing an interrupt-driven switch
     sw  t0, 8(tp)               // to make the sums work out
 
-ENTRY(nk_thread_switch_intr_entry)
-    REG_L t0,  ROFF(0,  tp)
-    REG_S sp,  ROFF(0,  t0)     // save the current stack pointer
+// ENTRY(nk_thread_switch_intr_entry)
+//     REG_L t0,  ROFF(0,  tp)
+//     REG_S sp,  ROFF(0,  t0)     // save the current stack pointer
 
 // On a thread exit we must avoid saving thread state
 // or using the stack at all since at this point the thread and its stack
@@ -74,11 +63,14 @@ ENTRY(nk_thread_switch_intr_entry)
 // Note that the first three instructions establish the new stack
 // and thread structure
 ENTRY(nk_thread_switch_on_exit)
-    REG_S a0,  ROFF(0, tp)       // make the thread pointer the current thread
+
+    mv ra, a0                    // load up pointer to the next thread
+
+    REG_S a0,  ROFF(0, tp)       // make it the new current thread
     REG_L sp,  ROFF(0, a0)       // load its stack pointer
 
     REG_L ra,  ROFF(0,  sp)      // RESTORE_GPRs()
-    REG_L s0,  ROFF(1,  sp)      // load the new thread's GRPs
+    REG_L s0,  ROFF(1,  sp)      // load the new thread's GPRs
     REG_L s1,  ROFF(2,  sp)
     REG_L s2,  ROFF(3,  sp)
     REG_L s3,  ROFF(4,  sp)
@@ -91,8 +83,6 @@ ENTRY(nk_thread_switch_on_exit)
     REG_L s10, ROFF(11, sp)
     REG_L s11, ROFF(12, sp)
     addi sp, sp, CTX_SIZE
-
-    addi sp, sp, 2*SZREG        // pop off the vector and the error code
 
     lwu t0, 8(tp)               // decrement interrupt nesting level
     addi t0, t0, -1             // we may now be leaving interrupt context
@@ -116,7 +106,7 @@ ENTRY(nk_thread_switch_exit_helper)
 	// note that interrupts are still off
 
 	// We now mark ourselves as toast for the reaper
-    sw a2, ROFF(0,  a1)
+    sw a2, 0(a1)
 
 	// At this point, we are racing with the reaper on a different core,
 	// which might take away our stack.  However, we have interrupts

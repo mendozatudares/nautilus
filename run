@@ -7,9 +7,9 @@ if [[ "$TOOLCHAIN_OVERRIDE" != "" ]]; then
   CROSS_COMPILE=$TOOLCHAIN_OVERRIDE
 fi
 
-ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j $* #V=1"
-
-if [[ "$*" == *"qemu"* ]]; then
+if [[ "$*" != *"qemu"* ]]; then
+  ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j $* #V=1"
+else
   echo 'Starting QEMU...'
   printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' _
   qemu-system-riscv64 -nographic -machine sifive_u -m 2G -bios default -kernel nautilus.bin -gdb tcp::1234
