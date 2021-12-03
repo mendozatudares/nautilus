@@ -1,13 +1,5 @@
 #include <asm/lowlevel.h>
 
-/* Macros for pointer/register sizes */
-#define PTRLOG 3
-#define SZREG 8
-#define REG_S sd
-#define REG_L ld
-#define REG_SC sc.d
-#define ROFF(N, R) N* SZREG(R)
-
 #define SIE_SEIE (1L << 9)  // external
 #define SIE_STIE (1L << 5)  // timer
 #define SIE_SSIE (1L << 1)  // software

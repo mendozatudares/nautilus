@@ -1,13 +1,5 @@
 #include <asm/lowlevel.h>
 
-/* Macros for pointer/register sizes */
-#define PTRLOG 3
-#define SZREG 8
-#define REG_S sd
-#define REG_L ld
-#define REG_SC sc.d
-#define ROFF(N, R) N* SZREG(R)
-
 /*
     rax = nk_lowlevel_memset(rdi=dest, rsi=src, rdx=count)
 */

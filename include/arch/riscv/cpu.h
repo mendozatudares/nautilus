@@ -260,14 +260,6 @@ static void udelay(uint_t n) {
     }
 }
 
-/* Macros for pointer/register sizes */
-#define PTRLOG 3
-#define SZREG 8
-#define REG_S sd
-#define REG_L ld
-#define REG_SC sc.d
-#define ROFF(N, R) N* SZREG(R)
-
 /* Status register flags */
 #define SR_SIE		(0x00000002UL) /* Supervisor Interrupt Enable */
 #define SR_MIE		(0x00000008UL) /* Machine Interrupt Enable */
