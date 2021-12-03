@@ -48,6 +48,7 @@
 #include <nautilus/prog.h>
 #include <nautilus/random.h>
 #include <nautilus/semaphore.h>
+#include <nautilus/shell.h>
 #include <nautilus/smp.h>
 #include <nautilus/spinlock.h>
 #include <nautilus/task.h>
@@ -113,7 +114,7 @@ extern uint64_t _bssStart[];
 extern uint64_t _bssEnd[];
 
 extern struct naut_info *smp_ap_stack_switch(uint64_t, uint64_t,
-					     struct naut_info *);
+                         struct naut_info *);
 
 bool second_done = false;
 
@@ -154,7 +155,7 @@ int start_secondary(struct sys_info *sys) {
     __sync_synchronize();
 
     struct sbiret ret =
-	sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
+    sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
     if (ret.error != SBI_SUCCESS) {
       continue;
     }
@@ -165,18 +166,18 @@ int start_secondary(struct sys_info *sys) {
       /*
       struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i);
       switch(ret.value) {
-	      case SBI_HSM_HART_STATUS_STARTED:
-		      printk("started\n");
-		      break;
-	      case SBI_HSM_HART_STATUS_STOPPED:
-		      printk("stopped\n");
-		      break;
-	      case SBI_HSM_HART_STATUS_START_PENDING:
-		      printk("start pending\n");
-		      break;
-	      case SBI_HSM_HART_STATUS_STOP_PENDING:
-		      printk("stop pending\n");
-		      break;
+          case SBI_HSM_HART_STATUS_STARTED:
+              printk("started\n");
+              break;
+          case SBI_HSM_HART_STATUS_STOPPED:
+              printk("stopped\n");
+              break;
+          case SBI_HSM_HART_STATUS_START_PENDING:
+              printk("start pending\n");
+              break;
+          case SBI_HSM_HART_STATUS_STOP_PENDING:
+              printk("stop pending\n");
+              break;
       }
       */
       __sync_synchronize();
@@ -294,7 +295,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   /* interrupts are now on */
 
-  /* nk_vc_init(); */
+  nk_vc_init();
 
   nk_fs_init();
 
@@ -317,10 +318,13 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   // start_secondary(&(naut->sys));
 
+  /* nk_launch_shell("root-shell",my_cpu_id(),0,0); */
+
   printk("Nautilus boot thread yielding (indefinitely)\n");
 
   idle(NULL, NULL);
 }
+
 
 /* Faking some vc stuff */
 

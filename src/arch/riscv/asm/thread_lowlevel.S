@@ -23,14 +23,10 @@
 .section .text
 
 ENTRY(nk_thread_switch)
-    REG_L t0,  ROFF(0,  sp)     // load ret addr
-    REG_S t0,  ROFF(-4, sp)     // move ret addr down (pass intr state holder)
 
-    REG_S sp,  ROFF(0, sp)      // save sp
-
-    addi sp, sp, -SZREG
-    csrr t1, sstatus
-    REG_S t1,  ROFF(0, sp)      // save sstatus
+    // addi sp, sp, -SZREG
+    // csrr t1, sstatus
+    // REG_S t1,  ROFF(0,  sp)     // save sstatus
 
     addi sp, sp, -CTX_SIZE      // SAVE_GRPS(), 13 registers
     REG_S ra,  ROFF(0,  sp)
@@ -51,9 +47,10 @@ ENTRY(nk_thread_switch)
     addi t0, t0, 1              // pretend we are doing an interrupt-driven switch
     sw  t0, 8(tp)               // to make the sums work out
 
-// ENTRY(nk_thread_switch_intr_entry)
-//     REG_L t0,  ROFF(0,  tp)
-//     REG_S sp,  ROFF(0,  t0)     // save the current stack pointer
+ENTRY(nk_thread_switch_intr_entry)
+
+    REG_L t0,  ROFF(0,  tp)
+    REG_S sp,  ROFF(0,  t0)     // save the current stack pointer
 
 // On a thread exit we must avoid saving thread state
 // or using the stack at all since at this point the thread and its stack
@@ -64,9 +61,7 @@ ENTRY(nk_thread_switch)
 // and thread structure
 ENTRY(nk_thread_switch_on_exit)
 
-    mv ra, a0                    // load up pointer to the next thread
-
-    REG_S a0,  ROFF(0, tp)       // make it the new current thread
+    REG_S a0,  ROFF(0, tp)       // load new thread as the current thread
     REG_L sp,  ROFF(0, a0)       // load its stack pointer
 
     REG_L ra,  ROFF(0,  sp)      // RESTORE_GPRs()
@@ -84,11 +79,15 @@ ENTRY(nk_thread_switch_on_exit)
     REG_L s11, ROFF(12, sp)
     addi sp, sp, CTX_SIZE
 
-    lwu t0, 8(tp)               // decrement interrupt nesting level
-    addi t0, t0, -1             // we may now be leaving interrupt context
+    lwu t0, 8(tp)                // decrement interrupt nesting level
+    addi t0, t0, -1              // we may now be leaving interrupt context
     sw  t0, 8(tp)
 
-    ret                         /* and off we go */
+    // REG_L t0,  ROFF(0, sp)       // restore sstatus
+    // csrw sstatus, t0
+    // addi sp, sp, SZREG
+
+    ret                          // and off we go
 
 // rdi = new thread
 // rsi = target address to write
