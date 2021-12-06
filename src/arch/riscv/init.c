@@ -333,3 +333,38 @@ vga_make_entry (char c, uint8_t color)
     uint16_t color16 = color;
     return c16 | color16 << 8;
 }
+
+
+/* Some threading stuff for monitor */
+
+static void print_ones(void)
+{
+    while (1) {
+        printk("1");
+        nk_yield();
+    }
+}
+
+static void print_twos(void)
+{
+    while (1) {
+        printk("2");
+        nk_yield();
+    }
+}
+
+int execute_threading(char command[])
+{
+    nk_thread_start(print_ones, 0, 0, 0, 0, NULL, my_cpu_id());
+    nk_thread_start(print_twos, 0, 0, 0, 0, NULL, my_cpu_id());
+
+    int i = 0;
+    while (i < 100) {
+        nk_yield();
+        printk("3");
+        i++;
+    }
+    printk("\n");
+
+    return 0;
+}

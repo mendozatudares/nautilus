@@ -413,6 +413,7 @@ static int execute_help(char command[])
   print("  pf");
   print("  test");
   print("  pwrstats");
+  print("  threading");
   return 0;
 }
 
@@ -668,6 +669,10 @@ static int execute_potential_command(char command[])
   else if (my_strcmp(word, "pwrstats") == 0)
   {
     quit = execute_rapl(command);
+  }
+  else if (my_strcmp(word, "threading") == 0)
+  {
+    quit = execute_threading(command);
   }
   else /* default: */
   {
