@@ -310,7 +310,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   // nk_test_init(naut);
 
   /* set the timer with sbi :) */
-  // sbi_set_timer(r_time() + TICK_INTERVAL);
+  /* sbi_set_timer(r_time() + TICK_INTERVAL); */
 
   my_monitor_entry();
 

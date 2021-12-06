@@ -234,7 +234,7 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
 {
 
 #ifdef NAUT_CONFIG_RISCV_HOST
-#define GPR_SAVE_SIZE      13*8
+#define GPR_SAVE_SIZE      31*8
     if (fun) {
         thread_push(t, (uint64_t)&thread_cleanup);
         thread_push(t, (uint64_t)&nk_thread_entry);

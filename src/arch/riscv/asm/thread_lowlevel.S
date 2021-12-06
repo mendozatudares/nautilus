@@ -2,7 +2,7 @@
 #include <nautilus/gdt.h>
 #include <nautilus/thread.h>
 
-#define CTX_SIZE (13 * SZREG)
+#define CTX_SIZE (31 * SZREG)
 
 /*
  * We come in like this:
@@ -22,19 +22,37 @@ ENTRY(nk_thread_switch)
     // REG_S t1,  ROFF(0,  sp)     // save sstatus
 
     addi sp, sp, -CTX_SIZE      // SAVE_GRPS(), 13 registers
-    REG_S ra,  ROFF(0,  sp)
-    REG_S s0,  ROFF(1,  sp)
-    REG_S s1,  ROFF(2,  sp)
-    REG_S s2,  ROFF(3,  sp)
-    REG_S s3,  ROFF(4,  sp)
-    REG_S s4,  ROFF(5,  sp)
-    REG_S s5,  ROFF(6,  sp)
-    REG_S s6,  ROFF(7,  sp)
-    REG_S s7,  ROFF(8,  sp)
-    REG_S s8,  ROFF(9,  sp)
-    REG_S s9,  ROFF(10, sp)
-    REG_S s10, ROFF(11, sp)
-    REG_S s11, ROFF(12, sp)
+    REG_S ra, ROFF(0, sp)
+	# not sp
+	REG_S gp, ROFF(2, sp)
+	# not tp
+	REG_S t0, ROFF(4, sp)
+	REG_S t1, ROFF(5, sp)
+	REG_S t2, ROFF(6, sp)
+	REG_S s0, ROFF(7, sp)
+	REG_S s1, ROFF(8, sp)
+	REG_S a0, ROFF(9, sp)
+	REG_S a1, ROFF(10,sp)
+	REG_S a2, ROFF(11, sp)
+	REG_S a3, ROFF(12, sp)
+	REG_S a4, ROFF(13, sp)
+	REG_S a5, ROFF(14, sp)
+	REG_S a6, ROFF(15, sp)
+	REG_S a7, ROFF(16, sp)
+	REG_S s2, ROFF(17, sp)
+	REG_S s3, ROFF(18, sp)
+	REG_S s4, ROFF(19, sp)
+	REG_S s5, ROFF(20, sp)
+	REG_S s6, ROFF(21, sp)
+	REG_S s7, ROFF(22, sp)
+	REG_S s8, ROFF(23, sp)
+	REG_S s9, ROFF(24, sp)
+	REG_S s10, ROFF(25, sp)
+	REG_S s11, ROFF(26, sp)
+	REG_S t3, ROFF(27, sp)
+	REG_S t4, ROFF(28, sp)
+	REG_S t5, ROFF(29, sp)
+	REG_S t6, ROFF(30, sp)
 
     lwu t0, 8(tp)               // increment interrupt nesting level
     addi t0, t0, 1              // pretend we are doing an interrupt-driven switch
@@ -57,19 +75,38 @@ ENTRY(nk_thread_switch_on_exit)
     REG_S a0,  ROFF(0, tp)       // load new thread as the current thread
     REG_L sp,  ROFF(0, a0)       // load its stack pointer
 
-    REG_L ra,  ROFF(0,  sp)      // RESTORE_GPRs()
-    REG_L s0,  ROFF(1,  sp)      // load the new thread's GPRs
-    REG_L s1,  ROFF(2,  sp)
-    REG_L s2,  ROFF(3,  sp)
-    REG_L s3,  ROFF(4,  sp)
-    REG_L s4,  ROFF(5,  sp)
-    REG_L s5,  ROFF(6,  sp)
-    REG_L s6,  ROFF(7,  sp)
-    REG_L s7,  ROFF(8,  sp)
-    REG_L s8,  ROFF(9,  sp)
-    REG_L s9,  ROFF(10, sp)
-    REG_L s10, ROFF(11, sp)
-    REG_L s11, ROFF(12, sp)
+    # restore registers
+	REG_L ra, ROFF(0, sp)
+    # skip sp for now...
+	REG_L gp, ROFF(2, sp)
+	REG_S tp, ROFF(3, sp)
+	REG_L t0, ROFF(4, sp)
+	REG_L t1, ROFF(5, sp)
+	REG_L t2, ROFF(6, sp)
+	REG_L s0, ROFF(7, sp)
+	REG_L s1, ROFF(8, sp)
+	REG_L a0, ROFF(9, sp)
+	REG_L a1, ROFF(10,sp)
+	REG_L a2, ROFF(11, sp)
+	REG_L a3, ROFF(12, sp)
+	REG_L a4, ROFF(13, sp)
+	REG_L a5, ROFF(14, sp)
+	REG_L a6, ROFF(15, sp)
+	REG_L a7, ROFF(16, sp)
+	REG_L s2, ROFF(17, sp)
+	REG_L s3, ROFF(18, sp)
+	REG_L s4, ROFF(19, sp)
+	REG_L s5, ROFF(20, sp)
+	REG_L s6, ROFF(21, sp)
+	REG_L s7, ROFF(22, sp)
+	REG_L s8, ROFF(23, sp)
+	REG_L s9, ROFF(24, sp)
+	REG_L s10, ROFF(25, sp)
+	REG_L s11, ROFF(26, sp)
+	REG_L t3, ROFF(27, sp)
+	REG_L t4, ROFF(28, sp)
+	REG_L t5, ROFF(29, sp)
+	REG_L t6, ROFF(30, sp)
     addi sp, sp, CTX_SIZE
 
     lwu t0, 8(tp)                // decrement interrupt nesting level
