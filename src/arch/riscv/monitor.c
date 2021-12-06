@@ -639,12 +639,11 @@ static int execute_test(char command[])
 
 static int execute_potential_command(char command[])
 {
-  // vga_attr = vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND);
-
   int quit = 0;
   char* print_string = "";
 
   char* word = get_next_word(command);
+	if (word == NULL) return 0;
 
   if (my_strcmp(word, "quit") == 0)
   {

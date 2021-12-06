@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 ARCH=riscv
 CROSS_COMPILE=/opt/homebrew/bin/riscv64-unknown-elf-
 
@@ -7,8 +9,11 @@ if [[ "$TOOLCHAIN_OVERRIDE" != "" ]]; then
   CROSS_COMPILE=$TOOLCHAIN_OVERRIDE
 fi
 
+ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j
+
+
 if [[ "$*" != *"qemu"* ]]; then
-  ARCH=riscv CROSS_COMPILE=$CROSS_COMPILE make -j $* #V=1"
+	echo not qemu
 else
   echo 'Starting QEMU...'
   printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' _

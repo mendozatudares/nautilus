@@ -25,19 +25,19 @@
 #define CSR_SIP			0x144
 #define CSR_SATP		0x180
 
-#define MSTATUS_MPP_MASK (3L << 11)  // previous mode.
+#define MSTATUS_MPP_MASK (3L << 11)  # previous mode.
 #define MSTATUS_MPP_M (3L << 11)
 #define MSTATUS_MPP_S (1L << 11)
 #define MSTATUS_MPP_U (0L << 11)
-#define MSTATUS_MIE (1L << 3)  // machine-mode interrupt enable.
+#define MSTATUS_MIE (1L << 3)  # machine-mode interrupt enable.
 
-#define SIE_SEIE (1L << 9)  // external
-#define SIE_STIE (1L << 5)  // timer
-#define SIE_SSIE (1L << 1)  // software
+#define SIE_SEIE (1L << 9)  # external
+#define SIE_STIE (1L << 5)  # timer
+#define SIE_SSIE (1L << 1)  # software
 
-#define MIE_MEIE (1L << 11)  // external
-#define MIE_MTIE (1L << 7)  // timer
-#define MIE_MSIE (1L << 3)  // software
+#define MIE_MEIE (1L << 11)  # external
+#define MIE_MTIE (1L << 7)  # timer
+#define MIE_MSIE (1L << 3)  # software
 
 
 # .option norvc # Disable instruction compression
@@ -106,10 +106,10 @@ secondary_core_stack:
 .balign 4
 GLOBAL(kernel_vec)
 
-    // make room to save registers.
+    # make room to save registers.
     addi sp, sp, -288 # 38 registers
 
-    // save the registers.
+    # save the registers.
     sd ra, 0(sp)
     ; sd sp, 8(sp)
     sd gp, 16(sp)
@@ -142,15 +142,15 @@ GLOBAL(kernel_vec)
     sd t5, 232(sp)
     sd t6, 240(sp)
 
-    // call the C trap handler in idt.c
-	move a0, sp /* arg0 <- trapframe */
+    # call the C trap handler in idt.c
+		move a0, sp /* arg0 <- trapframe */
     call kernel_trap
 
-    // restore registers.
+    # restore registers.
     ld ra, 0(sp)
     ld sp, 8(sp)
     ld gp, 16(sp)
-    // not this, in case we moved CPUs: ld tp, 24(sp)
+    # not this, in case we moved CPUs: ld tp, 24(sp)
     ld t0, 32(sp)
     ld t1, 40(sp)
     ld t2, 48(sp)
@@ -181,7 +181,7 @@ GLOBAL(kernel_vec)
 
     addi sp, sp, 256
 
-    // return to whatever we were doing in the kernel.
+    # return to whatever we were doing in the kernel.
     sret
 
 END(kernel_vec)

@@ -308,9 +308,10 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   nk_cmdline_init(naut);
   // nk_test_init(naut);
+	
 
-  /* set the timer with sbi :) */
-  /* sbi_set_timer(r_time() + TICK_INTERVAL); */
+	// kick off the timer subsystem by setting a timer some time in the future
+  sbi_set_timer(r_time() + TICK_INTERVAL);
 
   my_monitor_entry();
 
@@ -337,27 +338,31 @@ vga_make_entry (char c, uint8_t color)
 
 /* Some threading stuff for monitor */
 
+static bool done = false;
+
 static void print_ones(void)
 {
-    while (1) {
+    while (!done) {
         printk("1");
-        nk_yield();
+        // nk_yield();
     }
 }
 
 static void print_twos(void)
 {
-    while (1) {
+    while (!done) {
         printk("2");
-        nk_yield();
+        // nk_yield();
     }
 }
 
 int execute_threading(char command[])
 {
-    nk_thread_start(print_ones, 0, 0, 0, 0, NULL, my_cpu_id());
-    nk_thread_start(print_twos, 0, 0, 0, 0, NULL, my_cpu_id());
+	nk_thread_id_t a, b;
+    nk_thread_start(print_ones, 0, 0, 0, 0, &a, my_cpu_id());
+    nk_thread_start(print_twos, 0, 0, 0, 0, &b, my_cpu_id());
 
+		done = false;
     int i = 0;
     while (i < 100) {
         nk_yield();
@@ -365,6 +370,9 @@ int execute_threading(char command[])
         i++;
     }
     printk("\n");
+		done = true;
+		nk_join(a, NULL);
+		nk_join(b, NULL);
 
     return 0;
 }

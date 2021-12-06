@@ -17,12 +17,10 @@
 
 ENTRY(nk_thread_switch)
 
-    // addi sp, sp, -SZREG
-    // csrr t1, sstatus
-    // REG_S t1,  ROFF(0,  sp)     // save sstatus
-
-    addi sp, sp, -CTX_SIZE      // SAVE_GRPS(), 13 registers
-    REG_S ra, ROFF(0, sp)
+	# allocate space on the stack for the registers
+	addi sp, sp, -CTX_SIZE
+	# store the return address
+	REG_S ra, ROFF(0, sp)
 	# not sp
 	REG_S gp, ROFF(2, sp)
 	# not tp
@@ -54,30 +52,38 @@ ENTRY(nk_thread_switch)
 	REG_S t5, ROFF(29, sp)
 	REG_S t6, ROFF(30, sp)
 
-    lwu t0, 8(tp)               // increment interrupt nesting level
-    addi t0, t0, 1              // pretend we are doing an interrupt-driven switch
-    sw  t0, 8(tp)               // to make the sums work out
+  lwu t0, 8(tp)               # increment interrupt nesting level
+  addi t0, t0, 1              # pretend we are doing an interrupt-driven switch
+  sw  t0, 8(tp)               # to make the sums work out
 
 ENTRY(nk_thread_switch_intr_entry)
 
-    REG_L t0,  ROFF(0,  tp)
-    REG_S sp,  ROFF(0,  t0)     // save the current stack pointer
+	# load cur_thread from the cpu structure
+	REG_L t0,  ROFF(0,  tp)
+	# store the stack pointer into it
+	REG_S sp,  ROFF(0,  t0)
 
-// On a thread exit we must avoid saving thread state
-// or using the stack at all since at this point the thread and its stack
-// might already be deleted.  Interrupts are off, however.
-// We also want to save the cost of any state saves
-// We should get here via a JUMP
-// Note that the first three instructions establish the new stack
-// and thread structure
+# On a thread exit we must avoid saving thread state
+# or using the stack at all since at this point the thread and its stack
+# might already be deleted.  Interrupts are off, however.
+# We also want to save the cost of any state saves
+# We should get here via a JUMP
+# Note that the first three instructions establish the new stack
+# and thread structure
 ENTRY(nk_thread_switch_on_exit)
 
-    REG_S a0,  ROFF(0, tp)       // load new thread as the current thread
-    REG_L sp,  ROFF(0, a0)       // load its stack pointer
+	# set the CPUs cur_thread to the next thread (argument to this function)
+	REG_S a0,  ROFF(0, tp)
+	# load the stack pointer from the current (new) thread
+	REG_L sp,  ROFF(0, a0)
 
-    # restore registers
+
+	lwu t0, 8(tp)                // decrement interrupt nesting level
+	addi t0, t0, -1              // we may now be leaving interrupt context
+	sw  t0, 8(tp)
+
+  # restore registers
 	REG_L ra, ROFF(0, sp)
-    # skip sp for now...
 	REG_L gp, ROFF(2, sp)
 	REG_S tp, ROFF(3, sp)
 	REG_L t0, ROFF(4, sp)
@@ -107,17 +113,10 @@ ENTRY(nk_thread_switch_on_exit)
 	REG_L t4, ROFF(28, sp)
 	REG_L t5, ROFF(29, sp)
 	REG_L t6, ROFF(30, sp)
-    addi sp, sp, CTX_SIZE
+  addi sp, sp, CTX_SIZE
 
-    lwu t0, 8(tp)                // decrement interrupt nesting level
-    addi t0, t0, -1              // we may now be leaving interrupt context
-    sw  t0, 8(tp)
 
-    // REG_L t0,  ROFF(0, sp)       // restore sstatus
-    // csrw sstatus, t0
-    // addi sp, sp, SZREG
-
-    ret                          // and off we go
+	ret                          // and off we go
 
 // rdi = new thread
 // rsi = target address to write
@@ -156,6 +155,8 @@ ENTRY(nk_thread_entry)
     li      t1, SSTATUS_SIE
     or      t0, t0, t1
     csrw    sstatus, t0
+
+
 
     // return
     ret

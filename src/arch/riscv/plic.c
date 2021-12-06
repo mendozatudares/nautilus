@@ -86,12 +86,12 @@ static uint64_t timer_count = 0;
 uint32_t apic_realtime_to_ticks(struct apic_dev *apic, uint64_t ns)
 {
 
-    return ((ns*1000000000ULL)/RISCV_CLOCKS_PER_SECOND);
+    return ((ns*RISCV_CLOCKS_PER_SECOND)/1000000000ULL);
 }
 
 uint64_t apic_cycles_to_realtime(struct apic_dev *apic, uint64_t cycles)
 {
-    return 1000000000ULL*(cycles/RISCV_CLOCKS_PER_SECOND);
+    return (cycles * 1000000000ULL)/RISCV_CLOCKS_PER_SECOND;
 }
 
 void apic_set_oneshot_timer(struct apic_dev *apic, uint32_t ticks)
@@ -161,18 +161,22 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
     // as far as the next interrupt or cooperative rescheduling request,
     // breaking real-time semantics.
 
-    if (time_to_next_ns == -1) {
+    if (time_to_next_ns == 0) {
 	// indicates "infinite", which we turn into the maximum timer count
 	apic_set_oneshot_timer(apic,-1);
     } else {
 	apic_set_oneshot_timer(apic,apic_realtime_to_ticks(apic,time_to_next_ns));
     }
 
+
+		nk_yield();
+
     return 0;
 }
 
 void plic_timer_handler(void)
 {
+	printk("timer!\n");
     apic_timer_handler(0,0,0);
 }
 
