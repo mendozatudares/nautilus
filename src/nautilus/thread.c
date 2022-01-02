@@ -237,7 +237,7 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
 #define GPR_SAVE_SIZE      31*8
     if (fun) {
         thread_push(t, (uint64_t)&thread_cleanup);
-        thread_push(t, (uint64_t)&fun);
+        thread_push(t, (uint64_t)fun);
         thread_push(t, (uint64_t)arg);
         *(uint64_t*)(t->rsp-GPR_SAVE_SIZE) = (uint64_t)nk_thread_entry;
     }

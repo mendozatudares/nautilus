@@ -52,9 +52,9 @@ ENTRY(nk_thread_switch)
 	REG_S t5, ROFF(29, sp)
 	REG_S t6, ROFF(30, sp)
 
-  lwu t0, 8(tp)               # increment interrupt nesting level
-  addi t0, t0, 1              # pretend we are doing an interrupt-driven switch
-  sw  t0, 8(tp)               # to make the sums work out
+	lwu t0, 8(tp)               # increment interrupt nesting level
+	addi t0, t0, 1              # pretend we are doing an interrupt-driven switch
+	sw  t0, 8(tp)               # to make the sums work out
 
 ENTRY(nk_thread_switch_intr_entry)
 
@@ -77,15 +77,14 @@ ENTRY(nk_thread_switch_on_exit)
 	# load the stack pointer from the current (new) thread
 	REG_L sp,  ROFF(0, a0)
 
-
 	lwu t0, 8(tp)                // decrement interrupt nesting level
 	addi t0, t0, -1              // we may now be leaving interrupt context
 	sw  t0, 8(tp)
 
-  # restore registers
+	# restore registers
 	REG_L ra, ROFF(0, sp)
 	REG_L gp, ROFF(2, sp)
-	REG_S tp, ROFF(3, sp)
+	// REG_S tp, ROFF(3, sp)
 	REG_L t0, ROFF(4, sp)
 	REG_L t1, ROFF(5, sp)
 	REG_L t2, ROFF(6, sp)
@@ -113,8 +112,7 @@ ENTRY(nk_thread_switch_on_exit)
 	REG_L t4, ROFF(28, sp)
 	REG_L t5, ROFF(29, sp)
 	REG_L t6, ROFF(30, sp)
-  addi sp, sp, CTX_SIZE
-
+	addi sp, sp, CTX_SIZE
 
 	ret                          // and off we go
 
@@ -124,17 +122,17 @@ ENTRY(nk_thread_switch_on_exit)
 ENTRY(nk_thread_switch_exit_helper)
 	// reset interrupt nesting
 	// the context switch will decrement it to zero
-    li t0, 1
-    sw t0, 8(tp)
+	li t0, 1
+	sw t0, 8(tp)
 
 	// reset preemption disable level
-    li t0, 0
-    sw t0, 12(tp)
+	li t0, 0
+	sw t0, 12(tp)
 
 	// note that interrupts are still off
 
 	// We now mark ourselves as toast for the reaper
-    sw a2, 0(a1)
+	sw a2, 0(a1)
 
 	// At this point, we are racing with the reaper on a different core,
 	// which might take away our stack.  However, we have interrupts
@@ -145,19 +143,28 @@ ENTRY(nk_thread_switch_exit_helper)
 	ret
 
 
-
 #define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
 
 ENTRY(nk_thread_entry)
 
+	// explore the stack to get the right ra value
+	REG_L ra, ROFF(1, sp)
+
+	// store temp registers
+	REG_S t0, ROFF(0, sp)
+	REG_S t1, ROFF(1, sp)
+
     // enable interrupts
-    csrr    t0, sstatus
-    li      t1, SSTATUS_SIE
-    or      t0, t0, t1
-    csrw    sstatus, t0
+	csrr    t0, sstatus
+	li      t1, SSTATUS_SIE
+	or      t0, t0, t1
+	csrw    sstatus, t0
 
+	// restore temp registers
+	REG_L t0, ROFF(0, sp)
+	REG_L t1, ROFF(1, sp)
 
+	addi sp, sp, 2*SZREG
 
     // return
-    ret
-
+	ret

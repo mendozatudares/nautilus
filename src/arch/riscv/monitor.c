@@ -637,6 +637,8 @@ static int execute_test(char command[])
   return 0;
 }
 
+extern int execute_threading(char command[]);
+
 static int execute_potential_command(char command[])
 {
   int quit = 0;
