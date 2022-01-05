@@ -72,7 +72,9 @@ GLOBAL(nautilus_entry)
     sfence.vma zero, zero
 
     # enable supervisor interrupts
-    li      t0, SIE_SEIE | SIE_STIE | SIE_SSIE
+    li      t0, SIE_SEIE
+	or      t0, t0, SIE_STIE
+	or      t0, t0, SIE_SSIE
     csrs    sie, t0
 
     la      t0, main_ptr

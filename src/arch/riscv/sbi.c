@@ -45,11 +45,11 @@ status_t sbi_boot_hart(uint hartid, paddr_t start_addr, ulong arg) {
 
 void sbi_early_init(void) {
   // read the presence of some features
-  sbi_ext |= sbi_probe_extension(SBI_EXT_TIMER_SIG) ? (1 << SBI_EXTENSION_TIMER) : 0;
-  sbi_ext |= sbi_probe_extension(SBI_EXT_IPI_SIG) ? (1 << SBI_EXTENSION_IPI) : 0;
-  sbi_ext |= sbi_probe_extension(SBI_EXT_RFENCE_SIG) ? (1 << SBI_EXTENSION_RFENCE) : 0;
-  sbi_ext |= sbi_probe_extension(SBI_EXT_HSM_SIG) ? (1 << SBI_EXTENSION_HSM) : 0;
-  sbi_ext |= sbi_probe_extension(SBI_EXT_SRST_SIG) ? (1 << SBI_EXTENSION_SRST) : 0;
+  /* sbi_ext |= sbi_probe_extension(SBI_EXT_TIMER_SIG) ? (1 << SBI_EXTENSION_TIMER) : 0; */
+  /* sbi_ext |= sbi_probe_extension(SBI_EXT_IPI_SIG) ? (1 << SBI_EXTENSION_IPI) : 0; */
+  /* sbi_ext |= sbi_probe_extension(SBI_EXT_RFENCE_SIG) ? (1 << SBI_EXTENSION_RFENCE) : 0; */
+  /* sbi_ext |= sbi_probe_extension(SBI_EXT_HSM_SIG) ? (1 << SBI_EXTENSION_HSM) : 0; */
+  /* sbi_ext |= sbi_probe_extension(SBI_EXT_SRST_SIG) ? (1 << SBI_EXTENSION_SRST) : 0; */
 }
 
 
