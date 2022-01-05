@@ -160,11 +160,12 @@ static void wait_for_command(char *buf, int buffer_size)
 		struct sbiret ret = sbi_call(SBI_CONSOLE_GETCHAR);
 		key = ret.error;
 
-		// printk("e: %d, v: %d\n", ret.error, ret.value);
+		/* printk("e: %d, v: %d\n", ret.error, ret.value); */
 
 		// continue;
 
-    // key = serial_getchar();
+    /* key = serial_getchar(); */
+    /* printk("%c", key); */
     // key = ps2_wait_for_key();
     // uint16_t key_encoded = kbd_translate_monitor(key);
     //vga_clear_screen(vga_make_entry(key, vga_make_color(COLOR_FOREGROUND, COLOR_BACKGROUND)));

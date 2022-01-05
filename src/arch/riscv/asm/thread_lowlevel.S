@@ -15,6 +15,11 @@
  */
 .section .text
 
+#define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
+#define SIE_SEIE (1L << 9)  // external
+#define SIE_STIE (1L << 5)  // timer
+#define SIE_SSIE (1L << 1)  // software
+
 ENTRY(nk_thread_switch)
 
 	# allocate space on the stack for the registers
@@ -84,9 +89,9 @@ ENTRY(nk_thread_switch_on_exit)
 	# restore registers
 	REG_L ra, ROFF(0, sp)
 	REG_L gp, ROFF(2, sp)
-	// REG_S tp, ROFF(3, sp)
-	REG_L t0, ROFF(4, sp)
-	REG_L t1, ROFF(5, sp)
+	# REG_L tp, ROFF(3, sp)
+	# REG_L t0, ROFF(4, sp)
+	# REG_L t1, ROFF(5, sp)
 	REG_L t2, ROFF(6, sp)
 	REG_L s0, ROFF(7, sp)
 	REG_L s1, ROFF(8, sp)
@@ -112,6 +117,21 @@ ENTRY(nk_thread_switch_on_exit)
 	REG_L t4, ROFF(28, sp)
 	REG_L t5, ROFF(29, sp)
 	REG_L t6, ROFF(30, sp)
+
+    // ensure enable supervisor interrupts
+    li      t0, SIE_SEIE
+	or      t0, t0, SIE_STIE
+	or      t0, t0, SIE_SSIE
+    csrs    sie, t0
+
+	csrr    t0, sstatus
+	li      t1, SSTATUS_SIE
+	or      t0, t0, t1
+	csrw    sstatus, t0
+
+	// restore temp registers
+	REG_L t0, ROFF(4, sp)
+	REG_L t1, ROFF(5, sp)
 	addi sp, sp, CTX_SIZE
 
 	ret                          // and off we go
@@ -143,26 +163,11 @@ ENTRY(nk_thread_switch_exit_helper)
 	ret
 
 
-#define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
 
 ENTRY(nk_thread_entry)
 
 	// get the function from the stack, store in ra
 	REG_L ra, ROFF(1, sp)
-
-	// store temp registers
-	REG_S t0, ROFF(0, sp)
-	REG_S t1, ROFF(1, sp)
-
-    // enable interrupts
-	csrr    t0, sstatus
-	li      t1, SSTATUS_SIE
-	or      t0, t0, t1
-	csrw    sstatus, t0
-
-	// restore temp registers
-	REG_L t0, ROFF(0, sp)
-	REG_L t1, ROFF(1, sp)
 
 	addi sp, sp, 2*SZREG
 

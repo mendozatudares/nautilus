@@ -161,7 +161,7 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
     // as far as the next interrupt or cooperative rescheduling request,
     // breaking real-time semantics.
 
-    if (time_to_next_ns == -1) {
+    if (time_to_next_ns == 0) {
 	// indicates "infinite", which we turn into the maximum timer count
 	apic_set_oneshot_timer(apic,-1);
     } else {
@@ -175,7 +175,6 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 
 void plic_timer_handler(void)
 {
-    printk("timer!\n");
     apic_timer_handler(0,0,0);
 }
 

@@ -310,14 +310,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   // nk_test_init(naut);
 
   // kick off the timer subsystem by setting a timer sometime in the future
-  uint64_t t = r_time() + TICK_INTERVAL;
-  printk("setting timer for time %d\n", t);
-  sbi_set_timer(t);
-
-  while(1) {
-      uint64_t ct = r_time();
-      if (ct > 2*t) panic("timer interrupt never received, time=%d\n", r_time());
-  }
+  sbi_set_timer(r_time() + TICK_INTERVAL);
 
   my_monitor_entry();
 
@@ -350,7 +343,6 @@ static void print_ones(void)
 {
     while (!done) {
         printk("1");
-        printk(" interrupts enabled? %d\n", intr_get());
         /* nk_yield(); */
     }
 }
@@ -359,7 +351,7 @@ static void print_twos(void)
 {
     while (!done) {
         printk("2");
-        // nk_yield();
+        /* nk_yield(); */
     }
 }
 
@@ -373,7 +365,6 @@ int execute_threading(char command[])
     int i = 0;
     while (i < 100) {
         nk_yield();
-        printk("3");
         i++;
     }
     printk("\n");
