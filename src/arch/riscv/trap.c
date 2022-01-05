@@ -10,7 +10,7 @@ void trap_init_hart(void) { w_stvec((uint64_t)kernel_vec); }
 
 /* Supervisor Trap Function */
 void kernel_trap(struct nk_regs *regs) {
-	static unsigned long ticks = 0;
+  static unsigned long ticks = 0;
   int which_dev = 0;
   regs->sepc = r_sepc();
   regs->status = r_sstatus();
@@ -23,13 +23,13 @@ void kernel_trap(struct nk_regs *regs) {
   int nr = regs->cause & ~(1llu << 63);
 
   if (interrupt) {
-		if (nr == 5) {
-		  // timer interrupt
-			// on nautilus, we don't actaully want to set a new timer yet, we just
-			// want to call into the scheduler, which schedules the next timer.
+    if (nr == 5) {
+      // timer interrupt
+      // on nautilus, we don't actaully want to set a new timer yet, we just
+      // want to call into the scheduler, which schedules the next timer.
       /* printk("tick %4d ", ++ticks); */
       plic_timer_handler();
-		} else if (nr == 9) {
+    } else if (nr == 9) {
       // supervisor external interrupt
       // first, we claim the irq from the PLIC
       int irq = plic_claim();

@@ -308,10 +308,16 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   nk_cmdline_init(naut);
   // nk_test_init(naut);
-	
 
-	// kick off the timer subsystem by setting a timer some time in the future
-  sbi_set_timer(r_time() + TICK_INTERVAL);
+  // kick off the timer subsystem by setting a timer sometime in the future
+  uint64_t t = r_time() + TICK_INTERVAL;
+  printk("setting timer for time %d\n", t);
+  sbi_set_timer(t);
+
+  while(1) {
+      uint64_t ct = r_time();
+      if (ct > 2*t) panic("timer interrupt never received, time=%d\n", r_time());
+  }
 
   my_monitor_entry();
 
@@ -344,7 +350,8 @@ static void print_ones(void)
 {
     while (!done) {
         printk("1");
-        // nk_yield();
+        printk(" interrupts enabled? %d\n", intr_get());
+        /* nk_yield(); */
     }
 }
 
@@ -358,11 +365,11 @@ static void print_twos(void)
 
 int execute_threading(char command[])
 {
-	nk_thread_id_t a, b;
-    nk_thread_start(print_ones, 0, 0, 0, 0, &a, my_cpu_id());
-    nk_thread_start(print_twos, 0, 0, 0, 0, &b, my_cpu_id());
+    nk_thread_id_t a, b;
+    nk_thread_start((nk_thread_fun_t)print_ones, 0, 0, 0, 0, &a, my_cpu_id());
+    nk_thread_start((nk_thread_fun_t)print_twos, 0, 0, 0, 0, &b, my_cpu_id());
 
-		done = false;
+    done = false;
     int i = 0;
     while (i < 100) {
         nk_yield();
@@ -370,9 +377,9 @@ int execute_threading(char command[])
         i++;
     }
     printk("\n");
-		done = true;
-		nk_join(a, NULL);
-		nk_join(b, NULL);
+    done = true;
+    nk_join(a, NULL);
+    nk_join(b, NULL);
 
     return 0;
 }

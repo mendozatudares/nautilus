@@ -147,7 +147,7 @@ ENTRY(nk_thread_switch_exit_helper)
 
 ENTRY(nk_thread_entry)
 
-	// explore the stack to get the right ra value
+	// get the function from the stack, store in ra
 	REG_L ra, ROFF(1, sp)
 
 	// store temp registers
