@@ -363,7 +363,7 @@ int execute_threading(char command[])
 
     done = false;
     int i = 0;
-    while (i < 100) {
+    while (i < 10) {
         nk_yield();
         i++;
     }

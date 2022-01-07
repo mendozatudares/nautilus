@@ -171,5 +171,7 @@ ENTRY(nk_thread_entry)
 
 	addi sp, sp, 2*SZREG
 
-    // return
-	ret
+	jalr ra
+
+	li a0, 0
+	call nk_thread_exit

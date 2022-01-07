@@ -168,6 +168,7 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 	apic_set_oneshot_timer(apic,apic_realtime_to_ticks(apic,time_to_next_ns));
     }
 
+    /* printk("timer!\n"); */
     nk_yield();
 
     return 0;
