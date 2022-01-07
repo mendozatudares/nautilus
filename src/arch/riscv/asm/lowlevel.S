@@ -115,7 +115,7 @@ GLOBAL(kernel_vec)
     sd ra, 0(sp)
     ; sd sp, 8(sp)
     sd gp, 16(sp)
-    sd tp, 24(sp)
+    # sd tp, 24(sp)
     sd t0, 32(sp)
     sd t1, 40(sp)
     sd t2, 48(sp)
@@ -150,7 +150,7 @@ GLOBAL(kernel_vec)
 
     # restore registers.
     ld ra, 0(sp)
-    ld sp, 8(sp)
+    # ld sp, 8(sp)
     ld gp, 16(sp)
     # not this, in case we moved CPUs: ld tp, 24(sp)
     ld t0, 32(sp)
@@ -181,7 +181,7 @@ GLOBAL(kernel_vec)
     ld t5, 232(sp)
     ld t6, 240(sp)
 
-    addi sp, sp, 256
+    addi sp, sp, 288
 
     # return to whatever we were doing in the kernel.
     sret
