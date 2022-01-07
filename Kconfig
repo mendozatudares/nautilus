@@ -10,8 +10,6 @@ menu "Platform"
 		config ARCH_RISCV
 			bool
 
-		config ARCH_ARM64
-			bool
 
     choice
         prompt "Target Selection"
