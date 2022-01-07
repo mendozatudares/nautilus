@@ -4,7 +4,7 @@ mainmenu "Nautilus AeroKernel Configuration"
 menu "Platform"
 
 
-		config ARCH_X86
+		config ARCH_X86_64
 			bool
 
 		config ARCH_RISCV
@@ -12,7 +12,7 @@ menu "Platform"
 
 
     choice
-        prompt "Target Selection"
+        prompt "Platform Selection"
         default X86_64_HOST
 
         config X86_64_HOST
