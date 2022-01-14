@@ -176,8 +176,11 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/  )
 # Alternatively CROSS_COMPILE can be set in the environment.
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
-
 ARCH		?= $(SUBARCH)
+
+
+
+
 CROSS_COMPILE	?= 
 #CROSS_COMPILE	?= /home/kyle/opt/cross/bin/x86_64-elf-
 
@@ -323,6 +326,19 @@ else
    include .config
 endif
 
+
+
+
+ifdef NAUT_CONFIG_ARCH_X86
+SUBARCH = x86_64
+endif
+
+ifdef NAUT_CONFIG_ARCH_RISCV
+SUBARCH = riscv
+endif
+
+ARCH		?= $(SUBARCH)
+
 COMPILER_PREFIX := $(patsubst "%",%,$(NAUT_CONFIG_COMPILER_PREFIX))
 COMPILER_SUFFIX := $(patsubst "%",%,$(NAUT_CONFIG_COMPILER_SUFFIX))
 
@@ -332,21 +348,21 @@ COMPILER_SUFFIX := $(patsubst "%",%,$(NAUT_CONFIG_COMPILER_SUFFIX))
 #
 ifdef NAUT_CONFIG_USE_CLANG
   AS		= $(CROSS_COMPILE)$(COMPILER_PREFIX)llvm-as$(COMPILER_SUFFIX)
-  LD		= $(CROSS_COMPILE)ld
+  LD		= $(CROSS_COMPILE)$(COMPILER_PREFIX)ld
   CC		= $(CROSS_COMPILE)$(COMPILER_PREFIX)clang$(COMPILER_SUFFIX)
   CXX           = $(CROSS_COMPILE)$(COMPILER_PREFIX)clang++$(COMPILER_SUFFIX)
 endif
 
 ifdef NAUT_CONFIG_USE_WLLVM
   AS		= $(CROSS_COMPILE)$(COMPILER_PREFIX)llvm-as$(COMPILER_SUFFIX)
-  LD		= $(CROSS_COMPILE)ld
+  LD		= $(CROSS_COMPILE)$(COMPILER_PREFIX)ld
   CC		= $(CROSS_COMPILE)$(COMPILER_PREFIX)wllvm$(COMPILER_SUFFIX)
   CXX           = $(CROSS_COMPILE)$(COMPILER_PREFIX)wllvm++$(COMPILER_SUFFIX)
 endif
 
 ifdef NAUT_CONFIG_USE_GCC
   AS		= $(CROSS_COMPILE)$(COMPILER_PREFIX)as$(COMPILER_SUFFIX)
-  LD		= $(CROSS_COMPILE)ld
+  LD		= $(CROSS_COMPILE)$(COMPILER_PREFIX)ld
   CC		= $(CROSS_COMPILE)$(COMPILER_PREFIX)gcc$(COMPILER_SUFFIX)
   CXX           = $(CROSS_COMPILE)$(COMPILER_PREFIX)g++$(COMPILER_SUFFIX)
 endif
@@ -359,9 +375,12 @@ COMMON_FLAGS :=-fno-omit-frame-pointer \
 			   -fno-strict-aliasing \
                            -fno-strict-overflow \
 
-ifdef NAUT_CONFIG_RISCV_HOST
-  COMMON_FLAGS += -mcmodel=medany
-else
+ifdef NAUT_CONFIG_ARCH_RISCV
+  COMMON_FLAGS += -mcmodel=medany -march=rv64gc -mabi=lp64d
+endif
+
+
+ifdef NAUT_CONFIG_ARCH_X86
   COMMON_FLAGS += -mcmodel=large -mno-red-zone
 endif
 
