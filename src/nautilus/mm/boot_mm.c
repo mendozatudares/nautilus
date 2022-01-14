@@ -24,6 +24,7 @@
 #include <nautilus/naut_types.h>
 #include <nautilus/mm.h>
 #include <nautilus/paging.h>
+#include <nautilus/arch.h>
 #include <nautilus/mb_utils.h>
 #include <nautilus/multiboot2.h>
 #include <nautilus/macros.h>

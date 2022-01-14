@@ -163,9 +163,7 @@ void *nk_gc_pdsgc_malloc_specific(uint64_t, int cpu);
 #endif
 
 
-/* arch specific */
-void arch_detect_mem_map (mmap_info_t * mm_info, mem_map_entry_t * memory_map, unsigned long mbd);
-void arch_reserve_boot_regions(unsigned long mbd);
+
 
 #ifdef NAUT_CONFIG_RISCV_HOST
 #define ctz(x) __ctzdi2(x)
