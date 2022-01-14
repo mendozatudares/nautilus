@@ -4,7 +4,7 @@ mainmenu "Nautilus AeroKernel Configuration"
 menu "Platform"
 
 
-		config ARCH_X86_64
+		config ARCH_X86
 			bool
 
 		config ARCH_RISCV
