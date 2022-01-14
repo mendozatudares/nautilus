@@ -283,12 +283,25 @@ include  $(srctree)/scripts/Kbuild.include
 
 # Make variables (CC, etc...)
 
+#
+# Include .config early so that we have access to the toolchain-related options
+#
+ifeq (,$(wildcard .config))
+   NAUT_CONFIG_USE_GCC=1
+   NAUT_CONFIG_USE_CLANG=0
+   NAUT_CONFIG_USE_WLLVM=0
+   NAUT_CONFIG_COMPILER_PREFIX=
+   NAUT_CONFIG_COMPILER_SUFFIX=
+else
+   include .config
+endif
 
-AR		= $(CROSS_COMPILE)ar
-NM		= $(CROSS_COMPILE)nm
-STRIP		= $(CROSS_COMPILE)strip
-OBJCOPY		= $(CROSS_COMPILE)objcopy
-OBJDUMP		= $(CROSS_COMPILE)objdump
+
+AR		=     $(CROSS_COMPILE)$(COMPILER_PREFIX)ar
+NM		=     $(CROSS_COMPILE)$(COMPILER_PREFIX)nm
+STRIP		=   $(CROSS_COMPILE)$(COMPILER_PREFIX)strip
+OBJCOPY		= $(CROSS_COMPILE)$(COMPILER_PREFIX)objcopy
+OBJDUMP		= $(CROSS_COMPILE)$(COMPILER_PREFIX)objdump
 
 CPP		= $(CC) -E
 GRUBMKRESCUE    = $(CROSS_COMPILE)grub-mkrescue
@@ -311,20 +324,6 @@ NAUT_INCLUDE      := -D__NAUTILUS__ -Iinclude \
 		   -include include/autoconf.h
 
 CPPFLAGS        := $(NAUT_INCLUDE) -D__NAUTILUS__
-
-
-#
-# Include .config early so that we have access to the toolchain-related options
-#
-ifeq (,$(wildcard .config))
-   NAUT_CONFIG_USE_GCC=1
-   NAUT_CONFIG_USE_CLANG=0
-   NAUT_CONFIG_USE_WLLVM=0
-   NAUT_CONFIG_COMPILER_PREFIX=
-   NAUT_CONFIG_COMPILER_SUFFIX=
-else
-   include .config
-endif
 
 
 
@@ -791,11 +790,17 @@ nautilus: $(BIN_NAME) $(SYM_NAME) $(SEC_NAME)
 
 
 uImage: $(BIN_NAME)
-	$(CROSS_COMPILE)objcopy -O binary $(BIN_NAME) Image
+	$(OBJCOPY) -O binary $(BIN_NAME) Image
 	mkimage -A riscv -O linux -T kernel -C none \
 		-a 0x80100000 -e 0x80100000 -n "Nautilus" \
 		-d Image uImage
 	rm Image
+
+qemu: nautilus.bin
+ifdef NAUT_CONFIG_ARCH_RISCV
+	qemu-system-riscv64 -bios default -m 2G -M sifive_u -kernel nautilus.bin -serial mon:stdio -display none -gdb tcp::1234
+endif
+
 
 # New function to run a Python script which generates Lua test code,
 # addition of a separate flag (LUA_BUILD_FLAG) which is set to indicate
