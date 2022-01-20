@@ -23,6 +23,7 @@
 #define __NAUTILUS_MAIN__
 
 #include <nautilus/nautilus.h>
+#include <nautilus/arch.h>
 #include <nautilus/paging.h>
 #include <nautilus/barrier.h>
 #include <nautilus/blkdev.h>
@@ -123,7 +124,7 @@ void secondary_entry(int hartid) {
 
   struct naut_info *naut = &nautilus_info;
 
-  w_sscratch(r_tp());
+  write_csr(sscratch, r_tp());
 
   w_tp((uint64_t)naut->sys.cpus[hartid]);
 
@@ -201,7 +202,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   sbi_early_init();
 
   // M-Mode passes scratch struct through tp. Move it to sscratch
-  w_sscratch(r_tp());
+  write_csr(sscratch, r_tp());
 
   // Zero out tp for now until cls is set up
   w_tp(0);
@@ -291,7 +292,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   nk_sched_start();
 
-  sti();
+  arch_enable_ints();
 
   /* interrupts are now on */
 
@@ -310,7 +311,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   // nk_test_init(naut);
 
   // kick off the timer subsystem by setting a timer sometime in the future
-  sbi_set_timer(r_time() + TICK_INTERVAL);
+  sbi_set_timer(read_csr(time) + TICK_INTERVAL);
 
   my_monitor_entry();
 

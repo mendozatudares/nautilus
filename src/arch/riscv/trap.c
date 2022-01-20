@@ -1,21 +1,20 @@
-#include <nautilus/cpu.h>
+#include <nautilus/arch.h>
 #include <nautilus/printk.h>
 #include <arch/riscv/plic.h>
-#include <arch/riscv/sbi.h>
 
 void kernel_vec();
 
 // set up to take exceptions and traps while in the kernel.
-void trap_init_hart(void) { w_stvec((uint64_t)kernel_vec); }
+void trap_init_hart(void) { write_csr(stvec,(uint64_t)kernel_vec); }
 
 /* Supervisor Trap Function */
 void kernel_trap(struct nk_regs *regs) {
   static unsigned long ticks = 0;
   int which_dev = 0;
-  regs->sepc = r_sepc();
-  regs->status = r_sstatus();
-  regs->cause = r_scause();
-  regs->tval = r_stval();
+  regs->sepc = read_csr(sepc);
+  regs->status = read_csr(sstatus);
+  regs->cause = read_csr(scause);
+  regs->tval = read_csr(stval);
 
   // if it was an interrupt, the top bit it set.
   int interrupt = (regs->cause >> 63);
@@ -28,7 +27,7 @@ void kernel_trap(struct nk_regs *regs) {
       // on nautilus, we don't actaully want to set a new timer yet, we just
       // want to call into the scheduler, which schedules the next timer.
       /* printk("tick %4d ", ++ticks); */
-      plic_timer_handler();
+      arch_timer_handler(0,0,0);
     } else if (nr == 9) {
       // supervisor external interrupt
       // first, we claim the irq from the PLIC
@@ -51,6 +50,6 @@ void kernel_trap(struct nk_regs *regs) {
   }
 
   // restore trap registers for use by kernelvec.S's sepc instruction.
-  w_sepc(regs->sepc);
-  w_sstatus(regs->status);
+  write_csr(sepc, regs->sepc);
+  write_csr(sstatus, regs->status);
 }

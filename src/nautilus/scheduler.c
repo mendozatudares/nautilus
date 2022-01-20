@@ -50,6 +50,7 @@
 */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/arch.h>
 #include <nautilus/thread.h>
 #include <nautilus/waitqueue.h>
 #include <nautilus/task.h>
@@ -1979,8 +1980,7 @@ static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
     // which is the start of the scheduling pass.   We need to set
     // the cycle counter delay based on the set time relative 
     // to the *current time*
-    uint32_t ticks = apic_realtime_to_ticks(apic,  
-					    scheduler->tsc.set_time - cur_time() + scheduler->slack);
+    uint32_t ticks = arch_realtime_to_ticks(scheduler->tsc.set_time - cur_time() + scheduler->slack);
 
     
     if (cur_time() >= scheduler->tsc.set_time) {
@@ -1996,9 +1996,7 @@ static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
     //    DEBUG("Setting timer to at most %llu ns (%llu ticks)\n",scheduler->tsc.set_time - now + scheduler->slack,
     //	  apic_realtime_to_ticks(apic, scheduler->tsc.set_time - now + scheduler->slack));
 
-    apic_update_oneshot_timer(apic, 
-			      ticks,
-			      IF_EARLIER);
+    arch_update_timer(ticks, IF_EARLIER);
 			      
 
 }
@@ -2190,9 +2188,9 @@ struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
 		DEBUG("Reinjecting timer: in_timer=%d, in_kick=%d\n", 
 		      a->in_timer_interrupt, a->in_kick_interrupt);
 		//BACKTRACE(DEBUG,3);
-		apic_update_oneshot_timer(a, 
-					  apic_realtime_to_ticks(a, NAUT_CONFIG_INTERRUPT_REINJECTION_DELAY_NS),
-					  IF_EARLIER);
+        arch_update_timer(
+                      arch_realtime_to_ticks(NAUT_CONFIG_INTERRUPT_REINJECTION_DELAY_NS), 
+                      IF_EARLIER);
 		per_cpu_get(system)->cpus[my_cpu_id()]->sched_state->reinject_count++;
 	    }
 	    // do not context switch
@@ -2232,7 +2230,7 @@ struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
     int yielding = rt_c->status==YIELDING;
     int idle = rt_c->thread->is_idle;
     int timed_out = scheduler->tsc.set_time < now;  
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
     extern int in_timer_interrupt;
     extern int in_kick_interrupt;
     int apic_timer = in_timer_interrupt;
@@ -3396,10 +3394,8 @@ static inline void rt_thread_update_aperiodic(rt_thread *t, rt_scheduler *schedu
 // in nanoseconds
 static uint64_t cur_time()
 {
-    struct sys_info *sys = per_cpu_get(system);
-    struct apic_dev *apic = sys->cpus[my_cpu_id()]->apic;
-    uint64_t c = rdtsc();
-    uint64_t t = apic_cycles_to_realtime(apic, c);
+    uint64_t c = arch_read_timestamp();
+    uint64_t t = arch_cycles_to_realtime(c);
     return t;
 }
 
@@ -4333,7 +4329,7 @@ void nk_sched_start()
 
     my_cpu->sched_state->tsc.sync_time_cycles = cur_cycles;
 
-    my_cpu->sched_state->tsc.sync_time = apic_cycles_to_realtime(apic,cur_cycles);
+    my_cpu->sched_state->tsc.sync_time = arch_cycles_to_realtime(cur_cycles);
 
     DEBUG("Time restarted at %lu cycles (currently %lu cycles / %lu ns)\n", tsc_start, cur_cycles, my_cpu->sched_state->tsc.sync_time);
 

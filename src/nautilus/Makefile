@@ -78,12 +78,12 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	smp.o \
 	idle.o \
 	thread.o \
-		task.o \
-		future.o \
+	task.o \
+	future.o \
 	waitqueue.o \
 	group.o \
-		timer.o \
-		scheduler.o \
+	timer.o \
+	scheduler.o \
 	group_sched.o \
 	barrier.o \
 	libccompat.o \
@@ -93,10 +93,10 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	blkdev.o \
 	netdev.o \
 	gpudev.o \
-		fs.o \
-		shell.o \
+	fs.o \
+	shell.o \
 	fprintk.o \
-		dtoa.o \
+	dtoa.o \
 	devicetree.o \
 	module.o \
 	linker.o \

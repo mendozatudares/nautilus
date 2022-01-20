@@ -1,4 +1,5 @@
 obj-y += asm/ \
+	 arch.o \
 	 init.o \
 	 main.o \
 	 numa.o \

@@ -53,13 +53,6 @@ bool dtb_node_get_rsv_ram (struct dtb_node *n) {
     return true;
 }
 
-void
-arch_reserve_boot_regions (unsigned long mbd)
-{
-    dtb_walk_devices(dtb_node_get_rsv_ram);
-}
-
-
 bool dtb_node_get_ram (struct dtb_node * n) {
     if(!strcmp(n->name, "memory")) {
         dtb_ram_size = n->reg.length;
@@ -67,6 +60,12 @@ bool dtb_node_get_ram (struct dtb_node * n) {
         return false;
     }
     return true;
+}
+
+void
+arch_reserve_boot_regions (unsigned long mbd)
+{
+    dtb_walk_devices(dtb_node_get_rsv_ram);
 }
 
 void
@@ -109,5 +108,3 @@ arch_detect_mem_map (mmap_info_t * mm_info,
 
     ++mm_info->num_regions;
 }
-
-
