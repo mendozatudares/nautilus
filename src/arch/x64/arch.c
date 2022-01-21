@@ -1,12 +1,12 @@
 #include <nautilus/arch.h>
 
-void arch_enable_ints(void)  { set_csr(sstatus, SSTATUS_SIE); }
-void arch_disable_ints(void) { clear_csr(sstatus, SSTATUS_SIE); }
-int  arch_ints_enabled(void) { return read_csr(sstatus) & SSTATUS_SIE; };
-
-int  arch_early_init (struct naut_info * naut) { return riscv_early_init(naut); }
-int  arch_numa_init(struct sys_info* sys) { return riscv_numa_init(sys); }
-void arch_paging_init(struct nk_mem_info * mem, ulong_t mbd) { riscv_paging_init(mem, mbd); }
+void arch_enable_ints(void)  { asm volatile ("sti" : : : "memory"); }
+void arch_disable_ints(void) { asm volatile ("cli" : : : "memory"); }
+int  arch_ints_enabled(void) {
+    uint64_t rflags = 0;
+    asm volatile("pushfq; popq %0" : "=a"(rflags));
+    return (rflags & RFLAGS_IF) != 0;
+}
 
 #include <dev/apic.h>
 #define MY_APIC per_cpu_get(system)->cpus[my_cpu_id()]->apic

@@ -345,10 +345,10 @@ typedef struct nk_sched_percpu_state {
 } rt_scheduler;
 
 #if INSTRUMENT
-#define INST_SCHED_IN(WHAT)  uint64_t _inst_start = rdtsc()
+#define INST_SCHED_IN(WHAT)  uint64_t _inst_start = arch_read_timestamp()
 #define INST_SCHED_OUT(WHAT)						\
 {									\
-	uint64_t inst_diff = rdtsc() - _inst_start;			\
+	uint64_t inst_diff = arch_read_timestamp() - _inst_start;			\
 	scheduler->WHAT ## _num++;					\
 	scheduler->WHAT##_sum+=inst_diff;				\
 	scheduler->WHAT##_sum2+=inst_diff*inst_diff;			\
@@ -4310,7 +4310,7 @@ void nk_sched_start()
 	// spin
     }
 #endif
-    cur_cycles = rdtsc();
+    cur_cycles = arch_read_timestamp();
     if (my_cpu->is_bsp) { 
 	// everyone has started their local tsc at 0
 	// we will now use the BSP tsc, which has advanced
@@ -4325,7 +4325,7 @@ void nk_sched_start()
 
     // msr_write(IA32_TIME_STAMP_COUNTER,tsc_start);
 
-    cur_cycles = rdtsc();
+    cur_cycles = arch_read_timestamp();
 
     my_cpu->sched_state->tsc.sync_time_cycles = cur_cycles;
 
@@ -4445,18 +4445,18 @@ static void timing_test(uint64_t N, uint64_t M, int print)
     INFO("Beginning timing test (%lu calls to loop of %lu iterations)\n",M,N);
   }
 
-  begin = rdtsc();
+  begin = arch_read_timestamp();
   for (i=0;i<M;i++) { 
     //    INFO("Loop %lu\n", i);
-    start = rdtsc();
+    start = arch_read_timestamp();
     nk_simple_timing_loop(N);
-    dur = rdtsc() - start;
+    dur = arch_read_timestamp() - start;
     if (dur>max) { max=dur; }
     if (dur<min) { min=dur; }
     sum += dur;
     sum2 += dur*dur;
   }
-  totaldur = rdtsc()-begin;
+  totaldur = arch_read_timestamp()-begin;
 
   if (print) {
     INFO("Timing test done - stats follow\n");
