@@ -13,8 +13,6 @@ uint64_t arch_cycles_to_realtime(uint64_t cycles) { return (cycles * 1000000000U
 #include <nautilus/scheduler.h>
 #include <nautilus/timer.h>
 
-int in_timer_interrupt = 0;
-int in_kick_interrupt = 0;
 static uint8_t timer_set = 0;
 static uint32_t current_ticks = 0;
 static uint64_t timer_count = 0;
@@ -35,8 +33,8 @@ void arch_update_timer(uint32_t ticks, nk_timer_condition_t cond) {
         break;
     }
     }
-    in_timer_interrupt=0;
-    in_kick_interrupt=0;
+    get_cpu()->in_timer_interrupt=0;
+    get_cpu()->in_kick_interrupt=0;
 }
 
 void arch_set_timer(uint32_t ticks) {
@@ -53,7 +51,7 @@ int  arch_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 {
     uint64_t time_to_next_ns;
 
-    in_timer_interrupt=1;
+    get_cpu()->in_timer_interrupt=1;
 
     timer_count++;
 

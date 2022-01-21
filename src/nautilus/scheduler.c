@@ -1938,7 +1938,6 @@ static void rt_thread_dump(rt_thread *thread, char *pre)
 static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
 {
     struct sys_info *sys = per_cpu_get(system);
-    struct apic_dev *apic = sys->cpus[my_cpu_id()]->apic;
 
     uint64_t next_arrival = -1; //big num
     uint64_t next_preempt = -1; //big num
@@ -1994,7 +1993,7 @@ static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
     }
 
     //    DEBUG("Setting timer to at most %llu ns (%llu ticks)\n",scheduler->tsc.set_time - now + scheduler->slack,
-    //	  apic_realtime_to_ticks(apic, scheduler->tsc.set_time - now + scheduler->slack));
+    //	  arch_realtime_to_ticks(arch, scheduler->tsc.set_time - now + scheduler->slack));
 
     arch_update_timer(ticks, IF_EARLIER);
 			      
@@ -2164,7 +2163,7 @@ struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
 	    // everyone's now restarted
 	    // if we got here due to the world stopper's kick
 	    // we should avoid running the scheduler
-	    if (!force_resched && !per_cpu_get(system)->cpus[my_cpu_id()]->apic->in_timer_interrupt) {
+	    if (!force_resched && !get_cpu()->in_timer_interrupt) {
 		DEBUG("Resuming from world stop without scheduling pass\n");
 		NK_GPIO_OUTPUT_MASK(~0x4,GPIO_AND);
 		return 0;
@@ -2179,19 +2178,19 @@ struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
 	if (force_resched) {
 	    DEBUG("Forced reschedule with preemption off\n");
 	} else {
-	    struct apic_dev *a = per_cpu_get(system)->cpus[my_cpu_id()]->apic;
+			struct cpu *c = get_cpu();
 	    DEBUG("Preemption disabled, avoiding rescheduling pass and staying with current thread\n");
 
-	    if (a->in_timer_interrupt || a->in_kick_interrupt) {
+	    if (c->in_timer_interrupt || c->in_kick_interrupt) {
 		// We are about to lose a timer interrupt
 		// and we need to reinject it so that it shows up again
 		DEBUG("Reinjecting timer: in_timer=%d, in_kick=%d\n", 
-		      a->in_timer_interrupt, a->in_kick_interrupt);
+		      c->in_timer_interrupt, c->in_kick_interrupt);
 		//BACKTRACE(DEBUG,3);
         arch_update_timer(
                       arch_realtime_to_ticks(NAUT_CONFIG_INTERRUPT_REINJECTION_DELAY_NS), 
                       IF_EARLIER);
-		per_cpu_get(system)->cpus[my_cpu_id()]->sched_state->reinject_count++;
+		c->sched_state->reinject_count++;
 	    }
 	    // do not context switch
 	    NK_GPIO_OUTPUT_MASK(~0x4,GPIO_AND);
@@ -2230,15 +2229,8 @@ struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
     int yielding = rt_c->status==YIELDING;
     int idle = rt_c->thread->is_idle;
     int timed_out = scheduler->tsc.set_time < now;  
-#ifdef NAUT_CONFIG_ARCH_RISCV
-    extern int in_timer_interrupt;
-    extern int in_kick_interrupt;
-    int apic_timer = in_timer_interrupt;
-    int apic_kick = in_kick_interrupt;
-#else
-    int apic_timer = apic->in_timer_interrupt;
-    int apic_kick = apic->in_kick_interrupt;
-#endif
+    int apic_timer = get_cpu()->in_timer_interrupt;
+    int apic_kick = get_cpu()->in_kick_interrupt;
 
     // "SPECIAL" means the current task is not to be enqueued
 #define CUR_IS_SPECIAL (going_to_sleep || going_to_exit || changing)

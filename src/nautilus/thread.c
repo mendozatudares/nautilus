@@ -233,6 +233,7 @@ static void
 thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
 {
 
+
 #ifdef NAUT_CONFIG_RISCV_HOST
 #define GPR_SAVE_SIZE      31*8
 #define GPR_RDI_OFFSET     176
@@ -1044,6 +1045,8 @@ __thread_fork (void)
 #else
     __asm__ __volatile__ ( "movq %%rsp, %0" : "=r"(rsp) : : "memory");
 #endif
+
+		printk("thread fork rsp = %p\n", rsp);
 
 #ifdef NAUT_CONFIG_ENABLE_STACK_CHECK
     // now check again after update to see if we didn't overrun/underrun the stack in the parent...

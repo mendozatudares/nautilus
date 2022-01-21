@@ -116,6 +116,9 @@ struct cpu {
 
     volatile uint8_t booted;
 
+
+		int in_timer_interrupt;
+		int in_kick_interrupt;
     struct apic_dev * apic;
 
     struct sys_info * system;
