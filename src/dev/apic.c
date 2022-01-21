@@ -453,7 +453,7 @@ apic_bcast_sipi (struct apic_dev * apic, uint8_t target)
 }
 
 static void calibrate_apic_timer(struct apic_dev *apic);
-static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
+int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
 
 
 static void
@@ -1346,7 +1346,7 @@ static void calibrate_apic_timer(struct apic_dev *apic)
 }
 
 
-static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
+int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 {
     NK_GPIO_OUTPUT_MASK(0x2,GPIO_OR);
 

@@ -240,6 +240,9 @@ nk_get_nautilus_info (void)
     return &nautilus_info;
 }
 
+
+
+#include <nautilus/arch.h>
 #ifdef NAUT_CONFIG_XEON_PHI
 #include <arch/k1om/main.h>
 #elif defined NAUT_CONFIG_HVM_HRT

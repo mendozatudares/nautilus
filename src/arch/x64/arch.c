@@ -1,4 +1,8 @@
 #include <nautilus/arch.h>
+#include <dev/apic.h>
+
+// Defined in dev/apic.h
+int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
 
 void arch_enable_ints(void)  { asm volatile ("sti" : : : "memory"); }
 void arch_disable_ints(void) { asm volatile ("cli" : : : "memory"); }
@@ -40,6 +44,6 @@ void arch_update_timer(uint32_t ticks, nk_timer_condition_t cond) {
 void arch_set_timer(uint32_t ticks) { apic_set_oneshot_timer(MY_APIC, ticks); }
 int  arch_read_timer(void) { return apic_read_timer(MY_APIC); }
 int  arch_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state) {
-    return apic_timer_handler(MY_APIC, excp, vec, state);
+    return apic_timer_handler(excp, vec, state);
 }
-uint64_t arch_read_timestamp() { return rtdsc(); }
+uint64_t arch_read_timestamp() { return rdtsc(); }
