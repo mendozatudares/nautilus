@@ -199,6 +199,11 @@ void dump_dtb(struct dtb_node *node, int depth) {
     printk("- #size-cells: %d\n", node->size_cells);
   }
 
+  if (node->irq != 0) {
+    spaces(depth);
+    printk("- irq: %d\n", node->irq);
+  }
+
   spaces(depth);
   printk("- compatible: ");
   for (int i = 0; i < node->ncompat; i++) {
