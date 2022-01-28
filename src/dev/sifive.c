@@ -148,6 +148,8 @@ static void uart_init(addr_t base, uint64_t clock) {
     uint64_t quotient = (clock + baud - 1) / baud;
 
     regs(uart_base)->div = (quotient == 0) ? 0 : (uint32_t)(quotient - 1);
+    regs(uart_base)->rxctrl.cnt = 1;
+    regs(uart_base)->ie = 0xff;
 
     uart_inited = 1;
 }
@@ -179,7 +181,7 @@ void serial_write(const char *b) {
     }
 }
 
-bool dtb_node_get_sifive_uart(struct dtb_node *n) {
+bool_t dtb_node_get_sifive_uart(struct dtb_node *n) {
     if (strstr(n->compatible, "sifive,uart0")) {
         uart_init(n->address, 5);
         return false;
@@ -191,8 +193,8 @@ void serial_init(void) {
     dtb_walk_devices(dtb_node_get_sifive_uart);
 }
 
-// TODO: integrate the sifive driver with nautilus, interrupt-based I/O
 #if 0
+// TODO: integrate the sifive driver with nautilus, interrupt-based I/O
 /* This state supports early output */
 /* the lock is reused for late output to serial lines / chars */
 static spinlock_t sifive_lock; /* for SMP */
@@ -207,6 +209,7 @@ static struct sifive_state *early_dev = 0;
 
 struct sifive_state {
     struct nk_char_dev *dev;
+    uint8_t     irq;    // irq
     uint64_t    addr;   // base address
     spinlock_t  input_lock;
     spinlock_t  output_lock;
@@ -224,7 +227,6 @@ static int sifive_do_get_characteristics(void * state, struct nk_char_dev_charac
 
 static int sifive_input_empty(struct sifive_state *s)
 {
-    regs(s->addr)->rxctrl.
     return s->input_buf_head == s->input_buf_tail;
 }
 
@@ -291,6 +293,10 @@ static int sifive_do_read(void *state, uint8_t *dest)
     return rc;
 }
 
+static void kick_output(struct sifive_state *s);
+
+static void sifive_putchar_early (uchar_t c);
+
 static int sifive_do_write(void *state, uint8_t *src)
 {
     struct sifive_state *s = (struct sifive_state *)state;
@@ -349,50 +355,30 @@ static struct nk_char_dev_int chardevops = {
     .status = sifive_do_status
 };
 
-static int sifive_do_get_characteristics(void * state, struct nk_char_dev_characteristics *c)
+static void sifive_write_reg(struct sifive_state *s, uint8_t offset, uint8_t val)
 {
-    memset(c,0,sizeof(*c));
-    return 0;
+    if (s) {
+        *(volatile uint8_t *)(s->addr + offset) = val;
+    } else {
+	*(volatile uint8_t *)(sifive_io_addr + offset) = val;
+    }
 }
 
-static int serial_do_read(void *state, uint8_t *dest)
+static uint8_t sifive_read_reg(struct sifive_state *s, uint8_t offset)
 {
-    struct serial_state *s = (struct serial_state *)state;
-
-    int flags;
-
-    flags = spin_lock_irq_save(&s->input_lock);
-
-    int uart_getchar()
-
-
-
- out:
-    spin_unlock_irq_restore(&s->input_lock, flags);
-    return rc;
-}
-
-static struct nk_char_dev_int chardevops = {
-    .get_characteristics = sifive_do_get_characteristics,
-    .read = sifive_do_read,
-    .write = sifive_do_write,
-    .status = sifive_do_status
-};
-
-void
-serial_early_init (void)
-{
-    serial_print_level = SERIAL_PRINT_DEBUG_LEVEL;
-
-    spinlock_init(&serial_lock);
-
-
+    if (s) {
+	return *(volatile uint8_t)(s->addr + offset);
+    } else {
+	return *(volatile uint8_t)(sifive_io_addr + offset);
+    }
 }
 
 static int sifive_setup(struct sifive_state *s)
 {
 
 }
+
+static int sifive_irq_handler (excp_entry_t * excp, excp_vec_t vec, void *state);
 
 static void serial_putchar_early (uchar_t c)
 {
@@ -459,5 +445,4 @@ uchar_t serial_getchar(void) {
         return data.isEmpty ? -1 : data.data;
     }
 }
-
 #endif

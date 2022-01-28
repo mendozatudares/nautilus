@@ -16,10 +16,17 @@ addr_t plic_addr = 0;
 #define PLIC_MCLAIM(hart) (PLIC + 0x200004 + (hart)*0x2000)
 #define PLIC_SCLAIM(hart) (PLIC + 0x201004 + (hart)*0x2000)
 
-bool dtb_node_get_plic(struct dtb_node *n) {
-	// printk("%s %s\n", n->name, n->compatible);
-    if (strstr(n->name, "interrupt-controller") && strstr(n->compatible, "plic")) {
-        // printk("This one looks good.\n");
+bool_t dtb_node_plic_compatible(struct dtb_node *n) {
+    for (off_t i = 0; i < n->ncompat; i++) {
+	if (strstr(n->compatible[i], "plic")) {
+	    return true;
+	}
+    }
+    return false;
+}
+
+bool_t dtb_node_get_plic(struct dtb_node *n) {
+    if (strstr(n->name, "interrupt-controller") && dtb_node_plic_compatible(n)) {
         PLIC = n->address;
         return false;
     }
@@ -28,7 +35,7 @@ bool dtb_node_get_plic(struct dtb_node *n) {
 
 void plic_init(void) {
     dtb_walk_devices(dtb_node_get_plic);
-    // printk("PLIC @ %p\n", plic_addr);
+    printk("PLIC @ %p\n", plic_addr);
 
     if (plic_addr != 0) {
         // set desired IRQ priorities non-zero (otherwise disabled).

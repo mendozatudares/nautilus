@@ -85,7 +85,7 @@ dtb_parse_plic (struct dtb_node * n) {
     return 0;
 }
 
-bool dtb_node_get_cpu (struct dtb_node * n) {
+bool_t dtb_node_get_cpu (struct dtb_node * n) {
     if(!strcmp(n->name, "cpu")) {
         dtb_parse_cpu(n);
     } else if(!strcmp(n->name, "interrupt-controller") && strstr(n->compatible, "plic0")) {

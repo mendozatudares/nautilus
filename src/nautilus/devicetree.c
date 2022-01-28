@@ -17,18 +17,6 @@ static uint64_t bswap64(uint64_t val) {
   return (val & 0x00FF00FF00FF00FF) << 8  | (val & 0xFF00FF00FF00FF00) >> 8;
 }
 
-int dtb_node_get_addr_cells(struct dtb_node *n) {
-  if (n->address_cells != -1) return n->address_cells;
-  if (n->parent != NULL) return dtb_node_get_addr_cells(n->parent);
-  return 0;
-}
-
-int dtb_node_get_size_cells(struct dtb_node *n) {
-  if (n->size_cells != -1) return n->size_cells;
-  if (n->parent != NULL) return dtb_node_get_size_cells(n->parent);
-  return 0;
-}
-
 struct prop* device_tree_node_get_prop(struct device_tree_node *n, char* name) {
   struct prop *tmp_prop;
   list_for_each_entry(tmp_prop, &n->props, node) {
@@ -114,6 +102,14 @@ static struct dtb_node *alloc_device(const char *name) {
   return dev;
 }
 
+void dtb_walk_devices(bool_t (*callback)(struct dtb_node *)) {
+  for (int i = 0; i < next_device; i++) {
+    if (devices[i].is_device) {
+      if (!callback(&devices[i])) break;
+    }
+  }
+}
+
 #define STREQ(s1, s2) (!strcmp((s1), (s2)))
 
 static void node_set_prop(struct dtb_node *node, const char *name, int len, uint8_t *val) {
@@ -133,6 +129,7 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
     node->irq = bswap32(*(uint32_t *)val);
     return;
   }
+
 
   if (STREQ(name, "reg")) {
     node->is_device = true;
@@ -160,20 +157,28 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
 
   if (STREQ(name, "compatible")) {
     node->is_device = true;
-    strncpy(node->compatible, (const char *)val, sizeof(node->compatible));
-    // printk("compatible: %s\n", val);
+    memcpy(node->compat, (const char *)val, len);
+
+    node->ncompat = 0;
+    char *cur = node->compat;
+    off_t off = 0;
+    while (off < len) {
+      if (cur[0] == '\0') break;
+      size_t current_len = strlen(cur);
+      node->compatible[node->ncompat] = cur;
+      node->ncompat++;
+
+      off += current_len + 1;
+      cur = node->compat + off;
+    }
+    
+    printk("node is compatible with %d: ", node->ncompat);
+    for (int i = 0; i < node->ncompat; i++) {
+      printk("%s ", node->compatible[i]);
+    }
+    printk("\n");
 
     return;
-  }
-  // printk("   %s@%llx\t%s = %p\n", node->name, node->address, name, val);
-}
-
-
-void dtb_walk_devices(bool (*callback)(struct dtb_node *)) {
-  for (int i = 0; i < next_device; i++) {
-    if (devices[i].is_device) {
-      if (!callback(&devices[i])) break;
-    }
   }
 }
 
@@ -195,7 +200,12 @@ void dump_dtb(struct dtb_node *node, int depth) {
   }
 
   spaces(depth);
-  printk("- compatible: %s\n", node->compatible);
+  printk("- compatible: ");
+  for (int i = 0; i < node->ncompat; i++) {
+    if (i) printk(";");
+    printk("%s", node->compatible[i]);
+  }
+  printk("\n");
 
 
   if (node->is_device) {
@@ -208,21 +218,8 @@ void dump_dtb(struct dtb_node *node, int depth) {
 }
 
 int dtb_parse(struct dtb_fdt_header *fdt) {
-  INFO_PRINT("SBI gave FDT at %p\n", fdt);
+  INFO_PRINT("Parsing device tree at %p, size: %d\n", fdt, bswap32(fdt->totalsize));
   global_fdt_header = fdt;
-
-  DEBUG_PRINT("  magic: %p\n", bswap32(fdt->magic));
-  DEBUG_PRINT("  totalsize: %d\n", bswap32(fdt->totalsize));
-  DEBUG_PRINT("  off_dt_struct: %p\n", bswap32(fdt->off_dt_struct));
-  DEBUG_PRINT("  off_dt_strings: %p\n", bswap32(fdt->off_dt_strings));
-  DEBUG_PRINT("  off_mem_rsvmap: %p\n", bswap32(fdt->off_mem_rsvmap));
-  DEBUG_PRINT("  version: %d\n", bswap32(fdt->version));
-  DEBUG_PRINT("  last_comp_version: %d\n", bswap32(fdt->last_comp_version));
-  DEBUG_PRINT("  boot_cpuid_phys: %p\n", bswap32(fdt->boot_cpuid_phys));
-  DEBUG_PRINT("  size_dt_strings: %p\n", bswap32(fdt->size_dt_strings));
-  DEBUG_PRINT("  size_dt_struct: %p\n", bswap32(fdt->size_dt_struct));
-
-	next_device = 0;
 
   if (next_device != 0) panic("expected next_device = 0, got %d\n", next_device);
   struct dtb_node *root = alloc_device("");
@@ -235,6 +232,7 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
   int depth = 0;
 
   while (bswap32(*sp) != FDT_END) {
+    off_t off = ((off_t)sp - (off_t)fdt);
     uint32_t op = bswap32(*sp);
     /* sp points to the next word */
     sp++;
@@ -243,7 +241,6 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
     uint32_t nameoff;
     char *name;
     char *valptr = NULL;
-    char value[256];
 
     switch (op) {
       case FDT_BEGIN_NODE:
@@ -253,23 +250,18 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
         for (int i = 0; i < len; i++)
           sp++;
         new_node = alloc_device(name);
-
         new_node->parent = node;
-
+	new_node->fdt_offset = off;
         new_node->sibling = node->children;
         node->children = new_node;
-
         node = new_node;
         new_node = NULL;
-
         depth++;
-
         break;
       case FDT_END_NODE:
         depth--;
         node = node->parent;
         break;
-
       case FDT_PROP:
         len = bswap32(*sp);
         sp++;
@@ -279,20 +271,15 @@ int dtb_parse(struct dtb_fdt_header *fdt) {
         node_set_prop(node, strings + nameoff, len, valptr);
         for (int i = 0; i < round_up(len, 4) / 4; i++)
           sp++;
-
         break;
-
       case FDT_NOP:
-        // printk("nop\n");
         break;
-
       case FDT_END:
-        // printk("end\n");
         break;
     }
   }
 
-  INFO_PRINT("Dumping Parsed DTB:\n");
+  INFO_PRINT("Dumping parsed device tree:\n");
   dump_dtb(node, 0);
   return next_device;
 }
@@ -303,6 +290,9 @@ static struct fdt_type {
 } fdt_types[] = {
     {"compatible", FDT_T_STRING},
     {"model", FDT_T_STRING},
+    {"stdout-path", FDT_T_STRING},
+    {"bootargs", FDT_T_STRING},
+    {"riscv,isa", FDT_T_STRING},
     {"phandle", FDT_T_INT},
     {"status", FDT_T_STRING},
     {"#address-cells", FDT_T_INT},
@@ -313,6 +303,7 @@ static struct fdt_type {
     {"dma-ranges", FDT_T_EMPTY}, /* TODO: <prop-encoded-array> */
     {"name", FDT_T_STRING},
     {"device_type", FDT_T_STRING},
+    {"interrupts", FDT_T_STRING},
     {0, 0},
 };
 
@@ -388,7 +379,7 @@ void device_tree_init(struct device_tree *dt, struct dtb_fdt_header *fdt) {
 }
 
 
-void device_tree_deinit(struct device_tree *dt) { mm_boot_free((void *)dt->fdt, sizeof(dt->fdt)); }
+void device_tree_deinit(struct device_tree *dt) { free((void *)dt->fdt); }
 
 void device_tree_node_dump(struct device_tree_node *n, int depth) {
   for (int i = 0; i < depth; i++)

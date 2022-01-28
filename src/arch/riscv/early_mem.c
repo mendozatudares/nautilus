@@ -43,7 +43,7 @@ extern ulong_t kernel_end;
 off_t dtb_ram_start = 0;
 size_t dtb_ram_size = 0;
 
-bool dtb_node_get_rsv_ram (struct dtb_node *n) {
+bool_t dtb_node_get_rsv_ram (struct dtb_node *n) {
     if(strstr(n->name, "mmode_resv")) {
         addr_t start = n->reg.address;
         ulong_t len = n->reg.length;
@@ -53,7 +53,7 @@ bool dtb_node_get_rsv_ram (struct dtb_node *n) {
     return true;
 }
 
-bool dtb_node_get_ram (struct dtb_node * n) {
+bool_t dtb_node_get_ram (struct dtb_node * n) {
     if(!strcmp(n->name, "memory")) {
         dtb_ram_size = n->reg.length;
         dtb_ram_start = n->reg.address;

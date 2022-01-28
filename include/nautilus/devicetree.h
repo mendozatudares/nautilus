@@ -4,7 +4,6 @@
 #include <nautilus/naut_types.h>
 #include <nautilus/list.h>
 #include <nautilus/mm.h>
-#include <stdbool.h>
 
 struct dtb_fdt_header {
   uint32_t magic;
@@ -24,17 +23,24 @@ struct dtb_reg {
   size_t length;
 };
 
+#define DTB_MAX_COMPATIBLE 8
+
 struct dtb_node {
   // name@address
   char name[32];
   off_t address;
   struct dtb_node *parent;
-  char compatible[32];
-  bool is_device;
+
+  int ncompat;
+  char *compatible[DTB_MAX_COMPATIBLE];
+  char compat[128];
+  bool_t is_device;
 
   short address_cells;
   short size_cells;
   short irq;
+
+  off_t fdt_offset;
 
   struct dtb_reg reg;
 
@@ -43,13 +49,22 @@ struct dtb_node {
   struct dtb_node *sibling;  /* A pointer to the next sibling of the parent's children */
 };
 
-int dtb_node_get_addr_cells(struct dtb_node *n);
-int dtb_node_get_size_cells(struct dtb_node *n);
+static inline int dtb_node_get_addr_cells(struct dtb_node *n) {
+  if (n->address_cells != -1) return n->address_cells;
+  if (n->parent != NULL) return dtb_node_get_addr_cells(n->parent);
+  return 0;
+}
+
+static inline int dtb_node_get_size_cells(struct dtb_node *n) {
+  if (n->size_cells != -1) return n->size_cells;
+  if (n->parent != NULL) return dtb_node_get_size_cells(n->parent);
+  return 0;
+}
 
 /* Return the number of devices nodes found */
 int dtb_parse(struct dtb_fdt_header *hdr);
 /* Walk the devices with a callback. Continue if the callback returns true */
-void dtb_walk_devices(bool (*callback)(struct dtb_node *));
+void dtb_walk_devices(bool_t (*callback)(struct dtb_node *));
 
 /*
   * Some of the standard props

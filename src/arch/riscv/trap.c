@@ -68,6 +68,7 @@ void kernel_trap(struct nk_regs *regs) {
       int irq = plic_claim();
 
       // do something with the IRQ
+      printk("received irq: %d\n", irq);
 
       // the PLIC allows each device to raise at most one
       // interrupt at a time; tell the PLIC the device is

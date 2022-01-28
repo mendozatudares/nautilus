@@ -117,7 +117,7 @@ extern uint64_t _bssEnd[];
 extern struct naut_info *smp_ap_stack_switch(uint64_t, uint64_t,
                          struct naut_info *);
 
-bool second_done = false;
+bool_t second_done = false;
 
 void secondary_entry(int hartid) {
   printk("RISCV: hart %d started!\n", hartid);
@@ -338,7 +338,7 @@ vga_make_entry (char c, uint8_t color)
 
 /* Some threading stuff for monitor */
 
-static bool done = false;
+static bool_t done = false;
 
 static void print_ones(void)
 {
