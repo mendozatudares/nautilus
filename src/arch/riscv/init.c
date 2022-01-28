@@ -317,7 +317,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   // start_secondary(&(naut->sys));
 
-  /* nk_launch_shell("root-shell",my_cpu_id(),0,0); */
+  nk_launch_shell("root-shell",my_cpu_id(),0,0);
 
   printk("Nautilus boot thread yielding (indefinitely)\n");
 
