@@ -156,7 +156,7 @@ int start_secondary(struct sys_info *sys) {
     __sync_synchronize();
 
     struct sbiret ret =
-    sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
+    sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot, 1);
     if (ret.error != SBI_SUCCESS) {
       continue;
     }
@@ -315,7 +315,7 @@ void init(unsigned long hartid, unsigned long fdt) {
 
   my_monitor_entry();
 
-  // start_secondary(&(naut->sys));
+  start_secondary(&(naut->sys));
 
   nk_launch_shell("root-shell",my_cpu_id(),0,0);
 
