@@ -155,7 +155,7 @@ int start_secondary(struct sys_info *sys) {
     second_done = false;
     __sync_synchronize();
 
-    struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, init_smp_boot, 1);
+    struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot, 1);
     if (ret.error != SBI_SUCCESS) {
       continue;
     }
