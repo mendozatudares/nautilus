@@ -65,6 +65,7 @@ irq_to_vec (uint8_t irq)
     return nk_get_nautilus_info()->sys.int_info.irq_map[irq].vector;
 }
 
+#ifdef NAUT_CONFIG_ARCH_X86
 void
 irqmap_set_ioapic (uint8_t irq, struct ioapic * ioapic)
 {
@@ -106,6 +107,7 @@ nk_irq_is_assigned (uint8_t irq)
     struct naut_info * naut = nk_get_nautilus_info();
     return naut->sys.int_info.irq_map[irq].assigned;
 }
+#endif
 
 
 /* 
@@ -161,6 +163,7 @@ register_irq_handler (uint16_t irq,
 }
 
 
+#ifdef NAUT_CONFIG_ARCH_X86
 void 
 disable_8259pic (void)
 {
@@ -277,5 +280,6 @@ nk_int_init (struct sys_info * sys)
 
     return 0;
 }
+#endif
 
 

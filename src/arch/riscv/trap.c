@@ -10,9 +10,9 @@ void trap_init_hart(void) { write_csr(stvec,(uint64_t)kernel_vec); }
 static void print_regs(struct nk_regs *r) {
   int i = 0;
   printk("Current Thread=0x%x (%p) \"%s\"\n",
-	  get_cur_thread() ? get_cur_thread()->tid : -1,
-	  get_cur_thread() ? (void*)get_cur_thread() :  NULL,
-	  !get_cur_thread() ? "NONE" : get_cur_thread()->is_idle ? "*idle*" : get_cur_thread()->name);
+      get_cur_thread() ? get_cur_thread()->tid : -1,
+      get_cur_thread() ? (void*)get_cur_thread() :  NULL,
+      !get_cur_thread() ? "NONE" : get_cur_thread()->is_idle ? "*idle*" : get_cur_thread()->name);
 
   printk("[-------------- Register Contents --------------]\n");
   printk("RA:  %016lx SP:  %016lx\n", r->ra, r->sp);
@@ -48,15 +48,13 @@ void kernel_trap(struct nk_regs *regs) {
   regs->cause = read_csr(scause);
   regs->scratch = read_csr(sscratch);
 
-  int which_dev = 0;
-
   // if it was an interrupt, the top bit it set.
   int interrupt = (regs->cause >> 63);
   // the type of trap is the rest of the bits.
   int nr = regs->cause & ~(1llu << 63);
 
   if (interrupt) {
-    if (nr == 1) { }
+      printk("int!, nr = %d, sie=%p, pending=%p\n", nr, read_csr(sie), plic_pending());
     if (nr == 5) {
       // timer interrupt
       // on nautilus, we don't actaully want to set a new timer yet, we just
@@ -68,7 +66,7 @@ void kernel_trap(struct nk_regs *regs) {
       int irq = plic_claim();
 
       // do something with the IRQ
-      printk("received irq: %d\n", irq);
+      panic("received irq: %d\n", irq);
 
       // the PLIC allows each device to raise at most one
       // interrupt at a time; tell the PLIC the device is
@@ -79,47 +77,47 @@ void kernel_trap(struct nk_regs *regs) {
     // it's a fault/trap (like illegal instruction)
     switch (nr) {
       case 0:
-	kernel_unhandled_trap(regs, "Instruction address misaligned");
-	break;
+        kernel_unhandled_trap(regs, "Instruction address misaligned");
+        break;
       case 1:
-	kernel_unhandled_trap(regs, "Instruction access fault");
-	break;
+        kernel_unhandled_trap(regs, "Instruction access fault");
+        break;
       case 2:
-	kernel_unhandled_trap(regs, "Illegal instruction");
-	break;
+        kernel_unhandled_trap(regs, "Illegal instruction");
+        break;
       case 3:
-	kernel_unhandled_trap(regs, "Breakpoint");
-	break;
+        kernel_unhandled_trap(regs, "Breakpoint");
+        break;
       case 4:
-	kernel_unhandled_trap(regs, "Load address misaligned");
-	break;
+        kernel_unhandled_trap(regs, "Load address misaligned");
+        break;
       case 5:
-	kernel_unhandled_trap(regs, "Load access fault");
-	break;
+        kernel_unhandled_trap(regs, "Load access fault");
+        break;
       case 6:
-	kernel_unhandled_trap(regs, "Store/AMO address misaligned");
-	break;
+        kernel_unhandled_trap(regs, "Store/AMO address misaligned");
+        break;
       case 7:
-	kernel_unhandled_trap(regs, "Store/AMO access fault");
-	break;
+        kernel_unhandled_trap(regs, "Store/AMO access fault");
+        break;
       case 8:
-	kernel_unhandled_trap(regs, "Environment call from S-mode");
-	break;
+        kernel_unhandled_trap(regs, "Environment call from U-mode");
+        break;
       case 9:
-	kernel_unhandled_trap(regs, "Environment call from S-mode");
-	break;
+        kernel_unhandled_trap(regs, "Environment call from S-mode");
+        break;
       case 12:
-	kernel_unhandled_trap(regs, "Instruction page fault");
-	break;
+        kernel_unhandled_trap(regs, "Instruction page fault");
+        break;
       case 13:
-	kernel_unhandled_trap(regs, "Load page fault");
-	break;
+        kernel_unhandled_trap(regs, "Load page fault");
+        break;
       case 15:
-	kernel_unhandled_trap(regs, "Store/AMO page fault");
-	break;
+        kernel_unhandled_trap(regs, "Store/AMO page fault");
+        break;
       default:
-	kernel_unhandled_trap(regs, "Reserved");
-	break;
+        kernel_unhandled_trap(regs, "Reserved");
+        break;
     }
   }
 

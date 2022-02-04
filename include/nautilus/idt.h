@@ -131,6 +131,7 @@ int idt_find_and_reserve_range(ulong_t numentries, int aligned, ulong_t *first);
 int null_excp_handler(excp_entry_t * excp, excp_vec_t vec, void * state_addr);
 int null_irq_handler(excp_entry_t * excp, excp_vec_t vector, void * state_addr);
 
+#ifdef NAUT_CONFIG_ARCH_X86
 static inline void
 write_gate_desc (struct   gate_desc64 * idt,
                  uint32_t gate, 
@@ -164,10 +165,9 @@ set_intr_gate (struct gate_desc64 * idt, unsigned gate, const void * func)
 static inline void 
 lidt (const struct idt_desc * d) 
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
         asm volatile ("lidt %0" :: "m" (*d));
-#endif
 }
+#endif
 
 #endif /* !__ASSEMBLER__ */
 

@@ -7,6 +7,11 @@ void arch_enable_ints(void);
 void arch_disable_ints(void);
 int  arch_ints_enabled(void);
 
+void arch_irq_enable(int irq);
+void arch_irq_disable(int irq);
+void arch_irq_install(int irq, int(*handler)(excp_entry_t * excp, excp_vec_t vector, void *state));
+void arch_irq_uninstall(int irq);
+
 int  arch_early_init (struct naut_info * naut);
 int  arch_numa_init(struct sys_info* sys);
 

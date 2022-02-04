@@ -1,8 +1,4 @@
 #include <nautilus/arch.h>
-#include <dev/apic.h>
-
-// Defined in dev/apic.h
-int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
 
 void arch_enable_ints(void)  { asm volatile ("sti" : : : "memory"); }
 void arch_disable_ints(void) { asm volatile ("cli" : : : "memory"); }
@@ -28,15 +24,7 @@ uint64_t arch_cycles_to_realtime(uint64_t cycles) {
     return apic_cycles_to_realtime(MY_APIC, cycles);
 }
 
-#include <arch/riscv/sbi.h>
 #include <nautilus/scheduler.h>
-#include <nautilus/timer.h>
-
-int in_timer_interrupt = 0;
-int in_kick_interrupt = 0;
-static uint8_t timer_set = 0;
-static uint32_t current_ticks = 0;
-static uint64_t timer_count = 0;
 
 void arch_update_timer(uint32_t ticks, nk_timer_condition_t cond) {
     apic_update_oneshot_timer(MY_APIC, ticks, cond);

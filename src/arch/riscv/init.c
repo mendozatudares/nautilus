@@ -109,7 +109,7 @@ out_err:
   " Kyle C. Hale (c) 2014 | Northwestern University   \n" \
   "+===============================================+  \n\n"
 
-extern addr_t init_smp_boot;
+extern uint8_t  init_smp_boot[];
 extern uint64_t secondary_core_stack;
 extern uint64_t _bssStart[];
 extern uint64_t _bssEnd[];
@@ -155,8 +155,7 @@ int start_secondary(struct sys_info *sys) {
     second_done = false;
     __sync_synchronize();
 
-    struct sbiret ret =
-    sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, &init_smp_boot);
+    struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i, init_smp_boot, 1);
     if (ret.error != SBI_SUCCESS) {
       continue;
     }
@@ -164,23 +163,6 @@ int start_secondary(struct sys_info *sys) {
     printk("RISCV: hart %d is trying to start hart %d\n", my_cpu_id(), i);
 
     while (second_done != true) {
-      /*
-      struct sbiret ret = sbi_call(SBI_EXT_HSM, SBI_EXT_HSM_HART_START, i);
-      switch(ret.value) {
-          case SBI_HSM_HART_STATUS_STARTED:
-              printk("started\n");
-              break;
-          case SBI_HSM_HART_STATUS_STOPPED:
-              printk("stopped\n");
-              break;
-          case SBI_HSM_HART_STATUS_START_PENDING:
-              printk("start pending\n");
-              break;
-          case SBI_HSM_HART_STATUS_STOP_PENDING:
-              printk("stop pending\n");
-              break;
-      }
-      */
       __sync_synchronize();
     }
 
@@ -197,6 +179,9 @@ void init(unsigned long hartid, unsigned long fdt) {
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
   nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
+
+  // Write supervisor trap vector location
+  trap_init_hart();
 
   // Get necessary information from SBI
   sbi_early_init();
@@ -219,18 +204,19 @@ void init(unsigned long hartid, unsigned long fdt) {
     panic("Problem parsing devicetree header\n");
   }
 
-  // We now have serial output without SBI
-  serial_init();
-
   printk("RISCV: hart %d mvendorid: %llx\n", hartid, sbi_call(SBI_GET_MVENDORID).value);
   printk("RISCV: hart %d marchid:   %llx\n", hartid, sbi_call(SBI_GET_MARCHID).value);
   printk("RISCV: hart %d mimpid:    %llx\n", hartid, sbi_call(SBI_GET_MIMPID).value);
+
+  // Initialize platform level interrupt controller for this HART
+  plic_init();
 
   nk_dev_init();
   nk_char_dev_init();
   nk_block_dev_init();
   nk_net_dev_init();
   nk_gpu_dev_init();
+
 
   // Setup the temporary boot-time allocator
   mm_boot_init(fdt);
@@ -254,15 +240,11 @@ void init(unsigned long hartid, unsigned long fdt) {
    * allocated in the boot mem allocator are kept reserved */
   mm_boot_kmem_init();
 
-  // Write supervisor trap vector location
-  trap_init_hart();
-
-  // Initialize platform level interrupt controller for this HART
-  plic_init();
-
+  /* from this point on, we can use percpu macros (even if the APs aren't up) */
   plic_init_hart();
 
-  /* from this point on, we can use percpu macros (even if the APs aren't up) */
+  // We now have serial output without SBI
+  serial_init();
 
   sbi_init();
 
@@ -313,9 +295,10 @@ void init(unsigned long hartid, unsigned long fdt) {
   // kick off the timer subsystem by setting a timer sometime in the future
   sbi_set_timer(read_csr(time) + TICK_INTERVAL);
 
-  my_monitor_entry();
+  sifive_test();
+  /* my_monitor_entry(); */
 
-  // start_secondary(&(naut->sys));
+  start_secondary(&(naut->sys));
 
   nk_launch_shell("root-shell",my_cpu_id(),0,0);
 

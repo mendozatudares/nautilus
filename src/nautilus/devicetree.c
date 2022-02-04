@@ -171,12 +171,6 @@ static void node_set_prop(struct dtb_node *node, const char *name, int len, uint
       off += current_len + 1;
       cur = node->compat + off;
     }
-    
-    printk("node is compatible with %d: ", node->ncompat);
-    for (int i = 0; i < node->ncompat; i++) {
-      printk("%s ", node->compatible[i]);
-    }
-    printk("\n");
 
     return;
   }

@@ -73,8 +73,8 @@ GLOBAL(nautilus_entry)
 
     # enable supervisor interrupts
     li      t0, SIE_SEIE
-	or      t0, t0, SIE_STIE
-	or      t0, t0, SIE_SSIE
+    or      t0, t0, SIE_STIE
+    or      t0, t0, SIE_SSIE
     csrs    sie, t0
 
     la      t0, main_ptr
