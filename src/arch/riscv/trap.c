@@ -5,7 +5,7 @@
 void kernel_vec();
 
 // set up to take exceptions and traps while in the kernel.
-void trap_init_hart(void) { write_csr(stvec,(uint64_t)kernel_vec); }
+void trap_init(void) { write_csr(stvec,(uint64_t)kernel_vec); }
 
 static void print_regs(struct nk_regs *r) {
   int i = 0;

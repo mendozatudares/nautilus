@@ -8,7 +8,8 @@
 static addr_t plic_addr = 0;
 
 #define MREG(x) *((uint32_t *)x)
-#define PLIC           plic_addr
+
+#define PLIC plic_addr
 #define PLIC_PRIORITY MREG(PLIC + 0x0)
 #define PLIC_PENDING MREG(PLIC + 0x1000)
 #define PLIC_MENABLE(hart) MREG(PLIC + 0x2000 + (hart)*0x100)
@@ -32,6 +33,7 @@ bool_t dtb_node_plic_compatible(struct dtb_node *n) {
 
 bool_t dtb_node_get_plic(struct dtb_node *n) {
     if (strstr(n->name, "interrupt-controller") && dtb_node_plic_compatible(n)) {
+        printk("PLIC @ %p\n", n->address);
         PLIC = n->address;
         return false;
     }
@@ -39,39 +41,46 @@ bool_t dtb_node_get_plic(struct dtb_node *n) {
 }
 
 void plic_init(void) {
-    dtb_walk_devices(dtb_node_get_plic);
+    /* dtb_walk_devices(dtb_node_get_plic); */
+    PLIC = 0x0c000000L;
 }
 
 static void plic_toggle(int hart, int hwirq, int priority, bool_t enable) {
-    printk("toggling on hart %d, irq=%d, priority=%d, enable=%d\n", hart, hwirq, priority, enable);
+    printk("toggling on hart %d, irq=%d, priority=%d, enable=%d, plic=%p\n", hart, hwirq, priority, enable, PLIC);
     off_t enable_base = PLIC + ENABLE_BASE + hart * ENABLE_PER_HART;
+    printk("enable_base=%p\n", enable_base);
     uint32_t* reg = &(MREG(enable_base + (hwirq / 32) * 4));
+    printk("reg=%p\n", reg);
     uint32_t hwirq_mask = 1 << (hwirq % 32);
+    printk("hwirq_mask=%p\n", hwirq_mask);
     MREG(PLIC + 4 * hwirq) = 7;
     PLIC_SPRIORITY(hart) = 0;
 
     if (enable) {
     *reg = *reg | hwirq_mask;
+    printk("*reg=%p\n", *reg);
     } else {
     *reg = *reg & ~hwirq_mask;
     }
+
+    printk("*reg=%p\n", *reg);
 }
 
 void plic_enable(int hwirq, int priority)
 {
-    plic_toggle(my_cpu_id(), hwirq, priority, true);
+    plic_toggle(1, hwirq, priority, true);
 }
 void plic_disable(int hwirq)
 {
-    plic_toggle(my_cpu_id(), hwirq, 0, false);
+    plic_toggle(1, hwirq, 0, false);
 }
 int plic_claim(void)
 {
-    return PLIC_SCLAIM(my_cpu_id());
+    return PLIC_SCLAIM(1);
 }
 void plic_complete(int irq)
 {
-    PLIC_SCLAIM(my_cpu_id()) = irq;
+    PLIC_SCLAIM(1) = irq;
 }
 int plic_pending(void)
 {
@@ -79,16 +88,7 @@ int plic_pending(void)
 }
 
 
-/* static int boot_hart = -1; */
-
-void plic_init_hart(void) {
-    int hart = my_cpu_id();
-
-    for (int i = 0; i < 0x1000 / 4; i++)
-        MREG(PLIC + i * 4) = 7;
-
-    (&PLIC_SENABLE(hart))[0] = 0;
-    (&PLIC_SENABLE(hart))[1] = 0;
-    (&PLIC_SENABLE(hart))[2] = 0;
+void plic_init_hart(int hart) {
+    PLIC_SPRIORITY(hart) = 0;
 }
 

@@ -129,10 +129,10 @@ void secondary_entry(int hartid) {
   w_tp((uint64_t)naut->sys.cpus[hartid]);
 
   /* Initialize the platform level interrupt controller for this HART */
-  plic_init_hart();
+  plic_init_hart(hartid);
 
   // Write supervisor trap vector location
-  trap_init_hart();
+  trap_init();
 
   /* set the timer with sbi :) */
   // sbi_set_timer(rv::get_time() + TICK_INTERVAL);
@@ -174,14 +174,14 @@ int start_secondary(struct sys_info *sys) {
 
 void my_monitor_entry(void);
 
-void init(unsigned long hartid, unsigned long fdt) {
+void init_full(unsigned long hartid, unsigned long fdt) {
 
   if (!fdt) panic("Invalid FDT: %p\n", fdt);
 
   nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart);
 
   // Write supervisor trap vector location
-  trap_init_hart();
+  trap_init();
 
   // Get necessary information from SBI
   sbi_early_init();
@@ -241,7 +241,7 @@ void init(unsigned long hartid, unsigned long fdt) {
   mm_boot_kmem_init();
 
   /* from this point on, we can use percpu macros (even if the APs aren't up) */
-  plic_init_hart();
+  plic_init_hart(hartid);
 
   // We now have serial output without SBI
   serial_init();
@@ -305,6 +305,38 @@ void init(unsigned long hartid, unsigned long fdt) {
   printk("Nautilus boot thread yielding (indefinitely)\n");
 
   idle(NULL, NULL);
+}
+
+void init(unsigned long hartid, unsigned long fdt) {
+
+  if (!fdt) panic("Invalid FDT: %p\n", fdt);
+
+  /* nk_low_level_memset(_bssStart, 0, (off_t)_bssEnd - (off_t)_bssStart); */
+
+  // Write supervisor trap vector location
+  trap_init();
+
+  // Zero out tp for now until cls is set up
+  w_tp(0);
+
+  struct naut_info *naut = &nautilus_info;
+  nk_low_level_memset(naut, 0, sizeof(struct naut_info));
+
+  /* if (!dtb_parse(fdt)) { */
+  /*   panic("Problem parsing devicetree header\n"); */
+  /* } */
+
+  // Initialize platform level interrupt controller for this HART
+  plic_init();
+
+  plic_init_hart(hartid);
+
+  arch_enable_ints();
+
+  // We now have serial output without SBI
+  serial_init();
+
+  sifive_test();
 }
 
 

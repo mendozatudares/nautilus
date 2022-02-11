@@ -9,52 +9,41 @@
 #define UART_RXFIFO_DATA  0x000000ff
 #define UART_TXCTRL_TXEN  0x1
 #define UART_RXCTRL_RXEN  0x1
+#define UART_IP_RXWM      0x2
 
 #define SIFIVE_DEFAULT_BAUD_RATE 115200
 
-static addr_t   base = 0;
-static uint64_t clock = 0;
+static struct sifive_serial_regs * regs;
 static bool_t   inited = false;
-
-static inline struct sifive_serial_regs * regs(void) {
-    return (struct sifive_serial_regs *)base;
-}
 
 int sifive_handler (excp_entry_t * excp, excp_vec_t vector, void *state) {
     panic("sifive_handler!\n");
     while (1) {
-        union rx_data r;
-        r.val = regs()->rxdata.val;
-        if (r.isEmpty) { break; }
-        char buf = r.data;
-        printk("%c", buf);
+        uint32_t r = regs->rxfifo;
+        if (r & UART_RXFIFO_EMPTY) break;
+        char buf = r & 0xFF;
         // call virtual console here!
+        serial_putchar(buf);
     }
 }
 
 int sifive_test(void) {
     arch_enable_ints();
     while(1) {
-        printk("ie=%p, ip=%p, sie=%p, status=%p, sip=%p, pp=%p\t", regs()->ie, regs()->ip, read_csr(sie), read_csr(sstatus), read_csr(sip), plic_pending());
-        printk("%d\n", serial_getchar());
-        asm volatile ("wfi");
+        printk("ie=%p, ip=%p, sie=%p, status=%p, sip=%p, pp=%p\t\n", regs->ie, regs->ip, read_csr(sie), read_csr(sstatus), read_csr(sip), plic_pending());
+        /* asm volatile ("wfi"); */
+        /* printk("%d\n", serial_getchar()); */
     }
 }
 
 
 static void sifive_init(addr_t addr, uint16_t irq) {
     printk("SIFIVE @ %p, irq=%d\n", addr, irq);
-    base = addr;
+    regs = addr;
 
-    /* uart_clock = clock; */
-    /* uint32_t baud = SIFIVE_DEFAULT_BAUD_RATE; */
-    /* uint64_t quotient = (clock + baud - 1) / baud; */
-
-    /* regs(base)->div = (quotient == 0) ? 0 : (uint32_t)(quotient - 1); */
-
-    regs()->txctrl.enable = 1;
-    regs()->rxctrl.enable = 1;
-    regs()->ie = 2;
+    regs->txctrl = UART_TXCTRL_TXEN;
+    regs->rxctrl = UART_RXCTRL_RXEN;
+    regs->ie = 0b10;
 
     inited = true;
 
@@ -79,7 +68,9 @@ bool_t dtb_node_get_sifive(struct dtb_node *n) {
 }
 
 void serial_init(void) {
-    dtb_walk_devices(dtb_node_get_sifive);
+    /* dtb_walk_devices(dtb_node_get_sifive); */
+    /* regs = (struct sifive_serial_regs *)0x10010000L; */
+    sifive_init(0x10010000L, 4);
 }
 
 void serial_write(const char *b) {
@@ -90,12 +81,7 @@ void serial_write(const char *b) {
 }
 
 void serial_putchar(unsigned char ch) {
-    /* if (!inited) { */
-        sbi_call(SBI_CONSOLE_PUTCHAR, ch);
-    /* } else { */
-    /*     while (regs()->txdata.isFull); */
-    /*     regs()->txdata.val = ch; */
-    /* } */
+    sbi_call(SBI_CONSOLE_PUTCHAR, ch);
 }
 
 int serial_getchar(void) {
@@ -103,9 +89,8 @@ int serial_getchar(void) {
         struct sbiret ret = sbi_call(SBI_CONSOLE_GETCHAR);
         return ret.error == -1 ? -1 : ret.value;
     } else {
-        union rx_data data;
-        data.val = regs()->rxdata.val;
-        return data.isEmpty ? -1 : data.data;
+        uint32_t r = regs->rxfifo;
+        return (r & UART_RXFIFO_EMPTY) ? -1 : r & 0xFF;
     }
 }
 
