@@ -31,7 +31,7 @@ int sifive_test(void) {
     arch_enable_ints();
     while(1) {
         printk("ie=%p, ip=%p, sie=%p, status=%p, sip=%p, pp=%p\t\n", regs->ie, regs->ip, read_csr(sie), read_csr(sstatus), read_csr(sip), plic_pending());
-        /* asm volatile ("wfi"); */
+        asm volatile ("wfi");
         /* printk("%d\n", serial_getchar()); */
     }
 }

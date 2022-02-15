@@ -87,6 +87,65 @@ int plic_pending(void)
     return PLIC_PENDING;
 }
 
+void plic_dump(void)
+{
+    printk("Dumping SiFive PLIC Register Map\n");
+
+    printk("source priorities:\n");
+    uint32_t* addr = 0x0c000000L;
+    for (off_t i = 1; i < 54; i++) {
+        printk("  %p (source %2d) = %d\n", addr + i, i, MREG(addr + i));
+    }
+
+    addr = (uint32_t*)0x0c001000L;
+    printk("pending array:\t\t\t\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c002000L;
+    printk("hart 0 m-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c002080L;
+    printk("hart 1 m-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+    addr = (uint32_t*)0x0c002100L;
+    printk("hart 1 s-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+
+
+    addr = (uint32_t*)0x0c002180L;
+    printk("hart 2 m-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+    addr = (uint32_t*)0x0c002200L;
+    printk("hart 2 s-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c002280L;
+    printk("hart 3 m-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+    addr = (uint32_t*)0x0c002300L;
+    printk("hart 3 s-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+
+
+    addr = (uint32_t*)0x0c002380L;
+    printk("hart 4 m-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+    addr = (uint32_t*)0x0c002400L;
+    printk("hart 4 s-mode interrupt enables:\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c200000L;
+    printk("hart 0 m-mode priority threshold:\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c200004L;
+    printk("hart 0 m-mode claim/complete:\t\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c201000L;
+    printk("hart 1 m-mode priority threshold:\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c201004L;
+    printk("hart 1 m-mode claim/complete\t\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c202000L;
+    printk("hart 1 s-mode priority threshold:\t%p = %p\n", addr, MREG(addr));
+
+    addr = (uint32_t*)0x0c202004L;
+    printk("hart 1 s-mode claim/complete:\t\t%p = %p\n", addr, MREG(addr));
+
+
+
+}
 
 void plic_init_hart(int hart) {
     PLIC_SPRIORITY(hart) = 0;

@@ -336,6 +336,8 @@ void init(unsigned long hartid, unsigned long fdt) {
   // We now have serial output without SBI
   serial_init();
 
+  plic_dump();
+
   sifive_test();
 }
 
