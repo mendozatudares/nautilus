@@ -29,7 +29,7 @@ extern "C" {
 
 #include <nautilus/naut_types.h>
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #include <arch/riscv/cpu.h>
 #else
 #include <arch/x64/cpu.h>

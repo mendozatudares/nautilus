@@ -155,7 +155,7 @@ smp_bringup_aps (struct naut_info * naut)
         return 0;
     }
 
-    #ifndef NAUT_CONFIG_RISCV_HOST
+    #ifndef NAUT_CONFIG_ARCH_RISCV
     maxlvt = apic_get_maxlvt(apic);
 
     SMP_DEBUG("Passing target page num %x to SIPI\n", target_vec);
@@ -197,8 +197,7 @@ smp_bringup_aps (struct naut_info * naut)
         }
 
 
-        #ifdef NAUT_CONFIG_RISCV_HOST
-        #else
+        #ifndef NAUT_CONFIG_ARCH_RISCV
         /* Send the INIT sequence */
         SMP_DEBUG("sending INIT to remote APIC (0x%x)\n", naut->sys.cpus[i]->lapic_id);
         apic_send_iipi(apic, naut->sys.cpus[i]->lapic_id);
@@ -212,8 +211,7 @@ smp_bringup_aps (struct naut_info * naut)
         /* 10ms delay */
         udelay(10000);
 
-        #ifdef NAUT_CONFIG_RISCV_HOST
-        #else
+        #ifndef NAUT_CONFIG_ARCH_RISCV
         /* deassert INIT IPI (level-triggered) */
         apic_deinit_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
@@ -298,7 +296,7 @@ smp_setup_xcall_bsp (struct cpu * core)
     SMP_PRINT("Setting up cross-core IPI event queue\n");
     smp_xcall_init_queue(core);
 
-#ifndef NAUT_CONFIG_RISCV_HOST
+#ifndef NAUT_CONFIG_ARCH_RISCV
     if (register_int_handler(IPI_VEC_XCALL, xcall_handler, NULL) != 0) {
         ERROR_PRINT("Could not assign interrupt handler for XCALL on core %u\n", core->id);
         return -1;
@@ -312,7 +310,7 @@ smp_setup_xcall_bsp (struct cpu * core)
 static int
 smp_ap_setup (struct cpu * core)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
+#ifndef NAUT_CONFIG_ARCH_RISCV
     // Note that any use of SSE/AVX, for example produced by
     // clang/llvm optimation, that happens before fpu_init will
     // cause a panic.  Initialize FPU ASAP.
@@ -386,7 +384,7 @@ extern void nk_rand_init(struct cpu*);
 static void
 smp_ap_finish (struct cpu * core)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
+#ifndef NAUT_CONFIG_ARCH_RISCV
     nk_rand_init(core);
 
     nk_cpu_topo_discover(core);
@@ -561,7 +559,7 @@ smp_xcall (cpu_id_t cpu_id,
            void * arg,
            uint8_t wait)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
+#ifndef NAUT_CONFIG_ARCH_RISCV
     struct sys_info * sys = per_cpu_get(system);
     nk_queue_t * xcq  = NULL;
     struct nk_xcall x;

@@ -29,7 +29,7 @@ extern "C" {
 
 struct cpu;
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 
 #define __movop_4 lw
 #define __movop_8 ld

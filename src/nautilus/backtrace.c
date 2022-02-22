@@ -81,44 +81,16 @@ nk_dump_mem (const void * addr, ulong_t n)
     }
 }
 
-#ifdef NAUT_CONFIG_RISCV_HOST
 void 
 nk_stack_dump (ulong_t n)
 {
     void * rsp = NULL;
 
+#ifdef NAUT_CONFIG_ARCH_RISCV
     asm volatile ("move %[_r], sp" : [_r] "=r" (rsp));
-
-    if (!rsp) {
-        return;
-    }
-
-    printk("Stack Dump:\n");
-
-    nk_dump_mem(rsp, n);
-}
-
-
-void 
-nk_print_regs (struct nk_regs * r)
-{
-    printk("Current Thread=0x%x (%p) \"%s\"\n", 
-            get_cur_thread() ? get_cur_thread()->tid : -1,
-            get_cur_thread() ? (void*)get_cur_thread() :  NULL,
-            !get_cur_thread() ? "NONE" : get_cur_thread()->is_idle ? "*idle*" : get_cur_thread()->name);
-
-    
-    printk("[-------------- Register Contents --------------]\n");
-
-    printk("[-----------------------------------------------]\n");
-}
 #else
-void 
-nk_stack_dump (ulong_t n)
-{
-    void * rsp = NULL;
-
     asm volatile ("movq %%rsp, %[_r]" : [_r] "=r" (rsp));
+#endif
 
     if (!rsp) {
         return;
@@ -156,6 +128,23 @@ nk_print_regs (struct nk_regs * r)
 
     
     printk("[-------------- Register Contents --------------]\n");
+
+#ifdef NAUT_CONFIG_ARCH_RISCV
+
+    printk("RA:  %016lx SP:  %016lx\n", r->ra, r->sp);
+    printk("GP:  %016lx TP:  %016lx\n", r->gp, r->tp);
+    printk("T00: %016lx T01: %016lx T02: %016lx\n", r->t0, r->t1, r->t2);
+    printk("S00: %016lx S01: %016lx A00: %016lx\n", r->s0, r->s1, r->a0);
+    printk("A01: %016lx A02: %016lx A03: %016lx\n", r->a1, r->a2, r->a3);
+    printk("A04: %016lx A05: %016lx A06: %016lx\n", r->a4, r->a5, r->a6);
+    printk("A07: %016lx S02: %016lx S03: %016lx\n", r->a7, r->s2, r->s3);
+    printk("S04: %016lx S05: %016lx S06: %016lx\n", r->s4, r->s5, r->s6);
+    printk("S07: %016lx S08: %016lx S09: %016lx\n", r->s7, r->s8, r->s9);
+    printk("S10: %016lx S11: %016lx T03: %016lx\n", r->s10, r->s11, r->t3);
+    printk("T04: %016lx T05: %016lx T06: %016lx\n", r->t4, r->t5, r->t6);
+
+#else
+
     printk("RIP: %04lx:%016lx\n", r->cs, r->rip);
     printk("RSP: %04lx:%016lx RFLAGS: %08lx Vector: %08lx Error: %08lx\n", 
             r->ss, r->rsp, r->rflags, r->vector, r->err_code);
@@ -190,6 +179,7 @@ nk_print_regs (struct nk_regs * r)
             cr2, cr3, cr4);
     printk("CR8: %016lx EFER: %016lx\n", cr8, efer);
 
+#endif
+
     printk("[-----------------------------------------------]\n");
 }
-#endif

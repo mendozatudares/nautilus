@@ -91,7 +91,7 @@
 	     (bit) < (size);					\
 	     (bit) = find_next_zero_bit((addr), (size), (bit) + 1))
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #include <arch/riscv/bitops.h>
 #else
 #include <asm/bitops.h>

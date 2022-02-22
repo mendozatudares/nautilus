@@ -24,7 +24,7 @@
 #define __LOWLEVEL_H__
 
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #define ENTRY(x)   \
     .globl x;      \
     .align 4, 0x00,0x01;\
@@ -53,6 +53,42 @@
     .globl x;      \
     .align 4, 0x90;\
     x:
+
+#define SAVE_GPRS() \
+    movq %rax, -8(%rsp); \
+    movq %rbx, -16(%rsp); \
+    movq %rcx, -24(%rsp); \
+    movq %rdx, -32(%rsp); \
+    movq %rsi, -40(%rsp); \
+    movq %rdi, -48(%rsp); \
+    movq %rbp, -56(%rsp); \
+    movq %r8,  -64(%rsp); \
+    movq %r9,  -72(%rsp); \
+    movq %r10, -80(%rsp); \
+    movq %r11, -88(%rsp); \
+    movq %r12, -96(%rsp); \
+    movq %r13, -104(%rsp); \
+    movq %r14, -112(%rsp); \
+    movq %r15, -120(%rsp); \
+    subq $120, %rsp; 
+
+#define RESTORE_GPRS() \
+    movq (%rsp), %r15; \
+    movq 8(%rsp), %r14; \
+    movq 16(%rsp), %r13; \
+    movq 24(%rsp), %r12; \
+    movq 32(%rsp), %r11; \
+    movq 40(%rsp), %r10; \
+    movq 48(%rsp), %r9; \
+    movq 56(%rsp), %r8; \
+    movq 64(%rsp), %rbp; \
+    movq 72(%rsp), %rdi; \
+    movq 80(%rsp), %rsi; \
+    movq 88(%rsp), %rdx; \
+    movq 96(%rsp), %rcx; \
+    movq 104(%rsp), %rbx; \
+    movq 112(%rsp), %rax; \
+    addq $120, %rsp; 
 #endif
 
 #define GLOBAL(x)  \

@@ -74,7 +74,7 @@ struct nk_xcall {
 struct cpu {
     struct nk_thread * cur_thread;             /* +0  KCH: this must be first! */
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
     uint32_t interrupt_nesting_level;
     uint32_t preempt_disable_level;
 #else
@@ -104,7 +104,7 @@ struct cpu {
 
     cpu_id_t id;
     uint32_t lapic_id;   
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
     uint32_t enabled;
     uint32_t is_bsp;
 #else

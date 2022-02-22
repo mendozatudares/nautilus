@@ -27,25 +27,12 @@
 #ifndef __CPU_STATE
 #define __CPU_STATE
 
-#ifdef NAUT_CONFIG_RISCV_HOST
 
-//
-// This code assumes that tp is pointing to
-// the struct cpu of the running cpu and it assumes the
-// specific layout of struct cpu
-//
-
-static inline void *__cpu_state_get_cpu()
-{
-    uint64_t tp;
-    asm volatile("mv %0, tp" : "=r" (tp) );
-    return (void *) tp;
-}
-#else
 #include <nautilus/msr.h>
 
+
 //
-// This code assumes that %gs base is pointing to
+// This code assumes that %gs base (or tp) is pointing to
 // the struct cpu of the running cpu and it assumes the
 // specific layout of struct cpu
 //
@@ -55,13 +42,18 @@ static inline void *__cpu_state_get_cpu()
 {
     // there must be a smarter way to do this....
     // leaq %gs:... does not do it though
+#ifdef NAUT_CONFIG_ARCH_RISCV
+    uint64_t tp;
+    asm volatile("mv %0, tp" : "=r" (tp) );
+    return (void *) tp;
+#else
     return (void *) msr_read(MSR_GS_BASE);
-}
 #endif
+}
 
 
 #define INL_OFFSET 8
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #define PREEMPT_DISABLE_OFFSET 12
 #else
 #define PREEMPT_DISABLE_OFFSET 10

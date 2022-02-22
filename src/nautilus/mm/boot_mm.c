@@ -173,7 +173,7 @@ int
 mm_boot_init (ulong_t mbd)
 {
     addr_t kern_start     = (addr_t)&_loadStart;
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
     addr_t kern_end       = (addr_t)&_loadEnd;
 #else
     addr_t kern_end       = multiboot_get_modules_end(mbd);

@@ -1,4 +1,3 @@
-ifndef NAUT_CONFIG_RISCV_HOST
 obj-y += \
 	fmtout.o \
 	printk.o \
@@ -7,69 +6,9 @@ obj-y += \
 	idt.o \
 	queue.o \
 	irq.o \
-	mb_utils.o \
-	paging.o \
 	naut_string.o \
-	msr.o \
-	cpuid.o \
-	mtrr.o \
-	fpu.o \
 	spinlock.o \
 	ticketlock.o \
-	rwlock.o \
-	condvar.o \
-	semaphore.o \
-	msg_queue.o \
-	hashtable.o \
-	rbtree.o \
-	random.o \
-	smp.o \
-	idle.o \
-	thread.o \
-        task.o   \
-        future.o  \
-	waitqueue.o \
-	group.o \
-        timer.o \
-        scheduler.o \
-	group_sched.o \
-	barrier.o \
-	backtrace.o \
-	cpu.o \
-	acpi.o \
-	numa.o \
-	libccompat.o \
-	nemo.o \
-	pmc.o \
-	setjmp.o \
-	mm/ \
-	dev.o \
-	chardev.o \
-	blkdev.o \
-	netdev.o \
-	gpudev.o \
-        fs.o \
-        loader.o \
-        shell.o \
-	fprintk.o \
-        dtoa.o \
-	module.o \
-	linker.o \
-	prog.o \
-	getopt.o \
-	cmdline.o
-endif
-
-obj-$(NAUT_CONFIG_RISCV_HOST) += \
-	fmtout.o \
-	printk.o \
-	doprnt.o \
-	vc.o \
-	idt.o \
-	queue.o \
-	irq.o \
-	naut_string.o \
-	spinlock.o \
 	rwlock.o \
 	condvar.o \
 	semaphore.o \
@@ -88,6 +27,7 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	scheduler.o \
 	group_sched.o \
 	barrier.o \
+	backtrace.o \
 	libccompat.o \
 	mm/ \
 	dev.o \
@@ -99,12 +39,28 @@ obj-$(NAUT_CONFIG_RISCV_HOST) += \
 	shell.o \
 	fprintk.o \
 	dtoa.o \
-	devicetree.o \
 	module.o \
 	linker.o \
 	prog.o \
 	getopt.o \
 	cmdline.o
+
+obj-$(NAUT_CONFIG_ARCH_X86) += \
+	mb_utils.o \
+	paging.o \
+	msr.o \
+	cpuid.o \
+	mtrr.o \
+	fpu.o \
+	cpu.o \
+	acpi.o \
+	numa.o \
+	nemo.o \
+	pmc.o \
+	setjmp.o \
+	loader.o \
+
+obj-$(NAUT_CONFIG_ARCH_RISCV) += devicetree.o
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o

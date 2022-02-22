@@ -4295,7 +4295,7 @@ void nk_sched_start()
     DEBUG("Scheduler startup - %s\n", my_cpu->is_bsp ? "bsp" : "ap");
 
     // TODO: multicore scheduling for RISC-V port
-#ifndef NAUT_CONFIG_RISCV_HOST
+#ifndef NAUT_CONFIG_ARCH_RISCV
     // barrier for all the schedulers
     __sync_fetch_and_add(&sync_count,1);
     while (sync_count < num_cpus) {
@@ -4581,12 +4581,10 @@ burner (void * in, void ** out)
 
     nk_thread_name(get_cur_thread(),a->name);
 
-#ifndef NAUT_CONFIG_RISCV_HOST
     if (nk_bind_vc(get_cur_thread(), a->vc)) { 
         ERROR_PRINT("Cannot bind virtual console for burner %s\n",a->name);
         return;
     }
-#endif
 
     nk_vc_printf("%s (tid %llu) attempting to promote itself\n", a->name, get_cur_thread()->tid);
 #if 1

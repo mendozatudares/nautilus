@@ -234,7 +234,7 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
 {
 
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #define GPR_SAVE_SIZE      31*8
 #define GPR_RDI_OFFSET     176
     if (fun) {
@@ -1040,7 +1040,7 @@ __thread_fork (void)
     void         *child_stack;
     uint64_t     rsp;
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
     __asm__ __volatile__ ( "mv %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
 #else
     __asm__ __volatile__ ( "movq %%rsp, %0" : "=r"(rsp) : : "memory");

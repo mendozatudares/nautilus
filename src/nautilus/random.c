@@ -80,7 +80,7 @@ get_rand_byte (void)
 
 
     for (i = 0; i < 8; i++) {
-        #ifdef NAUT_CONFIG_RISCV_HOST
+        #ifdef NAUT_CONFIG_ARCH_RISCV
         val = read_csr(sip) ^ (rand->seed & 0xffffffff);
         #else
         val = apic_read(apic, APIC_GET_IRR(i)) ^ (rand->seed & 0xffffffff);

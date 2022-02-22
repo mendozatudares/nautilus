@@ -38,21 +38,22 @@ struct gdt_desc32 {
 } __packed;
 
 
+#ifdef NAUT_CONFIG_ARCH_RISCV
+static inline void lgdt32 (const struct gdt_desc32 * g) { }
+static inline void lgdt64 (const struct gdt_desc64 * g) { }
+#else
 static inline void
 lgdt32 (const struct gdt_desc32 * g)
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     asm volatile ("lgdt %0" :: "m" (*g));
-#endif
 }
 
 static inline void
 lgdt64 (const struct gdt_desc64 * g) 
 {
-#ifndef NAUT_CONFIG_RISCV_HOST
     asm volatile ("lgdt %0" :: "m" (*g)); 
-#endif
 }
+#endif
 
 
 #endif /* !__ASSEMBLER__ */

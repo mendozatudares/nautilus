@@ -41,7 +41,7 @@
 #define INT_MAX     ((int)(~0U>>1))
 #endif
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #define LONG_MAX    ((~0UL>>1))
 #define LLONG_MAX   ((~0ULL>>1))
 #endif

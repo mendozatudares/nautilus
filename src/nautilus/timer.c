@@ -353,7 +353,7 @@ int nk_delay(uint64_t ns) { return _sleep(ns,1); }
 uint64_t nk_timer_handler (void)
 {
     uint32_t my_cpu = my_cpu_id();
-#ifndef NAUT_CONFIG_RISCV_HOST
+#ifndef NAUT_CONFIG_ARCH_RISCV
     if (my_cpu!=0) {
 	//DEBUG("update: cpu %d - ignored/infinity\n",my_cpu);
 	return -1;  // infinitely far in the future
@@ -440,7 +440,7 @@ uint64_t nk_timer_handler (void)
     //DEBUG("update: earliest is %llu\n",earliest);
 
     now = nk_sched_get_realtime();
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
     return earliest != -1 ? earliest > now ? earliest-now : 0 : 0;
 #else
     return earliest > now ? earliest-now : 0;

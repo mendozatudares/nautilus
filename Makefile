@@ -625,7 +625,7 @@ else
   libs-y += $(CROSS_COMPILE)/../lib64/libstdc++.a
 endif
 else
-ifdef NAUT_CONFIG_RISCV_HOST
+ifdef NAUT_CONFIG_ARCH_RISCV
   libs-y += $(NAUT_CONFIG_TOOLCHAIN_ROOT)/../lib/rv64imac/lp64/libstdc++.a
 else
   libs-y += $(NAUT_CONFIG_TOOLCHAIN_ROOT)/lib64/libstdc++.a
@@ -721,7 +721,7 @@ else
 ifdef NAUT_CONFIG_GEM5
 LD_SCRIPT:=link/nautilus.ld.gem5
 else
-ifdef NAUT_CONFIG_RISCV_HOST
+ifdef NAUT_CONFIG_ARCH_RISCV
 LD_SCRIPT:=link/nautilus.ld.riscv
 else
 LD_SCRIPT:=link/nautilus.ld

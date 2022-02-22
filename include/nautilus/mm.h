@@ -165,7 +165,7 @@ void *nk_gc_pdsgc_malloc_specific(uint64_t, int cpu);
 
 
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #define ctz(x) __ctzdi2(x)
 #else
 #define ctz(x) __builtin_ctzl(x)

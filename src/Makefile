@@ -1,17 +1,15 @@
-ifndef NAUT_CONFIG_RISCV_HOST
-obj-y += \
+obj-$(NAUT_CONFIG_ARCH_X86) += \
 	nautilus/ \
 	arch/ \
 	dev/ \
-        fs/  \
-        gc/  \
+	fs/  \
+	gc/  \
 	rt/ \
-        net/ \
+	net/ \
 	acpi/ \
 	test/  
-endif
 
-obj-$(NAUT_CONFIG_RISCV_HOST) += \
+obj-$(NAUT_CONFIG_ARCH_RISCV) += \
 	nautilus/ \
 	arch/ \
 	dev/

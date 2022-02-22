@@ -104,7 +104,7 @@ size_t strspn (const char * s, const char * accept);
 size_t strcspn (const char * s, const char * reject);
 char * strstr (const char * haystack, const char * needle);
 
-#ifdef NAUT_CONFIG_RISCV_HOST
+#ifdef NAUT_CONFIG_ARCH_RISCV
 #include <arch/riscv/naut_string.h>
 #else
 #include <arch/x64/naut_string.h>

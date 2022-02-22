@@ -1,17 +1,15 @@
-ifndef NAUT_CONFIG_RISCV_HOST
-obj-y += apic.o \
+obj-$(NAUT_CONFIG_ARCH_X86) += apic.o \
 	 ioapic.o \
 	 i8254.o \
 	 ps2.o \
 	 pci.o \
-         vga.o
+	 vga.o
 
 ifndef NAUT_CONFIG_XEON_PHI
 obj-y += serial.o
 endif
-endif
 
-obj-$(NAUT_CONFIG_RISCV_HOST) += sifive.o
+obj-$(NAUT_CONFIG_ARCH_RISCV) += sifive.o
 
 obj-$(NAUT_CONFIG_HPET) += hpet.o
 
