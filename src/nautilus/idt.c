@@ -501,11 +501,9 @@ setup_idt (void)
         ERROR_PRINT("Couldn't assign NMI handler\n");
         return -1;
     }
-    
-
+#endif
 
     lidt(&idt_descriptor);
-#endif
 
     return 0;
 }
