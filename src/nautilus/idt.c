@@ -503,6 +503,8 @@ setup_idt (void)
     }
 #endif
 
+
+
     lidt(&idt_descriptor);
 
     return 0;

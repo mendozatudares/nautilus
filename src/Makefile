@@ -2,7 +2,6 @@ ifndef NAUT_CONFIG_RISCV_HOST
 obj-y += \
 	nautilus/ \
 	arch/ \
-	asm/ \
 	dev/ \
         fs/  \
         gc/  \
