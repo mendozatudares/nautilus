@@ -780,6 +780,10 @@ apic_init (struct cpu * core)
     memset(apic, 0, sizeof(struct apic_dev));
     core->apic = apic;
 
+    printk("apic=%p\n", apic);
+    /* while(true) { */
+    /* } */
+
     if (!check_apic_avail()) {
         panic("No APIC found on core %u, dying\n", core->id);
     } 
@@ -814,6 +818,9 @@ apic_init (struct cpu * core)
 	base_addr       = apic_get_base_addr();
 	
 	/* idempotent when not compiled as HRT */
+    pa_to_va(base_addr);
+    panic("%p", apic);
+
 	apic->base_addr = pa_to_va(base_addr);
 	
 #ifndef NAUT_CONFIG_HVM_HRT
