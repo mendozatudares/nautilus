@@ -111,7 +111,9 @@ init_ap_area (struct ap_init_area * ap_area,
     ap_area->gdt64[2]    = 0x00af92000000ffff;
 
     /* pointer to BSP's PML4 */
-    // ap_area->cr3         = read_cr3();
+#ifdef NAUT_CONFIG_ARCH_X86
+    ap_area->cr3         = read_cr3();
+#endif
 
     /* pointer to our entry routine */
     ap_area->entry       = smp_ap_entry;
