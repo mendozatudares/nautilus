@@ -10,6 +10,8 @@ menu "Platform"
 		config ARCH_RISCV
 			bool
 
+		config ARCH_ARM64
+			bool
 
     choice
         prompt "Platform Selection"
@@ -32,8 +34,12 @@ menu "Platform"
 						select ARCH_X86
 
         config RISCV_HOST
-            bool "RISC-V 64-bit Host (Gruesome hack)"
+            bool "Generic RISC-V 64-bit Host"
 						select ARCH_RISCV
+
+        config ARM64_GENERIC
+            bool "Generic ARM64 host (qemu-virt machine)"
+						select ARCH_ARM64
 
         config GEM5_FORCE_APIC_TIMER_CALIBRATION
 	    depends on GEM5
