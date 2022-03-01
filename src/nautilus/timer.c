@@ -353,7 +353,7 @@ int nk_delay(uint64_t ns) { return _sleep(ns,1); }
 uint64_t nk_timer_handler (void)
 {
     uint32_t my_cpu = my_cpu_id();
-#ifndef NAUT_CONFIG_ARCH_RISCV
+#ifdef NAUT_CONFIG_ARCH_X86
     if (my_cpu!=0) {
 	//DEBUG("update: cpu %d - ignored/infinity\n",my_cpu);
 	return -1;  // infinitely far in the future
