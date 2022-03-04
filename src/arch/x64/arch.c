@@ -98,3 +98,11 @@ void * arch_read_sp(void) {
     return sp;
 }
 
+void arch_relax(void) {
+    asm volatile ("pause");
+}
+
+void arch_halt(void) {
+    asm volatile ("hlt");
+}
+

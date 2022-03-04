@@ -485,7 +485,7 @@ wait_xcall (struct nk_xcall * x)
 {
 
     while (atomic_cmpswap(x->xcall_done, 1, 0) != 1) {
-        asm volatile ("pause");
+        arch_relax();
     }
 }
 

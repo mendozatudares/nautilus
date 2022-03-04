@@ -106,3 +106,12 @@ void * arch_read_sp(void) {
     __asm__ __volatile__ ( "mv %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
     return sp;
 }
+
+void arch_relax(void) {
+    asm volatile ("pause");
+}
+
+void arch_halt(void) {
+    asm volatile ("hlt");
+}
+

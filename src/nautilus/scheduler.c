@@ -3998,7 +3998,7 @@ static void interrupt(void *in, void **out)
 	DEBUG("Interrupt thread halting\n");
 	// we will be woken from this halt at least by the 
 	// timer interrupt at the end of our current slice
-	__asm__ __volatile__ ("hlt");
+    arch_halt();
 	DEBUG("Interrupt thread awoke from halt (interrupt occurred)\n");
     }
 }
@@ -4402,7 +4402,7 @@ nk_sched_init(struct nk_sched_config *cfg)
 
     //timing_test(1000000,1000000,1);
     //INFO("Hanging\n");
-    //while (1) { asm("hlt"); }
+    //while (1) { arch_halt(); }
 
     if (init_global_state()) { 
 	ERROR("Could not initialize global scheduler state\n");

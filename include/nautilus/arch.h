@@ -32,8 +32,8 @@ uint64_t arch_read_timestamp(void);
 
 void arch_print_regs(struct nk_regs * r);
 void * arch_read_sp(void);
-
-
+void arch_relax(void);
+void arch_halt(void);
 
 #ifdef NAUT_CONFIG_ARCH_X86
 #include <arch/x64/arch.h>
