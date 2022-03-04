@@ -97,6 +97,7 @@ init_ap_area (struct ap_init_area * ap_area,
     ap_area->stack   = boot_stack_ptr;
     ap_area->cpu_ptr = naut->sys.cpus[core_num];
 
+#ifdef NAUT_CONFIG_ARCH_X86
     /* protected mode temporary GDT */
     ap_area->gdt[2]      = 0x0000ffff;
     ap_area->gdt[3]      = 0x00cf9a00;
@@ -111,7 +112,6 @@ init_ap_area (struct ap_init_area * ap_area,
     ap_area->gdt64[2]    = 0x00af92000000ffff;
 
     /* pointer to BSP's PML4 */
-#ifdef NAUT_CONFIG_ARCH_X86
     ap_area->cr3         = read_cr3();
 #endif
 

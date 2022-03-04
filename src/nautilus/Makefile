@@ -8,7 +8,6 @@ obj-y += \
 	irq.o \
 	naut_string.o \
 	spinlock.o \
-	ticketlock.o \
 	rwlock.o \
 	condvar.o \
 	semaphore.o \
@@ -51,7 +50,7 @@ obj-$(NAUT_CONFIG_ARCH_X86) += \
 	msr.o \
 	cpuid.o \
 	mtrr.o \
-	fpu.o \
+	ticketlock.o \
 	cpu.o \
 	acpi.o \
 	numa.o \

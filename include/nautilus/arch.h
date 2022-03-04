@@ -27,7 +27,13 @@ void arch_update_timer(uint32_t ticks, nk_timer_condition_t cond);
 void arch_set_timer(uint32_t ticks);
 int  arch_read_timer(void);
 int  arch_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
+
 uint64_t arch_read_timestamp(void);
+
+void arch_print_regs(struct nk_regs * r);
+void * arch_read_sp(void);
+
+
 
 #ifdef NAUT_CONFIG_ARCH_X86
 #include <arch/x64/arch.h>

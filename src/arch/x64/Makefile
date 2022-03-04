@@ -7,4 +7,5 @@ obj-y += asm/ \
 		early_mem.o \
 		shutdown.o  \
 		arch.o \
-		irq.o
+		irq.o \
+		fpu.o

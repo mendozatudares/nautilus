@@ -1040,13 +1040,9 @@ __thread_fork (void)
     void         *child_stack;
     uint64_t     rsp;
 
-#ifdef NAUT_CONFIG_ARCH_RISCV
-    __asm__ __volatile__ ( "mv %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
-#else
-    __asm__ __volatile__ ( "movq %%rsp, %0" : "=r"(rsp) : : "memory");
-#endif
+    rsp = (uint64_t) arch_read_sp();
 
-		printk("thread fork rsp = %p\n", rsp);
+    printk("thread fork rsp = %p\n", rsp);
 
 #ifdef NAUT_CONFIG_ENABLE_STACK_CHECK
     // now check again after update to see if we didn't overrun/underrun the stack in the parent...

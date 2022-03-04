@@ -84,3 +84,25 @@ int  arch_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 }
 
 uint64_t arch_read_timestamp() { return read_csr(time); }
+
+void arch_print_regs(struct nk_regs * r) {
+
+    printk("RA:  %016lx SP:  %016lx\n", r->ra, r->sp);
+    printk("GP:  %016lx TP:  %016lx\n", r->gp, r->tp);
+    printk("T00: %016lx T01: %016lx T02: %016lx\n", r->t0, r->t1, r->t2);
+    printk("S00: %016lx S01: %016lx A00: %016lx\n", r->s0, r->s1, r->a0);
+    printk("A01: %016lx A02: %016lx A03: %016lx\n", r->a1, r->a2, r->a3);
+    printk("A04: %016lx A05: %016lx A06: %016lx\n", r->a4, r->a5, r->a6);
+    printk("A07: %016lx S02: %016lx S03: %016lx\n", r->a7, r->s2, r->s3);
+    printk("S04: %016lx S05: %016lx S06: %016lx\n", r->s4, r->s5, r->s6);
+    printk("S07: %016lx S08: %016lx S09: %016lx\n", r->s7, r->s8, r->s9);
+    printk("S10: %016lx S11: %016lx T03: %016lx\n", r->s10, r->s11, r->t3);
+    printk("T04: %016lx T05: %016lx T06: %016lx\n", r->t4, r->t5, r->t6);
+
+}
+
+void * arch_read_sp(void) {
+    void * sp = NULL;
+    __asm__ __volatile__ ( "mv %[_r], sp" : [_r] "=r" (rsp) : : "memory" );
+    return sp;
+}
