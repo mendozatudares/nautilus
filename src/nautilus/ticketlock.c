@@ -23,6 +23,7 @@
 #include <nautilus/nautilus.h>
 #include <nautilus/ticketlock.h>
 
+// TODO: Validate __atomic replacements for inline asm
 
 void
 nk_ticket_lock_init (nk_ticket_lock_t * l)
@@ -43,15 +44,18 @@ nk_ticket_lock (nk_ticket_lock_t * l)
 {
     NK_PROFILE_ENTRY();
 
-    asm volatile ("movw $1, %%ax\n\t"
-                  "lock xaddw %%ax, %[_users]\n\t"
-                  "1:\n\t"
-                  "cmpw %%ax, %[_ticket]\n\t"
-                  "jne 1b"
-                  : /* no outputs */
-                  : [_users] "m" (l->lock.users),
-                    [_ticket] "m" (l->lock.ticket)
-                  : "ax", "memory");
+    uint16_t t = __atomic_add_fetch(&l->lock.users, 1, __ATOMIC_SEQ_CST);
+    while (__atomic_load_n(&l->lock.ticket, __ATOMIC_SEQ_CST) != t) {}
+
+    /* asm volatile ("movw $1, %%ax\n\t" */
+    /*               "lock xaddw %%ax, %[_users]\n\t" */
+    /*               "1:\n\t" */
+    /*               "cmpw %%ax, %[_ticket]\n\t" */
+    /*               "jne 1b" */
+    /*               : /1* no outputs *1/ */
+    /*               : [_users] "m" (l->lock.users), */
+    /*                 [_ticket] "m" (l->lock.ticket) */
+    /*               : "ax", "memory"); */
 
     NK_PROFILE_EXIT();
 }
@@ -62,15 +66,17 @@ nk_ticket_unlock (nk_ticket_lock_t * l)
 {
     NK_PROFILE_ENTRY();
 
-#ifndef NAUT_CONFIG_XEON_PHI
-    asm volatile ("mfence\n\t"
-#else 
-    asm volatile (
-#endif
-                  "addw $1, %[_ticket]"
-                  : /* no outputs */
-                  : [_ticket] "m" (l->lock.ticket)
-                  : "memory");
+    __atomic_add_fetch(&l->lock.ticket, 1, __ATOMIC_SEQ_CST);
+
+/* #ifndef NAUT_CONFIG_XEON_PHI */
+/*     asm volatile ("mfence\n\t" */
+/* #else */ 
+/*     asm volatile ( */
+/* #endif */
+/*                   "addw $1, %[_ticket]" */
+/*                   : /1* no outputs *1/ */
+/*                   : [_ticket] "m" (l->lock.ticket) */
+/*                   : "memory"); */
 
     NK_PROFILE_EXIT();
 }
@@ -80,14 +86,18 @@ static inline uint32_t
 cmpxchg32 (void * m, uint32_t old, uint32_t new)
 {
     uint32_t ret;
-    asm volatile ("movl %[_old], %%eax\n\t"
-                  "cmpxchgl %[_new], %[_m]\n\t"
-                  "movl %%eax, %[_out]"
-                  : [_out] "=r" (ret)
-                  : [_old] "r" (old),
-                    [_new] "r" (new),
-                    [_m]   "m" (m)
-                  : "rax", "memory");
+
+    ret = __atomic_compare_exchange_n((uint32_t *)m, &old, new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST) ? new : old;
+
+    /* asm volatile ("movl %[_old], %%eax\n\t" */
+    /*               "cmpxchgl %[_new], %[_m]\n\t" */
+    /*               "movl %%eax, %[_out]" */
+    /*               : [_out] "=r" (ret) */
+    /*               : [_old] "r" (old), */
+    /*                 [_new] "r" (new), */
+    /*                 [_m]   "m" (m) */
+    /*               : "rax", "memory"); */
+
     return ret;
 }
 
