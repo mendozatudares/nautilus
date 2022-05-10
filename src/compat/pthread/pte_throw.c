@@ -83,10 +83,10 @@ pte_throw (unsigned int exception)
       switch (exception)
         {
         case PTE_EPS_CANCEL:
-          exitCode = (unsigned) PTHREAD_CANCELED;
+          exitCode = (unsigned) (uint64_t) PTHREAD_CANCELED;
           break;
         case PTE_EPS_EXIT:
-          exitCode = (unsigned) sp->exitStatus;;
+	  exitCode = (unsigned) (uint64_t) sp->exitStatus;;
           break;
         }
 
@@ -139,5 +139,5 @@ pte_pop_cleanup_all (int execute)
 unsigned int
 pte_get_exception_services_code (void)
 {
-  return (unsigned int) NULL;
+  return (unsigned int) (uint64_t) NULL;
 }
