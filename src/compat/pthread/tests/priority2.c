@@ -102,7 +102,7 @@ static void * func(void * arg)
 
   assert(pte_osThreadGetPriority(pte_osThreadGetHandle()) == param.sched_priority);
 
-  return (void *) param.sched_priority;
+  return (void *)  (int64_t) param.sched_priority;
 }
 
 
@@ -146,7 +146,7 @@ int pthread_test_priority2()
 //	  validPriorities[param.sched_priority+(PTW32TEST_MAXPRIORITIES/2)]);
 
       pthread_join(t, &result);
-      assert(param.sched_priority == (int)result);
+      assert(param.sched_priority == (int) (int64_t) result);
     }
 
   assert(pthread_barrier_destroy(&startBarrier) == 0);

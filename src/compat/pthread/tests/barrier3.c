@@ -51,7 +51,7 @@ static int result = 1;
 
 static void * func(void * arg)
 {
-  return (void *) pthread_barrier_wait(&barrier);
+    return (void *) (int64_t) pthread_barrier_wait(&barrier);
 }
 
 

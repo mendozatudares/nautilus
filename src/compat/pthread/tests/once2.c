@@ -83,7 +83,7 @@ static void *
 mythread(void * arg)
 {
 
-  assert(pthread_once(&once[(int) arg], myfunc) == 0);
+    assert(pthread_once(&once[(int) (int64_t)arg], myfunc) == 0);
 
   pte_osMutexLock(numThreads.cs);
   numThreads.i++;
@@ -109,7 +109,7 @@ int pthread_test_once2()
       once[j] = o;
 
       for (i = 0; i < NUM_THREADS; i++)
-        assert(pthread_create(&t[i][j], NULL, mythread, (void *) j) == 0);
+	  assert(pthread_create(&t[i][j], NULL, mythread, (void *) (int64_t)j) == 0);
     }
 
   for (j = 0; j < NUM_ONCE; j++)

@@ -4,7 +4,8 @@
 #include "pte_generic_osal.h"
 #include <nautilus/nautilus.h>
 
-#define OS_MAX_SIMUL_THREADS 256
+// just so we don't overdo things..
+#define OS_MAX_SIMUL_THREADS (NAUT_CONFIG_MAX_THREADS/2)
 
 #define calloc(a,b) ({ void *__pthread_dummy = malloc(a*b); if (__pthread_dummy) { memset(__pthread_dummy,0,a*b); } __pthread_dummy;  })
 

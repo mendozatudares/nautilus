@@ -164,7 +164,7 @@ int pthread_test_condvar3_1()
 
   for (i = 1; i <= NUMTHREADS; i++)
     {
-      assert(pthread_create(&t[i], NULL, mythread, (void *) i) == 0);
+	assert(pthread_create(&t[i], NULL, mythread, (void *) (int64_t) i) == 0);
     }
 
   do

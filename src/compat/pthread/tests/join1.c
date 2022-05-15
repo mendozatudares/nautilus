@@ -47,7 +47,7 @@
 static void *
 func(void * arg)
 {
-  int i = (int) arg;
+    int i = (int) (int64_t)arg;
 
   pte_osThreadSleep(i * 100);
 
@@ -66,7 +66,7 @@ int pthread_test_join1()
   /* Create a few threads and then exit. */
   for (i = 0; i < 4; i++)
     {
-      assert(pthread_create(&id[i], NULL, func, (void *) i) == 0);
+	assert(pthread_create(&id[i], NULL, func, (void *) (int64_t)i) == 0);
     }
 
   /* Some threads will finish before they are joined, some after. */

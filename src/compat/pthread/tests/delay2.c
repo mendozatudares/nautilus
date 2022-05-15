@@ -79,7 +79,7 @@ int pthread_test_delay2()
   assert(pthread_mutex_unlock(&mx) == 0);
 
   assert(pthread_join(t, (void **) &result) == 0);
-  assert(result == (int) PTHREAD_CANCELED);
+  assert(result == (int) (int64_t) PTHREAD_CANCELED);
 
   assert(pthread_mutex_destroy(&mx) == 0);
 

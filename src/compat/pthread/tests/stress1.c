@@ -85,7 +85,7 @@
 //#include <string.h>
 #include "test.h"
 
-typedef long long int64_t;
+//typedef long long int64_t;
 
 const unsigned int ITERATIONS = 1000;
 
@@ -150,9 +150,9 @@ static struct timespec *
 static void *
 masterThread (void * arg)
 {
-  int dither = (int) arg;
+  int dither = (int)  (int64_t) arg;
 
-  timeout = (int) arg;
+  timeout = (int)  (int64_t) arg;
 
   pthread_barrier_wait(&startBarrier);
 
@@ -256,7 +256,7 @@ int pthread_test_stress1()
   assert(pthread_barrier_init(&readyBarrier, NULL, 3) == 0);
   assert(pthread_barrier_init(&holdBarrier, NULL, 3) == 0);
 
-  assert(pthread_create(&master, NULL, masterThread, (void *) timeout) == 0);
+  assert(pthread_create(&master, NULL, masterThread, (void *)  (int64_t) timeout) == 0);
   assert(pthread_create(&slave, NULL, slaveThread, NULL) == 0);
 
   allExit = 0;

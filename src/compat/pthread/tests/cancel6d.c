@@ -94,7 +94,7 @@ static bag_t threadbag[NUMTHREADS + 1];
 static void *
 mythread(void * arg)
 {
-  int result = ((int)PTHREAD_CANCELED + 1);
+  int result = ((int)  (int64_t) PTHREAD_CANCELED + 1);
   bag_t * bag = (bag_t *) arg;
 
   assert(bag == &threadbag[bag->threadnum]);
@@ -117,7 +117,7 @@ mythread(void * arg)
       pthread_testcancel();
     }
 
-  return (void *) result;
+  return (void *)  (int64_t)  result;
 }
 
 int pthread_test_cancel6d()
@@ -175,7 +175,7 @@ int pthread_test_cancel6d()
 
       assert(pthread_join(t[i], (void **) &result) == 0);
 
-      fail = (result != (int) PTHREAD_CANCELED);
+      fail = (result != (int)  (int64_t) PTHREAD_CANCELED);
 
       failed = (failed || fail);
     }

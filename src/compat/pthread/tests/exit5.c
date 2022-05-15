@@ -115,7 +115,7 @@ static int osThread(void * arg)
   /*
    * Doesn't return.
    */
-  pthread_exit((void *) result);
+  pthread_exit((void *) (int64_t)result);
 
   return 0;
 }

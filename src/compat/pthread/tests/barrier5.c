@@ -78,7 +78,7 @@ func(void * barrierHeight)
       if (result == PTHREAD_BARRIER_SERIAL_THREAD)
         {
           serialThreads++;
-          assert(barrierReleases[i - 1] == (int) barrierHeight);
+          assert(barrierReleases[i - 1] == (int) (int64_t)barrierHeight);
           barrierReleases[i + 1] = 0;
         }
       else if (result != 0)
@@ -87,7 +87,7 @@ func(void * barrierHeight)
         }
     }
 
-  return (void *) serialThreads;
+  return (void *) (int64_t) serialThreads;
 }
 
 int pthread_test_barrier5()
@@ -109,7 +109,7 @@ int pthread_test_barrier5()
 
       for (i = 1; i <= j; i++)
         {
-          assert(pthread_create(&t[i], NULL, func, (void *) j) == 0);
+	    assert(pthread_create(&t[i], NULL, func, (void *) (int64_t) j) == 0);
         }
 
       serialThreadsTotal = 0;

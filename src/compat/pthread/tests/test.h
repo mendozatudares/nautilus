@@ -65,7 +65,7 @@
 #elif defined(__BORLANDC__)
 #define int64_t ULONGLONG
 #else
-#define int64_t _int64
+#define int64_t long
 #endif
 
 extern const char * error_string;
@@ -94,7 +94,7 @@ extern const char * error_string;
 	                            fflush(stdout) : \
                              0) : \
           (fprintf(stderr, "Assertion failed: (%s), file %s, line %d\n", \
-                   #e, __FILE__, (int) __LINE__), exit(1), 0))
+                   #e, __FILE__, (int) __LINE__), exit(1)))
 
 extern int assertE;
 # define assert_e(e, o, r) \
@@ -104,7 +104,7 @@ extern int assertE;
 	                            fflush(stdout) : \
                              0) : \
           (fprintf(stderr, "Assertion failed: (%s %s %s), file %s, line %d, error %s\n", \
-                   #e,#o,#r, __FILE__, (int) __LINE__, error_string[assertE]), exit(1), 0))
+                   #e,#o,#r, __FILE__, (int) __LINE__, error_string[assertE]), exit(1)))
 
 #endif
 

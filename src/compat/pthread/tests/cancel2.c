@@ -218,7 +218,7 @@ int pthread_test_cancel2()
       int result = 0;
 
       assert(pthread_join(t[i], (void **) &result) == 0);
-      fail = (result != (int) PTHREAD_CANCELED);
+      fail = (result != (int)  (int64_t) PTHREAD_CANCELED);
       failed |= fail;
     }
 

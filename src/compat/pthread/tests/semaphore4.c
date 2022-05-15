@@ -89,7 +89,7 @@ static void *
 thr (void * arg)
 {
 
-  if ((int) arg == 5)
+  if ((int)  (int64_t) arg == 5)
     {
       // We expect this thread to be cancelled,
       // so sem_wait should return EINTR.
@@ -117,7 +117,7 @@ int pthread_test_semaphore4(void)
 
   for (i = 1; i <= MAX_COUNT; i++)
     {
-      assert(pthread_create(&t[i], NULL, thr, (void *)i) == 0);
+      assert(pthread_create(&t[i], NULL, thr, (void *) (int64_t) i) == 0);
       do
         {
           sched_yield();

@@ -52,7 +52,7 @@ static pthread_spinlock_t spin;
 
 static void * unlocker(void * arg)
 {
-  int expectedResult = (int) arg;
+  int expectedResult = (int)  (int64_t)  arg;
 
   wasHere++;
   assert(pthread_spin_unlock(&spin) == expectedResult);

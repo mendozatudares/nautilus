@@ -60,7 +60,7 @@ static void * wrfunc(void * arg)
   bankAccount += 10;
   assert(pthread_rwlock_unlock(&rwlock1) == 0);
 
-  return ((void *) bankAccount);
+  return ((void *)  (int64_t) bankAccount);
 }
 
 static void * rdfunc(void * arg)
@@ -79,13 +79,13 @@ static void * rdfunc(void * arg)
   abstime.tv_nsec = NANOSEC_PER_MILLISEC * currSysTime.millitm;
 
 
-  if ((int) arg == 1)
+  if ((int)  (int64_t) arg == 1)
     {
       abstime.tv_sec += 1;
       assert(pthread_rwlock_timedrdlock(&rwlock1, &abstime) == ETIMEDOUT);
       ba = 0;
     }
-  else if ((int) arg == 2)
+  else if ((int)  (int64_t) arg == 2)
     {
       abstime.tv_sec += 3;
       assert(pthread_rwlock_timedrdlock(&rwlock1, &abstime) == 0);
@@ -93,7 +93,7 @@ static void * rdfunc(void * arg)
       assert(pthread_rwlock_unlock(&rwlock1) == 0);
     }
 
-  return ((void *) ba);
+  return ((void *)  (int64_t) ba);
 }
 
 int pthread_test_rwlock6t()

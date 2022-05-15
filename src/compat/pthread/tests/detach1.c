@@ -53,7 +53,7 @@ enum
 static void *
 func(void * arg)
 {
-  int i = (int) arg;
+    int i = (int) (int64_t) arg;
 
   pte_osThreadSleep(i * 10);
 
@@ -74,7 +74,7 @@ int pthread_test_detach1()
   /* Create a few threads and then exit. */
   for (i = 0; i < NUMTHREADS; i++)
     {
-      assert(pthread_create(&id[i], NULL, func, (void *) i) == 0);
+	assert(pthread_create(&id[i], NULL, func, (void *) (int64_t) i) == 0);
     }
 
 

@@ -63,7 +63,7 @@ int pthread_test_exit3()
   /* Create a few threads and then exit. */
   for (i = 0; i < 4; i++)
     {
-      assert(pthread_create(&id[i], NULL, func, (void *) i) == 0);
+	assert(pthread_create(&id[i], NULL, func, (void *) (int64_t)i) == 0);
     }
 
   pte_osThreadSleep(1000);
@@ -72,7 +72,7 @@ int pthread_test_exit3()
     {
       void * retValue;
       assert(pthread_join(id[i],&retValue) == 0);
-      assert((int)retValue == i);
+      assert((int)(int64_t)retValue == i);
     }
 
   /* Success. */

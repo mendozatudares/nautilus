@@ -60,7 +60,7 @@ int pthread_test_join2()
   /* Create a few threads and then exit. */
   for (i = 0; i < 4; i++)
     {
-      assert(pthread_create(&id[i], NULL, func, (void *) i) == 0);
+	assert(pthread_create(&id[i], NULL, func, (void *) (int64_t)i) == 0);
     }
 
   for (i = 0; i < 4; i++)

@@ -114,7 +114,7 @@ mythread(void * arg)
 
   abstime2.tv_sec = abstime.tv_sec;
 
-  if ((int) arg % 3 == 0)
+  if ((int) (int64_t) arg % 3 == 0)
     {
       abstime2.tv_sec += 2;
     }
@@ -155,14 +155,14 @@ int pthread_test_condvar3_2()
   /* get current system time */
   _ftime(&currSysTime);
 
-  abstime.tv_sec = abstime.tv_sec = currSysTime.time + 5;
+  abstime.tv_sec = abstime2.tv_sec = currSysTime.time + 5;
   abstime.tv_nsec = abstime2.tv_nsec = NANOSEC_PER_MILLISEC * currSysTime.millitm;
 
   assert(pthread_mutex_lock(&mutex) == 0);
 
   for (i = 1; i <= NUMTHREADS; i++)
     {
-      assert(pthread_create(&t[i], NULL, mythread, (void *) i) == 0);
+	assert(pthread_create(&t[i], NULL, mythread, (void *) (int64_t) i) == 0);
     }
 
   assert(pthread_mutex_unlock(&mutex) == 0);
