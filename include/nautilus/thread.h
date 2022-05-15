@@ -228,6 +228,12 @@ struct nk_thread {
     void  *gc_state;
 #endif
 
+#ifdef NAUT_CONFIG_HARDWARE_TLS
+    // used to track where TLS data is allocated
+    // note that hwtls points *into* this block
+    void  *tls_loc;  
+#endif
+    
     char name[MAX_THREAD_NAME];
 
     const void * tls[TLS_MAX_KEYS];

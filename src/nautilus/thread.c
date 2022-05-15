@@ -280,6 +280,66 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
 static void nk_thread_brain_wipe(nk_thread_t *t);
 
 
+
+static int hwtls_config_kernel_tls(nk_thread_t *t)
+{
+
+    int placement_cpu = t->placement_cpu;
+    
+    extern addr_t _tbss_end, _tdata_start,_tdata_end;
+
+    addr_t tdata_start = (addr_t) &_tdata_start;
+    addr_t tdata_end = (addr_t) &_tdata_end;
+    addr_t tbss_end = (addr_t) &_tbss_end;
+    uint64_t datasize = tdata_end-tdata_start;
+    
+    //tbss follows closely after tdata;
+    uint64_t bsssize = tbss_end-tdata_end;
+    
+    // nk_dump_mem(tdata_start, datasize+bsssize);
+    // printf("========size tdata  %d tbss  %d\n",datasize, bsssize);
+    // printf("====+++++======= tdata start %04x tdata end %04x \n", tdata_start, tdata_end);
+
+
+    
+    //malloc problem: increment tls_loc gives error fs;
+    //uint64_t align = 16;
+    uint64_t slack = 64;
+
+    if (!t->tls_loc) { // need to allocate it
+	t->tls_loc = malloc_specific(datasize+bsssize+slack, placement_cpu);
+	
+	if (!t->tls_loc) {
+	    THREAD_ERROR("Cannot allocate tls space for thread\n");
+	    return -1;
+	}
+    }
+
+    //printf("=======tls loc %p \n", tls_loc);
+
+    memset(t->tls_loc, 0, datasize+bsssize);
+
+    /*
+     * -------------------------------------------------------
+     *  |  |  |  |  | tdata | tdata | tdata | tbss |tbss|tcb|  
+     * ------------------------------------------------------
+    */
+    memcpy(t->tls_loc, (void*)tdata_start, datasize);
+
+    t->hwtls = t->tls_loc + datasize + bsssize;
+    
+    //printf("hwtls : %p \n", t->hwtls);
+    //    uint64_t fsbase = (uint64_t)(tls_loc+datasize+bsssize);
+    
+    //force fs:0x0 to have value fsbase    
+    *((void**)t->hwtls) = t->hwtls;
+
+    return 0;
+
+}
+
+
+
 /****** EXTERNAL THREAD INTERFACE ******/
 
 
@@ -368,13 +428,10 @@ nk_thread_create (nk_thread_fun_t fun,
     t->aspace = get_cur_thread()->aspace;
 
 #ifdef NAUT_CONFIG_HARDWARE_TLS
-    t->hwtls = clone_kernel_tls(placement_cpu);
-    if (!t->hwtls) { 
+    if (hwtls_config_kernel_tls(t)) {
         THREAD_ERROR("Could not clone kernel tls\n");
         goto out_err;
     }
-#else
-    t->hwtls = 0;
 #endif
 
     t->fun = fun;
@@ -524,77 +581,6 @@ int nk_thread_name(nk_thread_id_t tid, char *name)
   return 0;
 }
 
-int nk_thread_change_hw_tls(nk_thread_id_t tid, void *hwtls)
-{
-    ((nk_thread_t*)tid)->hwtls = hwtls;
-    msr_write(MSR_FS_BASE,(uint64_t)hwtls);
-    return 0;
-}
-
-uint64_t round(uint64_t offset, uint64_t align)
-{
-    if (align == 0 || align == 1)
-        return offset;
-    
-    return offset + align - offset % align;
-}
-
-
-static void* clone_kernel_tls(int placement_cpu)
-{
-    void * tls_loc;
-
-    extern addr_t _tbss_end, _tdata_start,_tdata_end;
-
-    addr_t tdata_start = (addr_t) &_tdata_start;
-    addr_t tdata_end = (addr_t) &_tdata_end;
-    addr_t tbss_end = (addr_t) &_tbss_end;
-    uint64_t datasize = tdata_end-tdata_start;
-    
-    //tbss follows closely after tdata;
-    uint64_t bsssize = tbss_end-tdata_end;
-    
-    // nk_dump_mem(tdata_start, datasize+bsssize);
-    // printf("========size tdata  %d tbss  %d\n",datasize, bsssize);
-    // printf("====+++++======= tdata start %04x tdata end %04x \n", tdata_start, tdata_end);
-
-
-    
-    //malloc problem: increment tls_loc gives error fs;
-    //uint64_t align = 16;
-    uint64_t slack = 64;
-
-    tls_loc = malloc_specific(datasize+bsssize+slack, placement_cpu);
-
-    if (!tls_loc) {
-      THREAD_ERROR("Cannot allocate tls space for thread\n");
-      return 0;
-    }
-
-    //printf("=======tls loc %p \n", tls_loc);
-
-    memset(tls_loc, 0, datasize+bsssize);
-
-    /*
-     * -------------------------------------------------------
-     *  |  |  |  |  | tdata | tdata | tdata | tbss |tbss|tcb|  
-     * ------------------------------------------------------
-    */
-    memcpy(tls_loc, (void*)tdata_start, datasize);
-
-    //printf("hwtls : %p \n", tls_loc+datasize+bsssize); 
-
-    uint64_t fsbase = (uint64_t)(tls_loc+datasize+bsssize);
-
-    //force fs:0x0 to have value fsbase    
-    *((uint64_t*)fsbase) = fsbase;
-
-    return  tls_loc + datasize + bsssize;
-
-}
-
-
-
 
 /*
  * wake_waiters
@@ -740,9 +726,15 @@ nk_thread_destroy (nk_thread_id_t t)
     nk_gc_bdwgc_thread_state_deinit(thethread);
 #endif
 
+#ifdef NAUT_CONFIG_HARDWARE_TLS
+    if (thethread->tls_loc) {
+	free(thethread->tls_loc);
+    }
+#endif
+
     free(thethread->stack);
     free(thethread);
-    
+
     preempt_enable();
 }
 
@@ -922,6 +914,13 @@ nk_set_thread_output (void * result)
     }
 }
 
+
+int nk_thread_change_hw_tls(nk_thread_id_t tid, void *hwtls)
+{
+    ((nk_thread_t*)tid)->hwtls = hwtls;
+    msr_write(MSR_FS_BASE,(uint64_t)hwtls);
+    return 0;
+}
 
 
 /* 
