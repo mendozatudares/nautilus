@@ -77,9 +77,7 @@
 #include <exception>
 #include <new>
 
-#ifdef __GNUC__
-#include <stdlib.h>
-#endif
+
 
 #include "test.h"
 
@@ -137,8 +135,6 @@ pthread_test_exception2()
 }
 
 #else /* defined(__cplusplus) */
-
-#include <stdio.h>
 
 int
 pthread_test_exception2()

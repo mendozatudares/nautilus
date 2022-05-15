@@ -35,13 +35,14 @@
 
 #define CONF95 1.96
 
-int nthreads = -1;           // Number of OpenMP threads
+int nthreads = 1;           // Number of OpenMP threads
 int delaylength = -1;        // The number of iterations to delay for
 int outerreps = -1;          // Outer repetitions
 double delaytime = -1.0;     // Length of time to delay for in microseconds
 double targettesttime = 0.0; // The length of time in microseconds that the test
                              // should run for.
 unsigned long innerreps; // Inner repetitions
+#define times TIMES
 double *times;           // Array of doubles storing the benchmark times in microseconds
 double referencetime;    // The average reference time in microseconds to perform
 			 // outerreps runs
@@ -327,8 +328,8 @@ void benchmark(char *name, void (*test)(void))
 // For the Cray compiler on HECToR we need to turn off optimisation 
 // for the delay and array_delay functions. Other compilers should
 // not be afffected. 
-#pragma _CRI noopt
-void delay(int delaylength) {
+//#pragma _CRI noopt
+void __attribute__((optnone)) delay(int delaylength) {
 
     int i;
     float a = 0.;
@@ -340,7 +341,7 @@ void delay(int delaylength) {
 
 }
 
-void array_delay(int delaylength, double a[1]) {
+void __attribute__((optnone)) array_delay(int delaylength, double a[1]) {
 
     int i;
     a[0] = 1.0;

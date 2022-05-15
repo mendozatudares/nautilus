@@ -149,7 +149,6 @@ pthread_test_exception3()
 
 #else /* defined(__cplusplus) */
 
-#include <stdio.h>
 
 int
 pthread_test_exception3()

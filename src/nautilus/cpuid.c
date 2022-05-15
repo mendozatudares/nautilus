@@ -83,6 +83,7 @@ cpuid_ext_leaf_max (void)
     return ret.a & 0xff;
 }
 
+
 uint32_t
 cpuid_leaf_max (void)
 {

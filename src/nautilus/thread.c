@@ -62,7 +62,7 @@ extern void nk_thread_switch(nk_thread_t*);
 extern void nk_thread_entry(void *);
 static struct nk_tls tls_keys[TLS_MAX_KEYS];
 
-
+static void * nk_thread_set_tls(int placement_cpu);
 /****** SEE BELOW FOR EXTERNAL THREAD INTERFACE ********/
 
 
@@ -323,7 +323,6 @@ nk_thread_create (nk_thread_fun_t fun,
 	// we have succeeded in reanimating a dead thread, so
 	// now all we need to do is the management that
 	// nk_thread_destroy() would otherwise have done
-
 	nk_thread_brain_wipe(t);
 
 	
@@ -368,9 +367,16 @@ nk_thread_create (nk_thread_fun_t fun,
     // a thread joins its creator's address space 
     t->aspace = get_cur_thread()->aspace;
 
-    // a thread joins its creator's HW TLS space
-    t->hwtls = get_cur_thread()->hwtls;
-    
+#ifdef NAUT_CONFIG_HARDWARE_TLS
+    t->hwtls = clone_kernel_tls(placement_cpu);
+    if (!t->hwtls) { 
+        THREAD_ERROR("Could not clone kernel tls\n");
+        goto out_err;
+    }
+#else
+    t->hwtls = 0;
+#endif
+
     t->fun = fun;
     t->input = input;
     t->output_loc = output;
@@ -498,7 +504,7 @@ int nk_thread_run(nk_thread_id_t t)
       THREAD_DEBUG("Running thread (%p, tid=%u) on bound cpu %u\n", newthread, newthread->tid, newthread->current_cpu); 
   }
 #endif
-
+ 
   nk_sched_kick_cpu(newthread->current_cpu);
 
   return 0;
@@ -524,6 +530,70 @@ int nk_thread_change_hw_tls(nk_thread_id_t tid, void *hwtls)
     msr_write(MSR_FS_BASE,(uint64_t)hwtls);
     return 0;
 }
+
+uint64_t round(uint64_t offset, uint64_t align)
+{
+    if (align == 0 || align == 1)
+        return offset;
+    
+    return offset + align - offset % align;
+}
+
+
+static void* clone_kernel_tls(int placement_cpu)
+{
+    void * tls_loc;
+
+    extern addr_t _tbss_end, _tdata_start,_tdata_end;
+
+    addr_t tdata_start = (addr_t) &_tdata_start;
+    addr_t tdata_end = (addr_t) &_tdata_end;
+    addr_t tbss_end = (addr_t) &_tbss_end;
+    uint64_t datasize = tdata_end-tdata_start;
+    
+    //tbss follows closely after tdata;
+    uint64_t bsssize = tbss_end-tdata_end;
+    
+    // nk_dump_mem(tdata_start, datasize+bsssize);
+    // printf("========size tdata  %d tbss  %d\n",datasize, bsssize);
+    // printf("====+++++======= tdata start %04x tdata end %04x \n", tdata_start, tdata_end);
+
+
+    
+    //malloc problem: increment tls_loc gives error fs;
+    //uint64_t align = 16;
+    uint64_t slack = 64;
+
+    tls_loc = malloc_specific(datasize+bsssize+slack, placement_cpu);
+
+    if (!tls_loc) {
+      THREAD_ERROR("Cannot allocate tls space for thread\n");
+      return 0;
+    }
+
+    //printf("=======tls loc %p \n", tls_loc);
+
+    memset(tls_loc, 0, datasize+bsssize);
+
+    /*
+     * -------------------------------------------------------
+     *  |  |  |  |  | tdata | tdata | tdata | tbss |tbss|tcb|  
+     * ------------------------------------------------------
+    */
+    memcpy(tls_loc, (void*)tdata_start, datasize);
+
+    //printf("hwtls : %p \n", tls_loc+datasize+bsssize); 
+
+    uint64_t fsbase = (uint64_t)(tls_loc+datasize+bsssize);
+
+    //force fs:0x0 to have value fsbase    
+    *((uint64_t*)fsbase) = fsbase;
+
+    return  tls_loc + datasize + bsssize;
+
+}
+
+
 
 
 /*

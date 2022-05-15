@@ -49,7 +49,6 @@
  *	pthread_setspecific()
  */
 
-#include <stdlib.h>
 
 #include "test.h"
 

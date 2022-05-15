@@ -43,8 +43,6 @@
  * Test some basic assertions about the number of threads at runtime.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "test.h"
 

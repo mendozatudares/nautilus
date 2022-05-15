@@ -177,7 +177,7 @@
 
 extern spinlock_t printk_lock;
 
-
+extern struct gdt_desc64 gdtr64;
 
 #define QUANTUM_IN_NS (1000000000ULL/NAUT_CONFIG_HZ)
 
@@ -489,6 +489,10 @@ init (unsigned long mbd,
     nk_cache_part_start();
 #endif
 
+#ifdef NAUT_CONFIG_USE_IST
+    nk_gdt_init();
+#endif
+    
     sti();
 
     /* interrupts are now on */

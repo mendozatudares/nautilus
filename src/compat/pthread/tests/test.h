@@ -44,14 +44,16 @@
 #ifndef _PTHREAD_TEST_H_
 #define _PTHREAD_TEST_H_
 
-#include <stdio.h>
-#include <stdlib.h>
+//#include <stdio.h>
+//#include <stdlib.h>
 
-#include "pte_osal.h"
 
-#include "pthread.h"
-#include "sched.h"
-#include "semaphore.h"
+//#include "pte_osal.h"
+#include "../pte_osal.h"
+
+#include "../pthread.h"
+#include "../sched.h"
+#include "../semaphore.h"
 
 //#include <windows.h>
 

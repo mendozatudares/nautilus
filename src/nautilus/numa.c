@@ -312,7 +312,7 @@ assign_core_coords_amd (struct cpu * me, struct nk_cpu_coords * coord, struct nk
         // for package IDs
         coord->pkg_id  = (uint32_t)(ret.c & 0xff);
     } else {
-        uint32_t logprocid = my_apic_id % tp->max_ncores;
+        uint32_t logprocid = (tp->max_ncores !=0) ? my_apic_id % tp->max_ncores : 0;
         coord->smt_id  = (tp->max_nthreads != 0) ? (my_apic_id % tp->max_nthreads) : 0;
         coord->core_id = (tp->max_nthreads != 0) ? (logprocid / tp->max_nthreads) : 0;
         coord->pkg_id  = (tp->max_ncores != 0) ? (my_apic_id / tp->max_ncores) : 0;

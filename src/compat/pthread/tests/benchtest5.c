@@ -48,9 +48,6 @@
 #include "test.h"
 
 
-#ifdef __GNUC__
-#include <stdlib.h>
-#endif
 
 #include "benchtest.h"
 
@@ -102,21 +99,7 @@ main (int argc, char *argv[])
           "Test",
           "Total(msec)",
           "average(usec)");
-<<<<<<< .mine
-<<<<<<< .mine
- * --------------------------------------------------------------------------
-=======
- * --------------------------------------------------------------------------
- *
- *      Pthreads-embedded (PTE) - POSIX Threads Library for embedded systems
- *      Copyright(C) 2008 Jason Schmidlapp
- *
- *      Contact Email: jschmidlapp@users.sourceforge.net
- *
-=======
- * --------------------------------------------------------------------------
->>>>>>> .r47
->>>>>>> .r51
+
 
   /*
    * Time the loop overhead so we can subtract it from the actual test times.

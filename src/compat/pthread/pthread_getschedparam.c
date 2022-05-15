@@ -75,7 +75,8 @@ pthread_getschedparam (pthread_t thread, int *policy,
    * for the target thread. It must not return the actual thread
    * priority as altered by any system priority adjustments etc.
    */
-  param->sched_priority = ((pte_thread_t *)thread.p)->sched_priority;
+  //priority here is complicated
+  param->sched_priority = 0; //((pte_thread_t *)thread.p)->sched_priority;
 
   return 0;
 }

@@ -76,7 +76,7 @@ idle (void * in, void ** out)
 #endif
 	    if ((task = nk_task_try_consume(my_cpu_id(),0,0))) { 
 		DEBUG_PRINT("idle consuming task %p\n",task);
-		void *output = task->func(task->input);
+		void *output = NK_TASK_RUN(task);
 		nk_task_complete(task, output);
 	    }
 #if NAUT_CONFIG_TASK_IN_IDLE_NOPREEMPT

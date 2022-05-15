@@ -54,7 +54,6 @@
 #include "semaphore.h"
 #include "implement.h"
 
-
 int
 sem_post (sem_t * sem)
 /*

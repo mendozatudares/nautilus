@@ -1,6 +1,7 @@
 obj-y += smpboot.o \
 		 excp_early.o \
 		 thread_lowlevel.o \
+		 task_lowlevel.o \
 		 setjmp_low.o \
 		 timing_loops.o \
 		 string_lowlevel.o

@@ -75,7 +75,7 @@
 
 // task and idle threads run tasks, and so their stacks
 // need to be sized to be sensible for those tasks
-#define TASK_THREAD_STACK_SIZE (PAGE_SIZE_2MB)
+#define TASK_THREAD_STACK_SIZE (16*PAGE_SIZE_2MB)
 #define IDLE_THREAD_STACK_SIZE (PAGE_SIZE_2MB)
 
 // interrupt and reaper threads are self-contained here, so
@@ -116,6 +116,10 @@
 #endif
 #endif
 
+#ifdef NAUT_CONFIG_DEBUG_TASKS
+#undef TASK_DEBUG
+#define TASK_DEBUG(fmt, args...) DEBUG_PRINT("task: " fmt, ##args)
+#endif
 
 #ifndef MIN
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -144,6 +148,10 @@
 #define TASK_LOCK(t) _task_flags = spin_lock_irq_save(&((t)->lock))
 #define TASK_TRY_LOCK(t) spin_try_lock_irq_save(&((t)->lock),&_task_flags)
 #define TASK_UNLOCK(t) spin_unlock_irq_restore(&((t)->lock),_task_flags)
+#define TASK_ALLOC_LOCK_CONF uint8_t _task_alloc_flags=0
+#define TASK_ALLOC_LOCK(t) _task_alloc_flags = spin_lock_irq_save(&((t)->alloc_lock))
+#define TASK_ALLOC_TRY_LOCK(t) spin_try_lock_irq_save(&((t)->alloc_lock),&_task_alloc_flags)
+#define TASK_ALLOC_UNLOCK(t) spin_unlock_irq_restore(&((t)->alloc_lock),_task_alloc_flags)
 //#define TASK_LOCK_CONF 
 //#define TASK_LOCK(t) spin_lock(&((t)->lock))
 //#define TASK_TRY_LOCK(t) spin_try_lock(&((t)->lock))
@@ -197,6 +205,7 @@ static volatile uint8_t      stop_flags;
 
 
 static struct nk_sched_global_state global_sched_state;
+
 
 //
 // List implementation for use in scheduler
@@ -272,6 +281,15 @@ static rt_thread* rt_priority_queue_remove(rt_priority_queue *queue, rt_thread *
 static int        rt_priority_queue_empty(rt_priority_queue *queue);
 static void       rt_priority_queue_dump(rt_priority_queue *queue, char *pre);
 
+// Global task state
+typedef struct nk_task_global_state {
+  uint64_t first_cpu;
+  uint64_t num_cpus;
+} nk_task_global_state_t;
+
+static volatile nk_task_global_state_t global_task_state;
+
+
 //
 // Per-CPU scheduler state - hangs off off global cpu struct
 //
@@ -286,7 +304,7 @@ typedef struct tsc_info {
 
 
 typedef struct nk_sched_task_state {
-    spinlock_t  lock;
+    spinlock_t         lock;             // lock for waitqueue, and task queues
     nk_wait_queue_t   *waitq;            // where the task thread blocks ultimately
     uint64_t           sized_enqueued;   // number of sized tasks enqueued
     uint64_t           sized_dequeued;   //   and dequeued (locally or remotely)
@@ -294,6 +312,12 @@ typedef struct nk_sched_task_state {
     uint64_t           unsized_enqueued; // number of unsized tasks enqueud
     uint64_t           unsized_dequeued; //   and dequeued (locally or remotely)
     struct list_head   unsized_queue;    // tasks with unknown sizes;
+#ifdef NAUT_CONFIG_TASK_REUSE
+    spinlock_t         alloc_lock;       // lock only for the free stack
+    uint64_t           num_free;         // count of tasks the in free stack
+    uint64_t           num_reuses;       // count of tasks the in free stack
+    struct list_head   free_stack;       // the free stack itself
+#endif
 } task_info;
 
 typedef struct nk_sched_percpu_state {
@@ -2138,7 +2162,8 @@ static int pump_sized_tasks(rt_scheduler *scheduler, rt_thread *next)
 // In both cases updates the timer to reflect the thread
 // that should be running
 //
-struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
+#define INTERRUPT __attribute__((target("no-sse")))
+INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched)
 {
     LOCAL_LOCK_CONF;
     
@@ -3722,39 +3747,209 @@ static inline uint64_t get_min_per(rt_priority_queue *runnable, rt_priority_queu
 
 static int task_initial_placement()
 {
-    struct sys_info * sys = per_cpu_get(system);
-    return (int)(get_random() % sys->num_cpus);
+  return (int)(global_task_state.first_cpu + get_random() % global_task_state.num_cpus);
+}
+
+int  nk_task_cpu_restrict(uint64_t first_cpu, uint64_t num_cpus)
+{
+  global_task_state.first_cpu = first_cpu;
+  global_task_state.num_cpus = num_cpus;
+  TASK_DEBUG("restricting task production and consumption to CPUs [%lu,%lu)\n", global_task_state.first_cpu, global_task_state.num_cpus);
+  return 0;
+}
+
+int  nk_task_cpu_get_restrict(uint64_t *first_cpu, uint64_t *num_cpus)
+{
+  *first_cpu = global_task_state.first_cpu;
+  *num_cpus = global_task_state.num_cpus;
+  TASK_DEBUG("get task production and consumption - response is CPUs [%lu,%lu)\n", *first_cpu, *num_cpus);
+  return 0;
 }
 
 
+// returns the task cleared and properly set up otherwise
+static inline struct nk_task *task_alloc(int cpu)
+{
+  struct nk_task *t = 0;
+
+#if NAUT_CONFIG_TASK_REUSE
+  
+  struct sys_info * sys = per_cpu_get(system);
+  task_info *ti = &sys->cpus[cpu]->sched_state->tasks;
+  
+  TASK_DEBUG("attempting to reallocate task from cpu %d's pool\n",cpu);
+  
+  TASK_ALLOC_LOCK_CONF;
+  
+  TASK_ALLOC_LOCK(ti);
+  
+  if (list_empty(&ti->free_stack)) {
+    // give up and just allocate
+    TASK_ALLOC_UNLOCK(ti);
+    TASK_DEBUG("no free tasks available, so creating a new one\n");
+    t = MALLOC_SPECIFIC(sizeof(struct nk_task),cpu);
+    if (!t) {
+      TASK_DEBUG("ran out of memory in allocating a task\n");
+      return 0;
+    }
+    TASK_DEBUG("allocating fresh task %p\n",t);
+  } else {
+    t = list_entry(ti->free_stack.next,struct nk_task, queue_node);
+    list_del_init(ti->free_stack.next);
+    ti->num_free--;
+    ti->num_reuses++;
+    TASK_ALLOC_UNLOCK(ti);
+    TASK_DEBUG("reallocating task %p\n",t);
+  }
+  
+  memset(t,0,sizeof(*t));
+  
+  t->alloc_cpu = cpu;
+  
+  INIT_LIST_HEAD(&t->queue_node);
+  
+  return t;
+  
+#else // no task pool
+  
+  t = MALLOC_SPECIFIC(sizeof(struct nk_task),cpu);
+  
+  if (t) {
+    TASK_DEBUG("succeeded in allocating new task %p for cpu %d\n",t,cpu);
+    memset(t,0,sizeof(*t));
+    INIT_LIST_HEAD(&t->queue_node);
+  } else {
+    TASK_DEBUG("failed to allocate new task for cpu %d\n",cpu);
+  }
+  
+  return t;
+  
+#endif
+}
+
+static void task_dealloc(struct nk_task *t)
+{
+  
+#if NAUT_CONFIG_TASK_REUSE
+
+  int cpu = t->alloc_cpu;
+  struct sys_info * sys = per_cpu_get(system);
+  task_info *ti = &sys->cpus[cpu]->sched_state->tasks;
+  
+  TASK_DEBUG("attempting to return task %p to cpu %d's pool\n",t,cpu);
+  TASK_ALLOC_LOCK_CONF;
+  
+  TASK_ALLOC_LOCK(ti);
+  
+  if (ti->num_free >= NAUT_CONFIG_TASK_REUSE_POOL_SIZE) {
+    TASK_ALLOC_UNLOCK(ti);
+    TASK_DEBUG("freeing %p since cpu %d's pool is already at capacity (has %lu)\n",t,cpu,ti->num_free);
+    FREE(t);
+    return;
+  } else {
+    list_add(&t->queue_node,&ti->free_stack);
+    ti->num_free++;
+    uint64_t count = ti->num_free;
+    TASK_ALLOC_UNLOCK(ti);
+    TASK_DEBUG("returned %p to cpu %d's pool which now has %lu tasks in it\n",t,cpu,count);
+    return;
+  }
+  
+#else // no task pool
+
+  TASK_DEBUG("freeing task %p\n",t);
+  FREE(t);
+  
+#endif
+  
+}
+
+#ifdef NAUT_CONFIG_TASK_REUSE_POOL_SEED
+
+static int task_seed(task_info *ti, int cpu)
+{
+  uint64_t i;
+  
+  for (i=0;i<NAUT_CONFIG_TASK_REUSE_POOL_SIZE;i++) {
+    struct nk_task *t = MALLOC_SPECIFIC(sizeof(struct nk_task),cpu);
+    
+    if (!t) {
+      TASK_ERROR("ran out of memory in seeding tasks for cpu %d\n",cpu);
+      return -1;
+    }
+    
+    memset(t,0,sizeof(*t));
+    INIT_LIST_HEAD(&t->queue_node);
+    t->alloc_cpu = cpu;
+    // add tail here to prefer earlier/lower memory addresses
+    // at the start of the stack
+    list_add_tail(&t->queue_node,&ti->free_stack);
+  }
+  
+  ti->num_free = NAUT_CONFIG_TASK_REUSE_POOL_SIZE;
+  
+  TASK_DEBUG("seeded cpu %d with %lu tasks\n", cpu, NAUT_CONFIG_TASK_REUSE_POOL_SIZE);
+  
+  return 0;
+}
+
+#endif
+
+
+  
 struct nk_task *nk_task_produce(int cpu, uint64_t size_ns, void *(*f)(void*), void *input, uint64_t flags)
 {
     TASK_LOCK_CONF;
+
+    TASK_DEBUG("starting produce %p(%p) size %lu for cpu %d\n",f,input,size_ns,cpu);
+
+    int placement_cpu;
+
+#if NAUT_CONFIG_TASK_DEEP_STATISTICS
+    uint64_t start_cycles = rdtsc();
+#endif
+    uint64_t start_ns = cur_time();
+
+    if (cpu>=0) {
+      if (!((cpu >= global_task_state.first_cpu)  &&
+	    (cpu < (global_task_state.first_cpu + global_task_state.num_cpus)))) {
+	TASK_ERROR("cannot produce task for out of limit cpu %d\n",cpu);
+	return 0;
+      } else {
+	placement_cpu = cpu;
+      }
+    } else {
+	placement_cpu =  task_initial_placement();
+    }
+
     
-    int placement_cpu = cpu>=0 ? cpu : task_initial_placement();
-    uint64_t start = cur_time();
-    
-    struct nk_task *t = MALLOC_SPECIFIC(sizeof(struct nk_task),placement_cpu);
+    struct nk_task *t = task_alloc(placement_cpu);
 
     if (!t) {
 	TASK_ERROR("Failed to allocate a task\n");
 	return 0;
     }
 
-    memset(t,0,sizeof(*t));
-
-    t->stats.size_ns = size_ns;
-    t->stats.enqueue_time_ns = start;
-    
     t->flags = flags & ~NK_TASK_COMPLETED;
     t->func = f;
     t->input = input;
 
-    INIT_LIST_HEAD(&t->queue_node);
+    t->stats.size_ns = size_ns;
+    t->stats.enqueue_time_ns = start_ns;
+    
+#if NAUT_CONFIG_TASK_DEEP_STATISTICS
+    t->stats.create_cost_cycles = rdtsc() - start_cycles;
+    start_cycles = rdtsc();
+#endif
+    
 
+    
     struct sys_info * sys = per_cpu_get(system);
     task_info *ti = &sys->cpus[placement_cpu]->sched_state->tasks;
 
+    TASK_DEBUG("mapping task %p to cpu %d\n", t,placement_cpu);
+
+    
     // own the target scheduler's task queue
     TASK_LOCK(ti);
     if (t->stats.size_ns) {
@@ -3764,25 +3959,48 @@ struct nk_task *nk_task_produce(int cpu, uint64_t size_ns, void *(*f)(void*), vo
 	list_add_tail(&t->queue_node, &ti->unsized_queue);
 	ti->unsized_enqueued++;
     }
+
+#if NAUT_CONFIG_TASK_DEEP_STATISTICS
+    // capture enqueue cost early with lock held because otherwise
+    // we race with the consumer and waiter.   
+    // this misses the waitqueue kick cost.
+    t->stats.enqueue_cost_cycles = rdtsc() - start_cycles;
+#endif
+    
     TASK_UNLOCK(ti);
 
     // kick any waitqueue
     nk_wait_queue_wake_all(ti->waitq);
 
+    TASK_DEBUG("task produce %p done\n", t);
+    
     return t;
 }
 
 static int task_cpu_selection()
 {
-    struct sys_info * sys = per_cpu_get(system);
-    return (int)(get_random() % sys->num_cpus);
+  return (int)(global_task_state.first_cpu + get_random() % global_task_state.num_cpus);
 }
 
 // dequeue a task, typically used internally
 // dequeuing a task does not execute it.
 static struct nk_task *_nk_task_consume(int cpu, uint64_t size_ns, uint64_t search_limit, int try)
 {
+    TASK_DEBUG("starting %s\n",try ? "try consume" : "consume");
+
+#ifdef NAUT_CONFIG_TASK_DEEP_STATISTICS
+    uint64_t start_cycles = rdtsc();
+#endif
+    
+    int me = my_cpu_id();
+    
     TASK_LOCK_CONF;
+
+    if (!((me >= global_task_state.first_cpu)  &&
+	  (me < (global_task_state.first_cpu + global_task_state.num_cpus)))) {
+      TASK_DEBUG("cannot consume because %d is not within the limit\n",me);
+      return 0;
+    }
     
     int source_cpu = cpu>=0 ? cpu : task_cpu_selection();
 
@@ -3794,6 +4012,7 @@ static struct nk_task *_nk_task_consume(int cpu, uint64_t size_ns, uint64_t sear
     if (try) {
 	if (TASK_TRY_LOCK(ti)) {
 	    // failed, so just leave
+            TASK_DEBUG("ending %s - can't get lock\n",try ? "try consume" : "consume");
 	    return 0;
 	}
     } else {
@@ -3838,6 +4057,12 @@ static struct nk_task *_nk_task_consume(int cpu, uint64_t size_ns, uint64_t sear
 
     if (t) {
 	t->stats.dequeue_time_ns = cur_time();
+#ifdef NAUT_CONFIG_TASK_DEEP_STATISTICS
+        t->stats.dequeue_cost_cycles = rdtsc() - start_cycles;
+#endif
+       TASK_DEBUG("ending %s - found task %p\n",try ? "try consume" : "consume",t);
+    } else {
+       TASK_DEBUG("ending %s - no task found\n",try ? "try consume" : "consume");
     }
 	
     return t;
@@ -3858,12 +4083,13 @@ struct nk_task *nk_task_try_consume(int cpu, uint64_t size_ns, uint64_t search_l
 // this will delete the task if it's detached
 int nk_task_complete(struct nk_task *task, void *output)
 {
+    TASK_DEBUG("task %p complete\n",task);
     task->output = output;
     // setting the flag must occur *after* setting the output
     __sync_fetch_and_or(&task->flags,NK_TASK_COMPLETED);
     task->stats.complete_time_ns = cur_time();
     if (task->flags & NK_TASK_DETACHED) {
-	free(task);
+	task_dealloc(task);
     }
     return 0;
 }
@@ -3873,6 +4099,8 @@ int nk_task_complete(struct nk_task *task, void *output)
 // this will delete the task
 static int _nk_task_wait(struct nk_task *task, void **output, struct nk_task_stats *stats, int try)
 {
+    TASK_DEBUG("starting %s on task %p\n",try ? "try wait" : "wait",task);
+    
     if (task->flags & NK_TASK_DETACHED) {
 	TASK_ERROR("Cannot wait on detached task; also probable race...\n");
 	return -1;
@@ -3884,6 +4112,7 @@ static int _nk_task_wait(struct nk_task *task, void **output, struct nk_task_sta
 
     if (try) {
 	if (!(*test & NK_TASK_COMPLETED)) {
+            TASK_DEBUG("try wait on task %p - not done yet\n",task);
 	    // not done yet, return immediately
 	    return 1;
 	}
@@ -3899,11 +4128,16 @@ static int _nk_task_wait(struct nk_task *task, void **output, struct nk_task_sta
 	    }
 	    if (t) {
 		// found task; run it and complete it
-		output = t->func(t->input);
+	        output = NK_TASK_RUN(t);
 		nk_task_complete(t,output);
+	    } else {
+	      nk_yield();
 	    }
 	}
     }
+#ifdef NAUT_CONFIG_TASK_DEEP_STATISTICS
+    uint64_t start_cycles = rdtsc();
+#endif
 
     if (output) {
 	*output = task->output;
@@ -3915,7 +4149,16 @@ static int _nk_task_wait(struct nk_task *task, void **output, struct nk_task_sta
 	*stats = task->stats;
     }
 
-    free(task);
+    
+    task_dealloc(task);
+
+#ifdef NAUT_CONFIG_TASK_DEEP_STATISTICS
+    if (stats) {
+      stats->destroy_cost_cycles = rdtsc() - start_cycles;
+    }
+#endif    
+
+    TASK_DEBUG("finished %s on task %p\n",try ? "try wait" : "wait",task); 
 
     return 0;
 }
@@ -3928,6 +4171,90 @@ int nk_task_wait(struct nk_task *task, void **output, struct nk_task_stats *stat
 int nk_task_try_wait(struct nk_task *task, void **output, struct nk_task_stats *stats)
 {
     return _nk_task_wait(task,output,stats,1);
+}
+
+
+void nk_task_cpu_snapshot(int cpu, nk_task_cpu_snapshot_t *snap)
+{
+    struct sys_info * sys = per_cpu_get(system);
+    task_info *ti = &sys->cpus[cpu]->sched_state->tasks;
+
+    // we will not lock the state to get this info...
+    // we are going for an approximate count
+
+#define COPY(x) snap->x = ti->x
+    COPY(sized_enqueued);
+    COPY(sized_dequeued);
+    COPY(unsized_enqueued);
+    COPY(unsized_dequeued);
+
+}
+
+void nk_task_system_snapshot(nk_task_system_snapshot_t *snap, uint64_t *idle_cpu_count)
+{
+    struct sys_info * sys = per_cpu_get(system);
+    int i;
+    uint64_t s, u;
+
+    memset(snap,0,sizeof(*snap));
+    *idle_cpu_count=0;
+    
+    // note no locking is done here by intention - this is an approximate count
+    // it's bad enough that it's unscalable.
+    for (i=0;i<sys->num_cpus;i++) {
+	task_info *ti = &sys->cpus[i]->sched_state->tasks;
+#define ADD(x) snap->x += ti->x
+	ADD(sized_enqueued);
+	ADD(sized_dequeued);
+	ADD(unsized_enqueued);
+	ADD(unsized_dequeued);
+	*idle_cpu_count +=
+	    ((snap->sized_enqueued - snap->sized_dequeued)==0) &&
+	    ((snap->unsized_enqueued - snap->unsized_dequeued)==0);
+	    
+    }
+
+}
+
+
+void nk_task_dump_state(int cpu_arg)
+{
+    struct sys_info * sys = per_cpu_get(system);
+    task_info *ti;
+    uint64_t  sizeds=0;
+    uint64_t  unsizeds=0;
+    uint64_t  reuses=0;
+    int cpu;
+    
+    for (cpu=0;cpu<sys->num_cpus;cpu++) { 
+	if (cpu_arg<0 || cpu_arg==cpu) {
+	  ti = &sys->cpus[cpu]->sched_state->tasks;
+
+	  nk_vc_printf("%dc %luse %lusd %luue %luud (%lu sized, %lu unsized, %lu reused, reuse=%s)\n",
+		       cpu,
+		       ti->sized_enqueued,
+		       ti->sized_dequeued,
+		       ti->unsized_enqueued,
+		       ti->unsized_dequeued,
+		       ti->sized_enqueued - ti->sized_dequeued,
+		       ti->unsized_enqueued - ti->sized_dequeued,
+#if NAUT_CONFIG_TASK_REUSE
+		       ti->num_reuses,
+		       "yes"
+#else
+		       0,
+	               "no"
+#endif
+		       );
+	  sizeds += ti->sized_enqueued - ti->sized_dequeued;
+	  unsizeds +=  ti->unsized_enqueued - ti->sized_dequeued;
+#if NAUT_CONFIG_TASK_REUSE
+	  reuses +=  ti->num_reuses;
+#endif
+	}
+    }
+
+    nk_vc_printf("Totals: %lu sized, %lu unsized, %lu reuses\n",sizeds,unsizeds,reuses);
 }
 
 
@@ -3958,6 +4285,17 @@ static struct nk_sched_percpu_state *init_local_state(struct nk_sched_config *cf
     INIT_LIST_HEAD(&state->tasks.sized_queue);
     INIT_LIST_HEAD(&state->tasks.unsized_queue);
 
+#ifdef NAUT_CONFIG_TASK_REUSE
+    spinlock_init(&state->tasks.alloc_lock);
+    INIT_LIST_HEAD(&state->tasks.free_stack);
+#ifdef NAUT_CONFIG_TASK_REUSE_POOL_SEED
+    if (task_seed(&state->tasks,my_cpu_id())) {
+      ERROR("Could not seed task pools\n");
+      goto fail_free;
+    }
+#endif
+#endif
+    
     snprintf(buf,NK_WAIT_QUEUE_NAME_LEN,"sched%d-task-wait",my_cpu_id());
     state->tasks.waitq = nk_wait_queue_create(buf);
     if (!state->tasks.waitq) {
@@ -4068,7 +4406,7 @@ static void task(void *in, void **out)
 	}
 	if (t) {
 	    // found task; run it and complete it
-	    output = t->func(t->input);
+	    output = NK_TASK_RUN(t);
 	    nk_task_complete(t,output);
 	} else {
 	    // no task, let's put ourselves to sleep on our own cpu's task queues
@@ -4217,6 +4555,10 @@ static int init_global_state()
 
     nk_counting_barrier_init(&stop_barrier,nk_get_num_cpus());
 
+    ZERO((void*)&global_task_state);
+    global_task_state.first_cpu=0;
+    global_task_state.num_cpus=nk_get_num_cpus();
+    
     return 0;
 
 }
@@ -4467,6 +4809,29 @@ static void timing_test(uint64_t N, uint64_t M, int print)
   }
 
 }
+
+
+static int
+handle_tasks (char * buf, void * priv)
+{
+    int cpu;
+
+    if (sscanf(buf, "tasks %d", &cpu) != 1) {
+      cpu = -1; 
+    }
+
+    nk_task_dump_state(cpu);
+
+    return 0;
+}
+
+
+static struct shell_cmd_impl tasks_impl = {
+    .cmd      = "tasks",
+    .help_str = "tasks [n]",
+    .handler  = handle_tasks,
+};
+nk_register_shell_cmd(tasks_impl);
 
 
 static int

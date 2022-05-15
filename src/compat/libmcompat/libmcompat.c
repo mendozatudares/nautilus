@@ -52,6 +52,14 @@
         return v;				\
     } 
 
+#define GEN_UNDEF0(t,f,v)			\
+    t f () {			        \
+        UNDEF_FUN_ERR();			\
+        return v;				\
+    } 
+
+#define GEN_UNDEF1(t,f,v) GEN_UNDEF(t,f,v)
+
 #define GEN_UNDEF2(t,f,v)			\
     t f (double x, double y) {		        \
         UNDEF_FUN_ERR();			\
@@ -126,9 +134,7 @@ double ldexp(double x, int exp)
     return f.d;
 }
 
-GEN_UNDEF(double,sin,0.0)
 GEN_UNDEF(double,sinh,0.0)
-GEN_UNDEF(double,cos,0.0)
 GEN_UNDEF(double,cosh,0.0)
 GEN_UNDEF(double,tan,0.0)
 GEN_UNDEF(double,tanh,0.0)
@@ -149,25 +155,6 @@ double floor(double x)
     return x;
 }
 
-double sqrt(double x)
-{
-    BOGUS();
-    return x;
-}
-
-double pow(double x, double y)
-{
-    BOGUS();
-    union dbl f = {.d = x};
-    f.exp*=y;
-    return f.d;
-}
-
-double log(double x)
-{
-    BOGUS();
-    return x;
-}
 
 double log10(double x)
 {
@@ -175,18 +162,11 @@ double log10(double x)
     return x;
 }
 
-double exp(double x)
-{
-    BOGUS();
-    return x;
-}
-
-
 
 // Complex intrinsics in case the compiler uses them...
 // Weirdly, these sometimes need to exist even if you are not
 // compiling for C99+
-
+ 
 #include <complex.h>   // creates the "complex" attribute
     
 complex long double __mulxc3(long double a, long double b, long double c, long double d)
@@ -224,3 +204,6 @@ complex float __divsc3(float a, float b, float c, float d)
     BOGUS();
     return (complex float)0;
 }
+
+
+

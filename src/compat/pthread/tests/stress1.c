@@ -82,7 +82,7 @@
  * - CV destroy fails.
  */
 
-#include <string.h>
+//#include <string.h>
 #include "test.h"
 
 typedef long long int64_t;

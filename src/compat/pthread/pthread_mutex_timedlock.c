@@ -184,6 +184,5 @@ pthread_mutex_timedlock (pthread_mutex_t * mutex,
             }
         }
     }
-
   return 0;
 }

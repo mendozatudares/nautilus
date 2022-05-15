@@ -1,3 +1,5 @@
+CFLAGS += -Isrc/compat/pthread
+
 NK_LIB =\
 	nk/
 
@@ -157,5 +159,6 @@ obj-y +=$(OBJS) \
 	$(NK_LIB) \
 
 obj-$(NAUT_CONFIG_BASE_PTHREAD_COMPAT_TESTS) += pthreadtest/
+obj-$(NAUT_CONFIG_BASE_PTHREAD_COMPAT_TESTS) += tests/
 
 

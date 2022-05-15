@@ -104,19 +104,39 @@ SECTIONS
         *(.aspace_impls*);
         __stop_aspace_impls = .;
     }
-
-    _loadEnd = .; 
     
-    .bss ALIGN(0x1000) : AT(ADDR(.aspace_impls)+SIZEOF(.aspace_impls))
+    
+
+   .tdata  ALIGN(0x1000) : AT(ADDR(.aspace_impls)+SIZEOF(.aspace_impls))
+   {
+       _tdata_start = .;
+
+       *(.tdata .tdata*);
+       . = ALIGN(0x1000);
+       _tdata_end = .;
+
+   }
+  
+   _loadEnd = .;
+   .tbss : AT(ADDR(.tdata)+SIZEOF(.tdata))
+   {
+       *(.tbss .tbss.*) *(.tcommon) ;
+       . = ALIGN(0x1000);
+       . += 0x1000;
+       _tbss_end = .;
+   }
+  
+   .bss ALIGN(0x1000) : AT(ADDR(.tbss)+SIZEOF(.tbss))
     {
         *(COMMON)
         *(.bss*)
         *(.gnu.linkonce.b*)
     }
     
-    _bssEnd = .; 
-
+    _bssEnd = .;
+   
     _data_end = .;
+   
     
     /DISCARD/ :
     {

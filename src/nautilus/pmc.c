@@ -140,15 +140,37 @@ static amd_event_attr_t amd_event_attrs[256] =
  */
 static intel_event_attr_t intel_event_attrs[256] = 
 {
-	{"Unhalted Core Cycles",        0x3c, 0x00, 0},
+	// description ============ event_num=umask=bitops
+	{"Unhalted Core Cycles",        0x3c, 0x00, 0}, 
 	{"Instructions Retired",        0xc0, 0x00, 1},
 	{"Unhalted Reference Cycles",   0x3c, 0x01, 2},
 	{"LLC References",              0x2e, 0x4f, 3},
 	{"LLC Misses",                  0x2e, 0x41, 4},
 	{"Branch Instructions Retired", 0xc4, 0x00, 5},
 	{"Branch Misses Retired",       0xc5, 0x00, 6},
+	
+	
     /* begin impl specific */
-    {"dTLB Load Misses -> Walk",    0x08, 0x01, 0},
+        
+	//xeon phi
+	{"unhalted core clock cycles",  0x3c, 0x00, 0}, //index 7
+	{"# of L2 cache misses",        0x2e, 0x41, 0}, //index 8
+	{"# of L2 cache references",    0x2e, 0x4f, 0}, //index 9
+	{"# of load micro-ops retired \
+	that miss in L1 D cache",       0x04, 0x01, 0}, //index 10
+	{"# of load micro-ops retired \
+        that hit in the L2",            0x04, 0x02, 0}, //index 11
+	{"# of load micro-ops retired \
+	that miss in the L2",           0x04, 0x04, 0}, //index 12
+	{"# of load micro-ops retired \
+	that cause a DTLB miss",        0x04, 0x08, 0}, //index 13
+	{"# of load micro-ops retired \
+	that caused micro TLB miss",    0x04, 0x10, 0}, //index 14
+	{"load micro-ops retired",      0x04, 0x40, 0}, //index 15
+	{"store micro-ops retired",     0x04, 0x80, 0}, //index 16
+	
+	//else
+	{"dTLB Load Misses -> Walk",    0x08, 0x01, 0},
 };
 	
 

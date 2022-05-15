@@ -13,28 +13,62 @@
    <http://www.gnu.org/licenses/>.  */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/shell.h>
 #include <compat/linux/sysconf.h>
 
 #define ERROR(fmt, args...) ERROR_PRINT("sysconf: " fmt, ##args)
-
 #define INFO(fmt, args...)   INFO_PRINT("sysconf: " fmt, ##args)
 
-
-#define DEBUG(fmt, args...)
-#ifdef NAUT_CONFIG_OPENMP_RT_DEBUG
-#undef DEBUG
+#if 0
 #define DEBUG(fmt, args...) DEBUG_PRINT("sysconf: " fmt, ##args)
+#else
+#define DEBUG(fmt, args...)
 #endif
+
 
 #define _SC_EQUIV_CLASS_MAX -1
 
 #define _SC_THREADS 67
 #define _SC_THREAD_THREADS_MAX 76
 #define _SC_THREAD_STACK_MIN 75
+#define _SC_NPROCESSORS_ONLN 80
 
 
-long int
-__sysconf (int name)
+static long available_cores = -1;
+
+static inline long get_available_cores(void)
+{
+   if (available_cores < 0) {
+      return (long) nk_get_num_cpus();
+   } else {
+     return available_cores;
+   }
+}
+
+
+static int handle_linux_sysconf_num_threads(char* buf, void* priv)
+{
+    long cores;
+    if ((sscanf(buf, "linux_sysconf_num_threads %d", &cores) !=1))	{
+      nk_vc_printf("Don't understand %s please input single number\n", buf);
+      return -1;
+    }
+    available_cores = cores;
+    return 0;
+}
+
+
+
+static struct shell_cmd_impl linux_sysconf_num_threads_impl = {
+    .cmd      = "linux_sysconf_num_threads",
+    .help_str = "linux_sysconf_num_threads count",
+    .handler  = handle_linux_sysconf_num_threads,
+};
+nk_register_shell_cmd(linux_sysconf_num_threads_impl);
+
+
+
+long int __sysconf (int name)
 {
 
   //DEBUG("name %d\n", name);
@@ -51,13 +85,17 @@ __sysconf (int name)
     case _SC_THREAD_STACK_MIN:
    DEBUG("sc_thread_stack_min %d\n", name);    
       return 0x4000;
-    case 84:
-   DEBUG("unknown %d\n", name);    
-      return 8;
+    case _SC_NPROCESSORS_ONLN:
+   DEBUG("sc_nprocessors_onln \n");
+      return (long) get_available_cores();
+//    case 84:
+      //important to set default number of threads
+//      DEBUG("unknown but possibly related to number of cpu %d\n", name);    
+//      return (long) nk_get_num_cpus();
     default:
       DEBUG("name %d\n", name);
       return 0;
-
+    
 
 /*     case _SC_ARG_MAX: */
 /* #ifdef        ARG_MAX */
@@ -1030,6 +1068,7 @@ __sysconf (int name)
 /* #endif */
     }
 }
+
 //#undef __sysconf
 //weak_alias (__sysconf, sysconf)
 //libc_hidden_def (__sysconf)

@@ -40,8 +40,7 @@
  *	pthread_mutex_unlock()
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+
 
 #include "test.h"
 
@@ -65,7 +64,6 @@ static void * locker(void * arg)
 
   abstime.tv_sec = currSysTime.time;
   abstime.tv_nsec = NANOSEC_PER_MILLISEC * currSysTime.millitm;
-
   assert(pthread_mutex_timedlock(&mutex, &abstime) == ETIMEDOUT);
 
   lockCount++;

@@ -472,10 +472,15 @@ nk_instrument_query (void)
             char * func = (void*)nk_htable_get_iter_key(iter);
             struct func_data * data = (struct func_data*)nk_htable_get_iter_value(iter);
 
+
+	    printf("key %s data count %d \n", func, data->call_count);
+	   
             uint64_t total_nsec = (instr_end_count - instr_start_count);
 
             if (data->call_count > 0) {
-                printk("\t%lu.%lu\% Func: %s\n\tCount: %16u Lat - Avg: %16llunsec Max: %16llunsec Min: %16llunsec\n", 
+
+		printk("\tpercent(%%): %f %% \t abs time(msec): %f \t avg time (msec): %f\n",((float)data->call_count*data->avg_nsec)/total_nsec*100, (float)data->avg_nsec*data->call_count/1000, (float)data->avg_nsec/1000);
+              /*  printk("\t%lu.%lu\% Func: %s\n\tCount: %16u Lat - Avg: %16llunsec Max: %16llunsec Min: %16llunsec\n", 
                         data->total_count / total_nsec,
                         data->total_count % total_nsec,
                         func,
@@ -483,6 +488,7 @@ nk_instrument_query (void)
                         data->avg_nsec,
                         data->max_nsec,
                         data->min_nsec);
+			*/
             }
 
 
@@ -539,7 +545,7 @@ handle_shell_instr (char * buf, void * priv)
 {
     char what[80];
 
-    if (sscanf(buf,"inst%s* %s", what)==1) { 
+    if (sscanf(buf,"instr %s", what)==1) { 
         if (!strncasecmp(what,"sta",3)) {
             nk_vc_printf("starting instrumentation\n");
             nk_instrument_start();

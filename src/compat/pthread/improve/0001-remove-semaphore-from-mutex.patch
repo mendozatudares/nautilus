@@ -1,0 +1,207 @@
+From 09f60a4dfd1e386536378592f4974e3f05097123 Mon Sep 17 00:00:00 2001
+From: MJChku <mjc97cooper@gmail.com>
+Date: Mon, 9 Nov 2020 06:30:41 -0600
+Subject: [PATCH] remove semaphore from mutex
+
+---
+ src/arch/x64/asm/boot.S                      |  2 +-
+ src/compat/pthread/implement.h               |  6 ++--
+ src/compat/pthread/pthread_mutex_destroy.c   |  2 +-
+ src/compat/pthread/pthread_mutex_init.c      |  2 +-
+ src/compat/pthread/pthread_mutex_lock.c      |  8 +++--
+ src/compat/pthread/pthread_mutex_timedlock.c | 35 ++++++++++++++------
+ src/compat/pthread/pthread_mutex_unlock.c    | 18 +++++-----
+ 7 files changed, 47 insertions(+), 26 deletions(-)
+
+diff --git a/src/arch/x64/asm/boot.S b/src/arch/x64/asm/boot.S
+index 58e4cc8..869c39a 100644
+--- a/src/arch/x64/asm/boot.S
++++ b/src/arch/x64/asm/boot.S
+@@ -124,7 +124,7 @@ paging_longmode_setup:
+     movl $pdpt, %ebx
+     movl %eax, (%ebx)
+    
+-    //set first 4 entry of PDPT 4GB total
++    //set first 2 entry of PDPT 2GB total
+     movl $2, %ecx
+     movl $pd, %edx
+     movl $0x83, %eax // set PS bit also (PDE -> 2MB page)
+diff --git a/src/compat/pthread/implement.h b/src/compat/pthread/implement.h
+index 2a185ad..3f95879 100644
+--- a/src/compat/pthread/implement.h
++++ b/src/compat/pthread/implement.h
+@@ -147,15 +147,15 @@ struct sem_t_
+ struct pthread_mutex_t_
+   {
+     //pte_osSemaphoreHandle handle;
+-    struct nk_semaphore *sem;
+-    
+     int lock_idx;
+     /* Provides exclusive access to mutex state
+     				   via the Interlocked* mechanism.
+     				    0: unlocked/free.
+     				    1: locked - no other waiters.
+     				   -1: locked - with possible other waiters.
+-    				*/
++        */
++    //possible alignment for lock
++    struct nk_semaphore *sem;
+     int recursive_count;		/* Number of unlocks a thread needs to perform
+ 				   before the lock is released (recursive
+ 				   mutexes only). */
+diff --git a/src/compat/pthread/pthread_mutex_destroy.c b/src/compat/pthread/pthread_mutex_destroy.c
+index 18b6afd..30614ac 100644
+--- a/src/compat/pthread/pthread_mutex_destroy.c
++++ b/src/compat/pthread/pthread_mutex_destroy.c
+@@ -90,7 +90,7 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
+ 
+               if (result == 0)
+                 {
+-                  nk_semaphore_release(mx->sem);
++                  //nk_semaphore_release(mx->sem);
+ 
+                   free(mx);
+ 
+diff --git a/src/compat/pthread/pthread_mutex_init.c b/src/compat/pthread/pthread_mutex_init.c
+index 5f03d52..94b2c96 100644
+--- a/src/compat/pthread/pthread_mutex_init.c
++++ b/src/compat/pthread/pthread_mutex_init.c
+@@ -78,7 +78,7 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
+       // mx->kind = (attr == NULL || *attr == NULL ? PTHREAD_MUTEX_DEFAULT : (*attr)->kind);
+       //DEBUG("pass mxkind\n");
+       mx->ownerThread.p = NULL;
+-      mx->sem = nk_semaphore_create(NULL, 0,0, NULL);
++     // mx->sem = nk_semaphore_create(NULL, 0,0, NULL);
+       //pte_osSemaphoreCreate(0,&mx->handle);
+ 
+     }
+diff --git a/src/compat/pthread/pthread_mutex_lock.c b/src/compat/pthread/pthread_mutex_lock.c
+index e48ee41..61bf72a 100644
+--- a/src/compat/pthread/pthread_mutex_lock.c
++++ b/src/compat/pthread/pthread_mutex_lock.c
+@@ -88,7 +88,10 @@ pthread_mutex_lock (pthread_mutex_t * mutex)
+           while (PTE_ATOMIC_EXCHANGE(&mx->lock_idx,-1) != 0)
+             {
+ 	     
+-	      nk_semaphore_down(mx->sem);
++	      //nk_semaphore_down(mx->sem);
++	      
++	      //spin
++	      __asm__("pause");
+             }
+         }
+     }
+@@ -118,7 +121,8 @@ pthread_mutex_lock (pthread_mutex_t * mutex)
+             {
+               while (PTE_ATOMIC_EXCHANGE(&mx->lock_idx,-1) != 0)
+                 {
+-                   nk_semaphore_down(mx->sem);
++		  __asm__("pause");	
++                  //   nk_semaphore_down(mx->sem);
+ 		}
+ 
+               if (0 == result)
+diff --git a/src/compat/pthread/pthread_mutex_timedlock.c b/src/compat/pthread/pthread_mutex_timedlock.c
+index 1d92ecf..f593736 100644
+--- a/src/compat/pthread/pthread_mutex_timedlock.c
++++ b/src/compat/pthread/pthread_mutex_timedlock.c
+@@ -114,6 +114,7 @@ pthread_mutex_timedlock (pthread_mutex_t * mutex,
+   int result;
+   pthread_mutex_t mx;
+   uint64_t timeout_ns = abstime->tv_sec*1000000000ULL+abstime->tv_nsec;
++  uint64_t start = nk_sched_get_realtime(), end;
+   /*
+    * Let the system deal with invalid pointers.
+    */
+@@ -140,12 +141,19 @@ pthread_mutex_timedlock (pthread_mutex_t * mutex,
+         {
+           while (PTE_ATOMIC_EXCHANGE(&mx->lock_idx,-1) != 0)
+             {
+-              
+-              if (0 != (result = nk_semaphore_down_timeout(mx->sem, timeout_ns)))
+-                {
+-                  return result;
+-                }
++             end = nk_sched_get_realtime();
++             if (timeout_ns < end-start){
++	        return 1;
++	     }
++
++	     __asm__("pause");
++
++             // if (0 != (result = nk_semaphore_down_timeout(mx->sem, timeout_ns)))
++             //   {
++             //     return result;
++             //   }
+             }
++	      return 0;
+         }
+     }
+   else
+@@ -173,11 +181,18 @@ pthread_mutex_timedlock (pthread_mutex_t * mutex,
+           else
+             {
+               while (PTE_ATOMIC_EXCHANGE(&mx->lock_idx,-1) != 0)
+-                {
+-                  if (0 != (result = nk_semaphore_down_timeout(mx->sem, timeout_ns)))
+-                    {
+-                      return result;
+-                    }
++                { 
++ 		 end = nk_sched_get_realtime();
++                 if (timeout_ns < end-start){
++                    return 1;
++                 }
++
++                 __asm__("pause");
++
++                 // if (0 != (result = nk_semaphore_down_timeout(mx->sem, timeout_ns)))
++                 //   {
++                 //     return result;
++                 //   }
+                 }
+ 
+               mx->recursive_count = 1;
+diff --git a/src/compat/pthread/pthread_mutex_unlock.c b/src/compat/pthread/pthread_mutex_unlock.c
+index b81274b..b168534 100644
+--- a/src/compat/pthread/pthread_mutex_unlock.c
++++ b/src/compat/pthread/pthread_mutex_unlock.c
+@@ -80,13 +80,13 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
+           idx = PTE_ATOMIC_EXCHANGE (&mx->lock_idx,0);
+           if (idx != 0)
+             {
+-              if (idx < 0)
+-                {
++             // if (idx < 0)
++             //   {
+                   /*
+                    * Someone may be waiting on that mutex.
+                    */
+-	          nk_semaphore_up(mx->sem);
+-                }
++	    //      nk_semaphore_up(mx->sem);
++            //    }
+             }
+           else
+             {
+@@ -104,11 +104,13 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
+                   || 0 == --mx->recursive_count)
+                 {
+                   mx->ownerThread.p = NULL;
++                  
++		  PTE_ATOMIC_EXCHANGE (&mx->lock_idx,0);
+ 
+-                  if (PTE_ATOMIC_EXCHANGE (&mx->lock_idx,0) < 0)
+-                    {
+-                       nk_semaphore_up(mx->sem);
+-                    }
++                 // if (PTE_ATOMIC_EXCHANGE (&mx->lock_idx,0) < 0)
++                 //   {
++                 //      nk_semaphore_up(mx->sem);
++                 //  }
+                 }
+             }
+           else
+-- 
+2.25.1
+

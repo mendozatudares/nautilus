@@ -1,0 +1,23 @@
+Your externally compiled code must be compiled with the following flags to be compatible. 
+
+-fno-omit-frame-pointer
+-ffreestanding
+-fno-stack-protector
+-mno-red-zone
+-mcmodel=large
+-fno-delete-null-pointer-checks 
+-fno-common
+-m64
+
+
+
+
+
+
+
+
+
+
+
+
+

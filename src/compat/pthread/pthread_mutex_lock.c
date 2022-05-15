@@ -138,6 +138,5 @@ pthread_mutex_lock (pthread_mutex_t * mutex)
 
     }
   DEBUG("mx :%d, mutex:%d \n", mx->lock_idx, (*mutex)->lock_idx);
-
   return (result);
 }

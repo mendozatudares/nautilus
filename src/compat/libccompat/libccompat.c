@@ -175,7 +175,7 @@ int
 clock_gettime (clockid_t clk_id, struct timespec * tp)
 {
 
-    BOGUS();
+ //   BOGUS();
     if (clk_id != CLOCK_MONOTONIC) {
         printk("NAUTILUS WARNING: using invalid clock type\n");
         return -EINVAL;
@@ -194,10 +194,16 @@ clock_gettime (clockid_t clk_id, struct timespec * tp)
     tp->tv_sec    = nsec / 1000000000;
     tp->tv_nsec   = nsec % 1000000000;
 #else
+
+    uint64_t ns = nk_sched_get_realtime();
+
+    tp->tv_sec =  ns / 1000000000ULL;
+    tp->tv_nsec = ns % 1000000000ULL;
+
     /* runs at "10kHz" */
-    tp->tv_nsec = dummy_mono_clock*100000;
-    tp->tv_sec  = dummy_mono_clock/10000;
-    ++dummy_mono_clock;
+    //tp->tv_nsec = dummy_mono_clock*100000;
+    //tp->tv_sec  = dummy_mono_clock/10000;
+    //++dummy_mono_clock;
 #endif
 
     return 0;
@@ -226,6 +232,11 @@ vfprintf (FILE * stream, const char * format, va_list arg)
     if (stream!=stdout && stream!=stderr) { return 0; BOGUS(); }
     return vprintk(format,arg);
 #endif
+}
+
+int puts(char *s)
+{
+  return nk_vc_puts(s);
 }
 
 
@@ -795,13 +806,6 @@ unsigned long getppid(void)
 
 
 
-#define suseconds_t uint64_t
-struct timeval {
-    time_t      tv_sec;     /* seconds */
-    suseconds_t tv_usec;    /* microseconds */
-};
-
-struct timezone;
 
 int gettimeofday(struct timeval *tv, struct timezone *tz_ignored)
 {
@@ -885,6 +889,7 @@ GEN_UNDEF(int,iswctype,0)
 GEN_UNDEF(int,wcsftime,0)
 GEN_UNDEF(int,wctype,0)
 GEN_UNDEF(int,strtold,0)
+GEN_UNDEF(int,strtoul,0)
 //GEN_UNDEF(int,strtod,0)
 GEN_UNDEF(int,strtof,0)
 GEN_UNDEF(int,__ctype_b_loc,0)
@@ -930,6 +935,8 @@ GEN_UNDEF(int,pthread_setspecific,0)
 GEN_UNDEF(int,sched_yield,0)
 #endif
 
+//for virgil	
+GEN_UNDEF(int, __sprintf_chk,0)
 
 GEN_UNDEF(int,atexit,0)
 GEN_UNDEF(int,catclose,0)
@@ -957,4 +964,26 @@ GEN_UNDEF(int,times,0)
 GEN_UNDEF(int,unsetenv,0)
 GEN_UNDEF(int,vfscanf,0)
 
-	  
+
+
+
+
+GEN_UNDEF(int,__isoc99_sscanf,0)
+GEN_UNDEF(int,__isoc99_vfscanf,0)
+GEN_UNDEF(int,__isoc99_fscanf,0)	
+
+
+int posix_memalign(void **memptr, size_t alignment, size_t size)
+{
+  // assume alignment is a power of two, although we should check
+  *memptr = malloc(size); // will be aligned to next power of 2 size
+  if (((addr_t)memptr) % alignment) { 
+      ERROR("Failed to allocate data at required alignment (size=%lu, align=%lu)\n",size,alignment);
+      if (memptr) { 
+          free(memptr);
+      }
+      return ENOMEM;
+  }
+  return *memptr ? 0 : ENOMEM;
+ 
+}  

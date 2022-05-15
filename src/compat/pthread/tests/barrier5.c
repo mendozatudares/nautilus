@@ -63,7 +63,6 @@ func(void * barrierHeight)
   int i;
   int result;
   int serialThreads = 0;
-
   for (i = 1; i < BARRIERS; i++)
     {
       result = pthread_barrier_wait(&barrier);

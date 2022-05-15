@@ -91,9 +91,10 @@ int pthread_test_barrier4()
 
   mx = PTHREAD_MUTEX_INITIALIZER;
 
+  pthread_mutex_init(&mx, NULL);
+
   for (j = 1; j <= NUMTHREADS; j++)
     {
-
       serialThreadCount = 0;
 
       assert(pthread_barrier_init(&barrier, NULL, j) == 0);

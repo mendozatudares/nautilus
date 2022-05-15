@@ -1,6 +1,6 @@
-#include "pte_osal.h"
+//#include "../nk/pte_osal.h"
 #include "test.h"
-
+#include <nautilus/shell.h>
 const char * error_string;
 
 int assertE;
@@ -97,7 +97,6 @@ static void runThreadTests(void)
 
   printf("Exit test #5\n");
   pthread_test_exit5();
-
   /* These tests can not be run in series with other tests,
    * as they rely on knowing what is on the reuse queue.
    */
@@ -114,7 +113,6 @@ static void runThreadTests(void)
 
   printf("Priority test #2\n");
   pthread_test_priority2();
-
 //  printf("Inherit test #1\n");
 //  pthread_test_inherit1();  ///@todo
 
@@ -483,6 +481,19 @@ void pte_test_main()
     }
 
   printf("Tests complete!\n");
-
 }
+
+static int handle_pthreadtest (char * buf, void * priv)
+{
+  pte_test_main();
+  return 0;
+}
+
+static struct shell_cmd_impl pthreadtest_impl = {
+    .cmd      = "pthreadtest",
+    .help_str = "pthreadtest",
+    .handler  = handle_pthreadtest,
+};
+nk_register_shell_cmd(pthreadtest_impl);
+
 

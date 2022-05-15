@@ -158,7 +158,7 @@ continue_context_switch:
     movq $0xc0000100, %rcx  // get FSBASE MSR number into RCX for use by wrmsr
 	
     wrmsr                   // actually change fsbase
-	
+
     pop %rcx                // restore regs we have usd
     pop %rdx
     pop %rax

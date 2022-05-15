@@ -28,9 +28,12 @@ int test_ompbench()
     taskbench_main(1, args);
 
 
-#if 0
+#if 1
     args[0]="schedbench";
     schedbench_main(1, args);
+#endif
+
+#if 0 
     args[0]="syncbench";
     syncbench_main(1, args);
 #endif

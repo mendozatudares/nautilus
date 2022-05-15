@@ -45,7 +45,6 @@
 #define PTHREAD_H
 
 #include "nk/pte_types.h"
-
 #include "sched.h"
 
 #define PTE_VERSION 2,8,0,0

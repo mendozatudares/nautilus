@@ -90,6 +90,5 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
           result = EBUSY;
         }
     }
-
   return (result);
 }

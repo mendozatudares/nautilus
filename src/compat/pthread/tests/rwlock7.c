@@ -7,9 +7,7 @@
 
 #include "test.h"
 
-#ifdef __GNUC__
-#include <stdlib.h>
-#endif
+
 
 #define THREADS         5
 #define DATASIZE        7

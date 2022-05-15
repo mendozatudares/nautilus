@@ -599,8 +599,19 @@ endif
 ifneq ($(NAUT_CONFIG_CXX_SUPPORT)a,a)
 ifeq ($(NAUT_CONFIG_TOOLCHAIN_ROOT)a,""a)
 ifeq ($(CROSS_COMPILE)a, a)
-# guess where the std libs are 
-  libs-y += `locate libstdc++.a | head -1`
+# guess where the std libs are
+#
+# Default option - PAD
+#
+#  libs-y += `locate libstdc++.a | head -1`
+#
+# Other option for omp work -PAD
+#
+#  libs-y += /home/ompnk/tools/lib64/libstdc++.a #/usr/lib/gcc/x86_64-linux-gnu/5/libstdc++.a
+#
+# Virgil option specifically on peroni, which hides this a bit
+#
+    libs-y += /usr/lib/gcc/x86_64-redhat-linux/8/libstdc++.a  
 else
   libs-y += $(CROSS_COMPILE)/../lib64/libstdc++.a
 endif
@@ -616,6 +627,10 @@ endif # NAUT_CONFIG_CXX_SUPPORT
 			   #/usr/lib64/libsupc++.a \
 
 			   #/usr/lib64/libc.a \
+
+ifdef NAUT_CONFIG_VIRGIL_RT
+   libs-y += $(NAUT_CONFIG_VIRGIL_RT_LIBRARY)
+endif
 
 ifdef NAUT_CONFIG_OPENMP_RT_OMP
    libs-y += $(NAUT_CONFIG_OPENMP_RT_INSTALL_DIR)/lib/libomp.a

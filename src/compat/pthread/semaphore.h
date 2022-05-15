@@ -68,7 +68,6 @@
  */
 
 #define _POSIX_SEMAPHORES
-
 #ifdef __cplusplus
 extern "C"
   {

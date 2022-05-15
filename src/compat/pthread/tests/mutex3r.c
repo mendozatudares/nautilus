@@ -48,9 +48,6 @@
  *	pthread_mutex_unlock()
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "test.h"
 
 static pthread_mutex_t mutex1 = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;

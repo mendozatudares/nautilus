@@ -7,6 +7,8 @@
 #include <nautilus/semaphore.h>
 #include <nautilus/waitqueue.h>
 
+#define BOGUS_FUN_ERR() ERROR_PRINT("Function (%s) is BOGUS\n", __func__)
+#define BOGUS() BOGUS_FUN_ERR()
 
 #define STATE_UNLOCK(a,b) spin_unlock_irq_restore(a,b)
 #define STATE_TRY_LOCK(a,b) spin_try_lock_irq_save(a,b)
@@ -118,7 +120,6 @@ pte_osResult pte_osMutexUnlock(pte_osMutexHandle handle){
  * @return PTE_OS_OK - New thread successfully created.
  * @return PTE_OS_NO_RESOURCES - Insufficient resources to create thread
  *============================================================================================================*/
-
 pte_osResult pte_osThreadCreate(pte_osThreadEntryPoint entryPoint,
                                 int stackSize,
                                 int initialPriority,
@@ -255,7 +256,7 @@ pte_osResult pte_osThreadCheckCancel(pte_osThreadHandle handle){
 /* fast yield                                        */
 /*===================================================*/
 void pte_osThreadSleep(unsigned int msecs){
-  nk_yield();
+  nk_sleep(msecs*1000000UL);
 }
 
 /*=============================================
@@ -460,6 +461,7 @@ pte_osResult pte_osSemaphorePend(pte_osSemaphoreHandle handle, unsigned int *pTi
 pte_osResult pte_osSemaphoreCancellablePend(pte_osSemaphoreHandle handle, unsigned int *pTimeout){
 
      //cancel not allowed !!!
+     BOGUS();
      return pte_osSemaphorePend(handle, pTimeout);
 }
 

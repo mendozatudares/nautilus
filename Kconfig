@@ -256,6 +256,12 @@ config PARTITION_SUPPORT
     help
       Enable disk/device partitioning
 
+config USE_IST 
+    bool "Enable IST"
+    default n
+    help
+      Enable IST (separate interrupt stacks)
+
 config VIRTUAL_CONSOLE_DISPLAY_NAME
    bool "Display name of current virtual console"
    default y
@@ -440,7 +446,44 @@ config VIRTUAL_CONSOLE_SERIAL_MIRROR_ALL
 	  system.  The purpose of this option is to choose
 	  which of these behaviors you want if you are executing tasks
 	  in idle loops.
-	  
+
+    config TASK_REUSE
+       bool "Reuse tasks"
+       default false
+       help
+          When enabled, task structures are reused instead of being created/destroyed 
+	  during a task lifetime.
+
+    config TASK_REUSE_POOL_SIZE
+       depends on TASK_REUSE
+       int "Maximum pool size per CPU"
+       default 256
+       help
+          When the available reusable tasks per CPU exceeds this number,
+	  they start being destroyed
+
+    config TASK_REUSE_POOL_SEED
+       depends on TASK_REUSE
+       bool "Seed task pools"
+       default y
+       help
+	  If set, each CPU's task pool is maximally seeded at boot time
+  
+
+    config TASK_TRAMPOLINE
+       bool "Trampoline tasks"
+       default false
+       help
+          When enabled, each task is run via a trampoline that does register
+	  save/restore, thus the task does not need to follow callee save conventions.
+
+    config TASK_DEEP_STATISTICS
+       bool "Collect deeper statistics for each task"
+       default false
+       help
+          When enabled, additional task overheads are collected to help
+	  work on the task system.  These come at the cost of greater measurement overhead
+
     config INTERRUPT_THREAD
        bool "Restrict interrupts to special real-time interrupt thread"
        default false
@@ -1484,6 +1527,30 @@ menu "Runtimes"
             depends on OPENMP_RT
             help 
               Include OpenMP simple tests and Edinburgh microbenchmarks
+
+       config VIRGIL_RT
+            bool "Virgil RT"
+	    default n
+	    help
+	      Include the Virgil run-time
+
+       config VIRGIL_RT_LIBRARY
+            string "Path to application codebase (.a or .o)"
+	    default "/home/simone/test/virgil1/virgil1.o"
+	    depends on VIRGIL_RT
+	    help
+	       The path to the code that has been compiled to
+	       use the virgil runtime.  This will be statically linked
+	       to Nautilus and its entry point,
+	       smain(int argc, char *argv[])
+	       will be bound to the shell command "virgil ..."
+
+       config VIRGIL_RT_DEBUG
+            bool "Debug Virgil RT"
+	    default n
+	    depends on VIRGIL_RT
+	    help
+	      Debugging output from the Virgil run-time
 
        config RACKET_RT
             bool "Racket RT (via Multiverse)";

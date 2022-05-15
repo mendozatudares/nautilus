@@ -3,5 +3,5 @@ CFLAGS += -fopenmp -Iinclude/rt/openmp \
 
 obj-y += \
 	ompsimpletest.o \
-	omptest.o	
-
+        omptest-ori.o      
+#omptest-modified.o

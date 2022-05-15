@@ -77,9 +77,6 @@
  */
 
 
-#ifdef __GNUC__
-#include <stdlib.h>
-#endif
 
 #include "test.h"
 

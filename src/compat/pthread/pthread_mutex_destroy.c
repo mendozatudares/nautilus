@@ -150,6 +150,5 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
       pte_osMutexUnlock(pte_mutex_test_init_lock);
 
     }
-
   return (result);
 }

@@ -108,6 +108,12 @@ struct pollfd {
 
 typedef void* locale_t;
 
+#define suseconds_t uint64_t
+struct timeval {
+    time_t      tv_sec;     /* seconds */
+    suseconds_t tv_usec;    /* microseconds */
+};
+
 
 #ifndef _STRUCT_TIMESPEC
 #define _STRUCT_TIMESPEC
@@ -208,7 +214,7 @@ int rename(const char *old, const char *new);
 int remove(const char *path);
 
 int isatty(int fd);
-    
+
 
 /*==================*
 *    				*
@@ -246,7 +252,9 @@ void (*signal(int sig, void (*func)(int)))(int);
 
 int abs(int x);
 
-    
+struct timezone;
+
+int gettimeofday(struct timeval *tv, struct timezone *tz_ignored);    
 double pow(double x, double y);
 char *tmpnam(char *s);
 clock_t clock(void);
@@ -256,8 +264,8 @@ time_t time(time_t * timer);
 double difftime(time_t time1, time_t time2);
 void *memchr(const void *str, int c, size_t n);
 double fabs(double __x);
-double atan(double __x);
-double atan2(double y, double x);
+/* double atan(double __x); */
+/* double atan2(double y, double x); */
 double fmodnew(int y, int x); //dupe for test
 double modf(double y, double *x);
 double fmod(double y, double x);

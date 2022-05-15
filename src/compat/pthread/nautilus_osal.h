@@ -43,7 +43,7 @@ typedef spinlock_t *pte_osMutexHandle;
 
 
 
-#define OS_MAX_SIMUL_THREADS 1000
+#define OS_MAX_SIMUL_THREADS 256
 
 #define OS_DEFAULT_PRIO 11
 
