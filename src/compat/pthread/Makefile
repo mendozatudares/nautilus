@@ -1,6 +1,6 @@
 CFLAGS += -Isrc/compat/pthread
 
-NK_OSAL = nautilus_osal.o
+NK_OSAL = nk/ 
 
 MUTEX_OBJS = \
   pthread_mutex_unlock.o \
@@ -155,7 +155,7 @@ CANCEL_OBJS = \
 
 OBJS = $(MUTEX_OBJS) $(MUTEXATTR_OBJS) $(THREAD_OBJS) $(SUPPORT_OBJS) $(TLS_OBJS) $(MISC_OBJS) $(SEM_OBJS) $(BARRIER_OBJS) $(SPIN_OBJS) $(CONDVAR_OBJS) $(RWLOCK_OBJS) $(CANCEL_OBJS)
 obj-y +=$(OBJS) \
-	$(NK_LIB) \
+	$(NK_OSAL) \
 
 obj-$(NAUT_CONFIG_BASE_PTHREAD_COMPAT_TESTS) += pthreadtest/
 obj-$(NAUT_CONFIG_BASE_PTHREAD_COMPAT_TESTS) += tests/
