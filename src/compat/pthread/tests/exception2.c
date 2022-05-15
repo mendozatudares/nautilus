@@ -71,6 +71,7 @@
  * - Process returns non-zero exit status.
  */
 
+#include "test.h"
 
 #if defined(__cplusplus)
 
@@ -79,7 +80,6 @@
 
 
 
-#include "test.h"
 
 /*
  * Create NUMTHREADS threads in addition to the Main thread.

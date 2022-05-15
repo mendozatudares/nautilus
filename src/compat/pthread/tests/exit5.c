@@ -137,7 +137,7 @@ int pthread_test_exit5()
 
       ptr = &(threadbag[i]);
 
-      pte_osThreadCreate(osThread, 4096, 10,
+      pte_osThreadCreate((pte_osThreadEntryPoint)osThread, 4096, 10,
                          &ptr,
                          &h[i]);
 

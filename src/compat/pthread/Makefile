@@ -1,7 +1,6 @@
 CFLAGS += -Isrc/compat/pthread
 
-NK_LIB =\
-	nk/
+NK_OSAL = nautilus_osal.o
 
 MUTEX_OBJS = \
   pthread_mutex_unlock.o \
