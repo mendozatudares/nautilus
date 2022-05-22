@@ -12,16 +12,19 @@
 
 static inline double sqrt(double x)
 {
+    return __builtin_sqrt(x);
+    /*
     double ret;
     asm volatile(
-		 "movq %1, %%xmm0 \n"
+		 "movsd %1, %%xmm0 \n"
 		 "sqrtsd %%xmm0, %%xmm1 \n"
-		 "movq %%xmm1, %0 \n"
-		 : "=r"(ret)
-		 : "g"(x)
+		 "movsd %%xmm1, %0 \n"
+		 : "=f"(ret)
+		 : "f"(x)
 		 : "xmm0", "xmm1", "memory"
 		 );
     return ret;
+    */
 }
 
 #define fabs(x) __builtin_fabs(x)
