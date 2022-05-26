@@ -381,7 +381,7 @@ typedef struct nk_sched_percpu_state {
 	if (!scheduler->WHAT##_min || scheduler->WHAT##_min > inst_diff) { \
 	    scheduler->WHAT##_min = inst_diff;				\
 	}								\
-    }
+}
 
 #define INST_DUMP(WHAT,BUF,LEN)						\
     snprintf(BUF,LEN,"+ rf:(n=%lu,a=%lu,v=%lu,m=%lu,M=%lu) rs:(n=%lu,a=%lu,v=%lu,m=%lu,M=%lu) rs-ns:(n=%lu,a=%lu,v=%lu,m=%lu,M=%lu)\n", \
@@ -503,7 +503,7 @@ typedef enum { ARRIVED=0,          // no admission control done
                                    // will not return
 	       DENIED,             // not admitted
 	       REAPABLE,           // it's OK for the reaper to destroy the thread
-             } rt_status;
+} rt_status;
 
 typedef struct nk_sched_thread_state {
     // how this thread is to be scheduled
@@ -926,11 +926,11 @@ static struct shell_cmd_impl threadtopo_impl = {
 nk_register_shell_cmd(threadtopo_impl);
 
 
-void nk_sched_stop_world()
+int nk_sched_stop_world()
 {
     // this must happen before any of the lookups...
     if (!scheduler_ready) {
-        return;
+    return 0;
     }
 
     
@@ -955,21 +955,25 @@ void nk_sched_stop_world()
     preempt_enable();  // interrupts are still off - scheduler is not going to preempt us
     
     // kick everyone else to get them to stop
+#if 0
     for (i=0;i<num_cpus;i++) { 
 	if (i!=my_cpu_id) {
 	    nk_sched_kick_cpu(i);
 	}
     }
-
+#else
+  apic_bcast_ipi (per_cpu_get(apic), APIC_NULL_KICK_VEC);
+#endif
     // wait for them all to stop
     nk_counting_barrier(&stop_barrier);
 
+  return 1;
 }
 
-void nk_sched_start_world()
+int nk_sched_start_world()
 {
     if (!scheduler_ready) {
-      return;
+    return 0;
     }
 
     // indicate that we are restarting the world
@@ -982,6 +986,7 @@ void nk_sched_start_world()
     // so the scheduler can preempt us
     irq_enable_restore(stop_flags);
     
+  return 1;	
 }
 
 
@@ -1512,12 +1517,12 @@ static int    _sched_make_runnable(struct nk_thread *thread, int cpu, int admit,
 	break;
     }
 
- out_bad:
+out_bad:
     if (!have_lock) {
 	LOCAL_UNLOCK(s);
     }
     return -1;
- out_good:
+out_good:
     if (!have_lock) { 
 	LOCAL_UNLOCK(s);
     }
@@ -2674,19 +2679,19 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
 	break;
     }    
     
- panic_no_aperiodic:
+panic_no_aperiodic:
     // This cannot happen since there must at least be an idle thread available
     ERROR("APERIODIC QUEUE IS EMPTY.\n THE WORLD IS GOVERNED BY MADNESS.\n");
     panic("ATTEMPTING TO RUN A NULL RT_THREAD.\n");
     return 0;
     
- panic_queue:
+panic_queue:
     ERROR("UNEXPECTED QUEUE OVERFLOW\n");
     panic("UNEXPECTED QUEUE OVERFLOW IN nk_sched_need_resched()\n");
     return 0;
 
 
- out_good_early:
+out_good_early:
     //   DEBUG("Have not timed out yet (set_time=%llu now=%llu caller=%p) - early exit\n",scheduler->tsc.set_time,now,__builtin_return_address(0));
     if (!have_lock) {
 	LOCAL_UNLOCK(scheduler);
@@ -2701,35 +2706,35 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
 
     return 0;
 
- out_good:
+out_good:
     //DEBUG("out good\n");
     //DEBUG("out good new tid = %llu (%s) \n",rt_n->thread->tid,rt_n->thread->name);}
     
-    rt_c->resched_long_count++;
+rt_c->resched_long_count++;
 
-    if (changing) {
+if (changing) {
 	DEBUG("Thread %llu constraint change complete\n",rt_c->thread->tid);
 	rt_c->status=ADMITTED;
-    }
+}
 
-    if (going_to_exit) { 
+if (going_to_exit) { 
 	//DEBUG("Thread %llu exit complete\n", rt_c->thread->tid);
 	rt_c->exit_time = now;
-    }
+}
     
-    if (going_to_sleep) {
+if (going_to_sleep) {
 	//	DEBUG("%llu sleep complete\n", rt_c->thread->tid);
-    }
+}
 
-    if (yielding) { 
+if (yielding) { 
 	//DEBUG("Thread %llu yield complete\n", rt_c->thread->tid);
-    }
+}
 
-    scheduler->current = rt_n;
+scheduler->current = rt_n;
 
-    // set timer according to nature of thread
-    set_timer(scheduler, rt_n, now);
-    if (rt_n!=rt_c) {
+// set timer according to nature of thread
+set_timer(scheduler, rt_n, now);
+if (rt_n!=rt_c) {
 	//if (!rt_n->is_intr) {
 	//    INFO("Switching to non-interrupt thread (%lu, %s)\n",rt_n->thread->tid,rt_n->thread->name);
 	//}  else {
@@ -2782,7 +2787,7 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
 	INST_SCHED_OUT(resched_slow);
 	NK_GPIO_OUTPUT_MASK(~0x4,GPIO_AND);
 	return rt_n->thread;
-    } else {
+} else {
 	// we are not switching threads
 	// the thread may be marked waiting as we may have been preempted in the 
 	// middle of going to sleep
@@ -2807,7 +2812,7 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
 	INST_SCHED_OUT(resched_slow_noswitch);
 	NK_GPIO_OUTPUT_MASK(~0x4,GPIO_AND);
 	return 0;
-    }
+}
 }
 
 
@@ -2901,12 +2906,12 @@ int nk_sched_thread_change_constraints(struct nk_sched_constraints *constraints)
 	goto out_good_no_unlock;
     }
 
- out_bad:
+out_bad:
     LOCAL_UNLOCK(scheduler);
- out_bad_no_unlock:
+out_bad_no_unlock:
     return -1;
 
- out_good_no_unlock:
+out_good_no_unlock:
     return 0;
 }
 
@@ -2943,7 +2948,7 @@ int nk_sched_thread_move(struct nk_thread *t, int new_cpu, int block)
 	return -1;
     }
     
- retry:
+retry:
 
     // I now need to grab it from the old scheduler, so own it
     LOCAL_LOCK(os);
@@ -2976,7 +2981,7 @@ int nk_sched_thread_move(struct nk_thread *t, int new_cpu, int block)
     // we will make it runnable after we drop the lock
     rc = 0;
 
- out_good_or_retry_if_blocking:
+out_good_or_retry_if_blocking:
     
     LOCAL_UNLOCK(os);
 
@@ -3010,7 +3015,7 @@ int nk_sched_thread_move(struct nk_thread *t, int new_cpu, int block)
 	}
     }
 
- out_fail:
+out_fail:
     LOCAL_UNLOCK(os);
     return -1;
 }
@@ -3265,7 +3270,7 @@ static void handle_special_switch(rt_status what, int have_lock, uint8_t flags, 
     
     DEBUG("After return from switch (back in %llu \"%s\")\n", c->tid, c->name);
 
- out_good:
+out_good:
     c->sched_state->status = last_status;
     if (have_lock) {
 	spin_unlock(&s->lock);
@@ -4305,7 +4310,7 @@ static struct nk_sched_percpu_state *init_local_state(struct nk_sched_config *cf
     
     return state;
 
- fail_free:
+fail_free:
     FREE(state); 
 
     return 0;
@@ -4530,7 +4535,7 @@ static int shared_init(struct cpu *my_cpu, struct nk_sched_config *cfg)
 
     return 0;
 
- fail_free:
+fail_free:
     // Note I will leak any internal thread stuff here
     if (my_stack) { 
 	free(my_stack);
@@ -4572,7 +4577,7 @@ static int init_global_state()
  * have booted up
  *
  */
-int
+  int
 nk_sched_init_ap (struct nk_sched_config *cfg)
 {
     cpu_id_t id = my_cpu_id();
@@ -4737,7 +4742,7 @@ static void timing_test(uint64_t N, uint64_t M, int print);
  * entry point into the scheduler at bootup on the boot core
  *
  */
-int
+  int
 nk_sched_init(struct nk_sched_config *cfg) 
 {
     struct cpu * my_cpu = nk_get_nautilus_info()->sys.cpus[nk_get_nautilus_info()->sys.bsp_id];
@@ -4857,7 +4862,7 @@ static struct shell_cmd_impl cores_impl = {
 nk_register_shell_cmd(cores_impl);
 
 
-static int
+  static int
 handle_threads (char * buf, void * priv)
 {
     int cpu;
@@ -4878,7 +4883,7 @@ static struct shell_cmd_impl threads_impl = {
 };
 nk_register_shell_cmd(threads_impl);
 
-static int
+  static int
 handle_reap (char * buf, void * priv)
 {
     nk_sched_reap(1); // unconditional reap
@@ -4894,7 +4899,7 @@ static struct shell_cmd_impl reap_impl = {
 nk_register_shell_cmd(reap_impl);
 
 
-static int
+  static int
 handle_time (char * buf, void * priv)
 {
     int cpu;
@@ -4940,7 +4945,7 @@ struct burner_args {
 #define LOOP() {SWITCH(); udelay(1000); }
 
 
-static void 
+  static void 
 burner (void * in, void ** out)
 {
     uint64_t start, end, dur;
@@ -4982,7 +4987,7 @@ burner (void * in, void ** out)
 }
 
 
-static int 
+  static int 
 launch_aperiodic_burner (char * name, 
                          uint64_t size_ns, 
                          uint32_t tpr, 
@@ -5013,7 +5018,7 @@ launch_aperiodic_burner (char * name,
     }
 }
 
-static int 
+  static int 
 launch_sporadic_burner (char * name, 
                         uint64_t size_ns, 
                         uint32_t tpr, 
@@ -5049,7 +5054,7 @@ launch_sporadic_burner (char * name,
     }
 }
 
-static int 
+  static int 
 launch_periodic_burner (char * name, 
                         uint64_t size_ns, 
                         uint32_t tpr, 
@@ -5083,7 +5088,7 @@ launch_periodic_burner (char * name,
     }
 }
 
-static int
+  static int
 handle_burn (char * buf, void * priv)
 {
     uint64_t size_ns;
@@ -5152,8 +5157,69 @@ static struct shell_cmd_impl burn_impl = {
 };
 nk_register_shell_cmd(burn_impl);
 
+  static int 
+test_timed_stop (char * buf, void * priv)
+{
+  uint64_t i;
+  uint64_t start, end;
+  uint64_t sum, sum2, min, max;
+  uint64_t average;
+  double var;
+  double stddev;
+  uint64_t count = 0;
+  if (sscanf(buf, "timed_stop %lu", &count) != 1) { 
+    nk_vc_printf("Incorrect number of arguments! (only requires a single unsigned long)\n");
+    return -1;
+  } 
 
-static int 
+  uint64_t* timestamps = (uint64_t*)MALLOC(sizeof(uint64_t) * count);
+
+  nk_vc_printf("Starting and stopping the world %lu times\n", count);
+  start = rdtsc();
+  for (i = 0; i < count; i++) { 
+    timestamps[i] = rdtsc();
+    nk_sched_stop_world();
+    nk_sched_start_world();
+    timestamps[i] = rdtsc() - timestamps[i];
+  }
+  end = rdtsc();
+  sum = 0;
+  sum2 = 0;
+  min = -1;
+  max = 0;
+  
+  //Grab the needed data
+  for(i = 0; i < count; i++){
+    sum += timestamps[i];
+    if(timestamps[i] < min){
+      min = timestamps[i];
+    } 
+    if(timestamps[i] > max){
+      max = timestamps[i];
+    }
+  }
+  average = sum / count;
+  for(i = 0; i < count; i++){
+    long long diff = (long long)timestamps[i] - (long long)average;
+    uint64_t diffSq = (uint64_t)(diff * diff);
+    sum2 += diffSq;
+  }
+  var = ((double)sum2 / (double)count);
+  stddev = sqrt(var);
+  nk_vc_printf("Total time: %lu\n Average Per-iteration time: %lu\nMin: %lu\nMax: %lu\nVariance: %lf\nStd Deviation:%lf <- CURRENTLY INCORRECT\n", sum, average, min, max, var, stddev);
+
+  return 0;
+}
+
+
+static struct shell_cmd_impl timed_stop = {
+  .cmd      = "timed_stop",
+  .help_str = "timed_stop",
+  .handler  = test_timed_stop,
+};
+
+nk_register_shell_cmd(timed_stop);
+  static int 
 test_stop (char * buf, void * priv)
 {
     int i;

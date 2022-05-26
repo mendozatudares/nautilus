@@ -16,7 +16,6 @@ static double fl, k, f, s, _s2,_s4,R,t1,t2,hfsq;
 
 static double log(double x){
   
-  NK_PROFILE_ENTRY();
   int ki;
   double f1 = frexp(x,&ki);
  // printf("frac %f,exp %d\n", f1, ki);
@@ -36,8 +35,6 @@ t1 = _s2 * (L1 + _s4 * (L3 + _s4 * (L5 + _s4 * L7)));
 t2 = _s4 * (L2 + _s4 * (L4 + _s4 * L6));
 R = t1 + t2;
 hfsq = 0.5 * f * f;
-
-NK_PROFILE_EXIT();
 return k * LOG2_HI - ((hfsq - (s * (hfsq + R) + k * LOG2_LOW)) - f);
 }
 

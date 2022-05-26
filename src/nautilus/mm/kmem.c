@@ -39,6 +39,12 @@
 
 #include <dev/gpio.h>
 
+#ifdef NAUT_CONFIG_ALLOCS
+#include <nautilus/alloc.h>
+#endif
+
+#define KARAT_MEM_DEBUG 1
+
 #ifndef NAUT_CONFIG_DEBUG_KMEM
 #undef DEBUG_PRINT
 #define DEBUG_PRINT(fmt, args...)
@@ -102,10 +108,12 @@ static struct list_head glob_zone_list;
  */
 struct kmem_block_hdr {
     void *   addr;   /* address of block */
-    uint64_t order;  /* order of the block allocated from buddy system */
+    uint64_t order;  /* order of the block allocated from buddy system indicating the size of the block */
                      /* order>=MIN_ORDER => in use, safe to examine */
                      /* order==0 => unallocated header */
                      /* order==1 => allocation in progress, unsafe */
+    uint64_t aligned_order;     /* The order that addr is aligned to (when first allocated). used for expansion for right child  */
+                                /* the order will differ from order  */
     struct buddy_mempool * zone; /* zone to which this block belongs */
     uint64_t flags;  /* flags for this allocated block */
 } __packed __attribute((aligned(8)));
@@ -490,13 +498,15 @@ void kmem_inform_boot_allocation(void *low, void *high)
  *       [IN] size: Amount of memory to allocate in bytes.
  *       [IN] cpu:  affinity cpu (-1 => current cpu)
  *       [IN] zero: Whether to zero the whole allocated block
+ *       [IN] lb:   restrict to [lb,ub) (use 0,-1 for all memory)
+ *       [IN] ub:   restrict to [lb,ub) (use 0,-1 for all memory)
  *
  * Returns:
  *       Success: Pointer to the start of the allocated memory.
  *       Failure: NULL
  */
 static void *
-_kmem_malloc (size_t size, int cpu, int zero)
+_kmem_sys_malloc (size_t size, int cpu, int zero, addr_t lb, addr_t ub)
 {
     NK_GPIO_OUTPUT_MASK(0x20,GPIO_OR);
     int first = 1;
@@ -536,9 +546,17 @@ _kmem_malloc (size_t size, int cpu, int zero)
     list_for_each_entry(reg, &(my_kmem->ordered_regions), mem_ent) {
         struct buddy_mempool * zone = reg->mem->mm_state;
 
+	addr_t zone_start = zone->base_addr;
+	addr_t zone_end = zone->base_addr + (1ULL<<(zone->pool_order));
+
+	if ((ub <= zone_start) || (lb > zone_end)) {
+	  // skip any zone which does not meet the restrictions
+	  continue;
+	}
+	
         /* Allocate memory from the underlying buddy system */
         uint8_t flags = spin_lock_irq_save(&zone->lock);
-        block = buddy_alloc(zone, order);
+        block = buddy_alloc(zone, order, lb, ub);
         spin_unlock_irq_restore(&zone->lock, flags);
 
 	if (block) {
@@ -558,6 +576,7 @@ _kmem_malloc (size_t size, int cpu, int zero)
 	    // force a software barrier here, since our next write must come last
 	    __asm__ __volatile__ ("" :::"memory");
 	    hdr->order = order; // allocation complete
+        hdr->aligned_order = order;
             break;
         }
         
@@ -593,28 +612,145 @@ _kmem_malloc (size_t size, int cpu, int zero)
 
     NK_GPIO_OUTPUT_MASK(~0x20,GPIO_AND);
 
+    if (!block) {
+        KMEM_ERROR("Going to return 0\n");
+    }
+
     /* Return address of the block */
     return block;
 }
 
 
-void *kmem_malloc(size_t size)
+void *kmem_sys_malloc(size_t size)
 {
-    return _kmem_malloc(size,-1,0);
+  return _kmem_sys_malloc(size,-1,0,0,-1ULL);
 }
 
-void *kmem_mallocz(size_t size)
+void *kmem_sys_mallocz(size_t size)
 {
-    return _kmem_malloc(size,-1,1);
+  return _kmem_sys_malloc(size,-1,1,0,-1ULL);
 }
 
-void *kmem_malloc_specific(size_t size, int cpu, int zero)
+void *kmem_sys_malloc_specific(size_t size, int cpu, int zero)
 {
-    return _kmem_malloc(size,cpu,zero);
+  return _kmem_sys_malloc(size,cpu,zero,0,-1ULL);
 }
+
+void * kmem_sys_malloc_restrict(size_t size, addr_t lb, addr_t ub)
+{
+  return _kmem_sys_malloc(size,-1,0,lb,ub);
+}
+
+/*
+ * This is a *dead simple* implementation of realloc that tries to change the
+ * size of the allocation pointed to by ptr to size, and returns ptr.  Realloc will
+ * malloc a new block of memory, copy as much of the old data as it can, and free the
+ * old block. If ptr is NULL, this is equivalent to a malloc for the specified size.
+ *
+ */
+void * 
+kmem_sys_realloc_specific(void * ptr, size_t size, int cpu)
+{
+	struct kmem_block_hdr *hdr;
+	size_t old_size;
+	void * tmp = NULL;
+	
+	/* this is just a malloc */
+	if (!ptr) {
+	    return kmem_sys_malloc_specific(size,cpu,0);
+	}
+
+	hdr = block_hash_find_entry(ptr);
+
+	if (!hdr) {
+		KMEM_DEBUG("Realloc failed to find entry for block %p\n", ptr);
+		return NULL;
+	}
+
+	old_size = 1 << hdr->order;
+	tmp = kmem_sys_malloc_specific(size,cpu,0);
+	if (!tmp) {
+		panic("Realloc failed\n");
+	}
+
+	if (old_size >= size) {
+		memcpy(tmp, ptr, size);
+	} else {
+		memcpy(tmp, ptr, old_size);
+	}
+	
+	kmem_sys_free(ptr);
+	return tmp;
+}
+
+void * kmem_sys_realloc(void * ptr, size_t size)
+{
+    return kmem_sys_realloc_specific(ptr,size,-1);
+}
+
+
+int    kmem_sys_realloc_in_place(void *addr, size_t new_size, size_t *actual_new_size)
+{
+    struct kmem_block_hdr *hdr;
+    struct buddy_mempool * zone;
+    uint64_t old_order, new_order;
+
+    KMEM_DEBUG("realloc_in_place of address %p to size %lu from:\n", addr, new_size);
+    KMEM_DEBUG_BACKTRACE();
+
+    hdr = block_hash_find_entry(addr);
+
+    if (!hdr) { 
+      KMEM_ERROR("Failed to find entry for block %p in kmem_realloc_in_place()\n",addr);
+      KMEM_ERROR_BACKTRACE();
+      return -1;
+    }
+
+    zone = hdr->zone;
+    old_order = hdr->order;
+
+    if (!zone) {
+      KMEM_ERROR("Cannot find memory zone\n");
+      BACKTRACE(KMEM_ERROR,3);
+      return -1;
+    }
+    
+    new_order = ilog2(roundup_pow_of_two(new_size));
+
+    if (new_order<MIN_ORDER) {
+      KMEM_ERROR("new order is too small\n");
+      BACKTRACE(KMEM_ERROR,3);
+      return -1;
+    }
+
+    KMEM_DEBUG("old order %lu  new order %lu\n", old_order, new_order);
+    
+    /* Return block to the underlying buddy system */
+    uint8_t flags = spin_lock_irq_save(&zone->lock);
+    ulong_t resulting_new_order;
+    kmem_bytes_allocated += (1UL << new_order) - (1UL << old_order);
+    int rc = buddy_resize(zone, (addr_t)addr, old_order, hdr->aligned_order, new_order,&resulting_new_order);
+    spin_unlock_irq_restore(&zone->lock, flags);
+
+    if (rc) {
+      KMEM_ERROR("buddy_resize failed\n");
+      return -1;
+    }
+
+    // update header so we can free enough when needed
+    hdr->order = new_order;
+    hdr->aligned_order = resulting_new_order;
+
+    *actual_new_size = (1UL << new_order);
+
+    KMEM_DEBUG("resize succeeded: addr=0x%lx order=%lu\n",addr,resulting_new_order);
+
+    return 0;
+}
+
 
 /**
- * Frees memory previously allocated with kmem_alloc().
+ * Frees memory previously allocated with kmem_sys_alloc().
  *
  * Arguments:
  *       [IN] addr: Address of the memory region to free.
@@ -625,11 +761,13 @@ void *kmem_malloc_specific(size_t size, int cpu, int zero)
  *       kmem_alloc().
  */
 void
-kmem_free (void * addr)
+kmem_sys_free (void * addr)
 {
+
     struct kmem_block_hdr *hdr;
     struct buddy_mempool * zone;
     uint64_t order;
+    uint64_t aligned_order;
 
     KMEM_DEBUG("free of address %p from:\n", addr);
     KMEM_DEBUG_BACKTRACE();
@@ -660,7 +798,7 @@ kmem_free (void * addr)
 
     zone = hdr->zone;
     order = hdr->order;
-
+    aligned_order = hdr->aligned_order;
     // Sanity check things here
     // this will in some cases catch a double free that is causing a
     // race on the header
@@ -676,7 +814,17 @@ kmem_free (void * addr)
     /* Return block to the underlying buddy system */
     uint8_t flags = spin_lock_irq_save(&zone->lock);
     kmem_bytes_allocated -= (1UL << order);
-    buddy_free(zone, addr, order);
+    
+    if (aligned_order != order) {
+        /* case where expansion happens for the right child */
+        unaligned_buddy_free(zone, addr, order, aligned_order);
+
+    } else {
+        buddy_free(zone, addr, order);
+    }
+
+    
+
     spin_unlock_irq_restore(&zone->lock, flags);
     KMEM_DEBUG("free succeeded: addr=0x%lx order=%lu\n",addr,order);
     block_hash_free_entry(hdr);
@@ -690,48 +838,61 @@ kmem_free (void * addr)
 
 }
 
-/*
- * This is a *dead simple* implementation of realloc that tries to change the
- * size of the allocation pointed to by ptr to size, and returns ptr.  Realloc will
- * malloc a new block of memory, copy as much of the old data as it can, and free the
- * old block. If ptr is NULL, this is equivalent to a malloc for the specified size.
- *
- */
-void * 
-kmem_realloc (void * ptr, size_t size)
+
+
+// the general kmem_* wrappers should be optimized to be free
+// if the allocator interface is not enabled
+
+void * kmem_malloc_specific(size_t size, int cpu, int zero)
 {
-	struct kmem_block_hdr *hdr;
-	size_t old_size;
-	void * tmp = NULL;
-
-	/* this is just a malloc */
-	if (!ptr) {
-		return kmem_malloc(size);
-	}
-
-	hdr = block_hash_find_entry(ptr);
-
-	if (!hdr) {
-		KMEM_DEBUG("Realloc failed to find entry for block %p\n", ptr);
-		return NULL;
-	}
-
-	old_size = 1 << hdr->order;
-	tmp = kmem_malloc(size);
-	if (!tmp) {
-		panic("Realloc failed\n");
-	}
-
-	if (old_size >= size) {
-		memcpy(tmp, ptr, size);
-	} else {
-		memcpy(tmp, ptr, old_size);
-	}
-	
-	kmem_free(ptr);
-	return tmp;
+#ifdef NAUT_CONFIG_ALLOCS
+    nk_alloc_t *alloc = nk_alloc_get_associated();
+    if (alloc) {
+	return nk_alloc_alloc_extended(alloc,size,NK_ALLOC_DEFAULT_ALIGNMENT,cpu,zero ? NK_ALLOC_ZERO : 0);
+    }
+#endif
+    return kmem_sys_malloc_specific(size,cpu,zero);
+}
+    
+void * kmem_malloc(size_t size)
+{
+    return kmem_malloc_specific(size,-1,0);
 }
 
+void * kmem_mallocz(size_t size)
+{
+    return kmem_malloc_specific(size,-1,1);
+}
+
+void * kmem_realloc_specific(void * ptr, size_t size, int cpu)
+{
+#ifdef NAUT_CONFIG_ALLOCS
+    nk_alloc_t *alloc = nk_alloc_get_associated();
+    if (alloc) {
+	return nk_alloc_realloc_extended(alloc,ptr,size,NK_ALLOC_DEFAULT_ALIGNMENT,cpu,0);
+    }
+#endif
+    return kmem_sys_realloc_specific(ptr,size,cpu);
+}
+
+void *kmem_realloc(void * ptr, size_t size)
+{
+    return kmem_realloc_specific(ptr,size,-1);
+}
+
+
+void kmem_free(void *addr)
+{
+#ifdef NAUT_CONFIG_ALLOCS
+    // actually, this needs to work even if we have the wrong context...
+    nk_alloc_t *alloc = nk_alloc_get_associated();
+    if (alloc) {
+	nk_alloc_free_extended(alloc,addr);
+	return;
+    }
+#endif
+    kmem_sys_free(addr);
+}
 
 typedef enum {GET,COUNT} stat_type_t;
 
@@ -989,6 +1150,10 @@ handle_meminfo (char * buf, void * priv)
         return 0;
     }
 
+#if KARAT_MEM_DEBUG
+    nk_vc_printf("KARAT: handle_meminfo (after malloc) : %p\n", s);
+#endif
+
     s->max_pools = num;
 
     kmem_stats(s);
@@ -1007,6 +1172,9 @@ handle_meminfo (char * buf, void * priv)
     nk_vc_printf("%lu pools %lu blks free %lu bytes free\n", s->total_num_pools, s->total_blocks_free, s->total_bytes_free);
     nk_vc_printf("  %lu bytes min %lu bytes max\n", s->min_alloc_size, s->max_alloc_size);
 
+#if KARAT_MEM_DEBUG
+    nk_vc_printf("KARAT: handle_meminfo (before free) : %p\n", s);
+#endif
     free(s);
 
     return 0;

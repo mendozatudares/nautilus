@@ -37,6 +37,8 @@
 #include "globals.h"
 #include "../math/nas_math.h"
 
+#include "../paging_benchmark.h"
+
 #include <nautilus/nautilus.h>
 #include <nautilus/shell.h>
 /* parameters */
@@ -75,17 +77,17 @@ static void nonzero(double ***z, int n1, int n2, int n3);
 /*--------------------------------------------------------------------
       program mg
 c-------------------------------------------------------------------*/
-int program_MG(char *_buf, void* _priv);
-int program_MG_profile(char *_, void *__);
+static int program_MG(char *_buf, void* _priv);
+static int program_MG_profile(char *_, void *__);
 
 static struct shell_cmd_impl nas_mg_impl = {
     .cmd      = "nas-mg",
     .help_str = "NAS parallel benchmark MG",
-    .handler  = program_MG_profile,
+    .handler  = program_MG,
 };
 nk_register_shell_cmd(nas_mg_impl);
 
-int program_MG_profile(char *_, void *__){
+static int program_MG_profile(char *_, void *__){
    
 #ifdef NAUT_CONFIG_PROFILE
       nk_instrument_clear();
@@ -99,8 +101,22 @@ int program_MG_profile(char *_, void *__){
 return 0;
 }
 
+#ifdef NAUT_CONFIG_ASPACE_PAGING
 
-int program_MG(char * _buf, void *_priv) {
+int program_MG_paging(char * _buf, void *_priv){
+    return paging_wrapper(_buf, _priv, &program_MG);
+}
+
+static struct shell_cmd_impl nas_mg_paging_impl = {
+    .cmd      = "nas-mg-paging",
+    .help_str = "NAS parallel benchmark MG with paging",
+    .handler  = program_MG_paging,
+};
+nk_register_shell_cmd(nas_mg_paging_impl);
+
+#endif
+
+static int program_MG(char * _buf, void *_priv) {
 
 /*-------------------------------------------------------------------------
 c k is the current level. It is passed down through subroutine args
@@ -354,6 +370,8 @@ c---------------------------------------------------------------------*/
 		    nit, nthreads, t, mflops, "          floating point", 
 		    verified, NPBVERSION, COMPILETIME,
 		    CS1, CS2, CS3, CS4, CS5, CS6, CS7);
+	
+	return 0;
 }
 
 /*--------------------------------------------------------------------

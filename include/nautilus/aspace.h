@@ -24,6 +24,7 @@
 #ifndef __NK_ASPACE
 #define __NK_ASPACE
 
+#include <nautilus/list.h>
 #include <nautilus/idt.h>
 
 typedef struct nk_aspace_characteristics {
@@ -60,6 +61,13 @@ typedef struct nk_aspace_protections {
 #define NK_ASPACE_KERN   16   // meaning "kernel only", which is not yet supported
 #define NK_ASPACE_SWAP   32   // meaning "is swaped", which is not yet supported
 #define NK_ASPACE_EAGER  64   // meaning the mapping must be immediately constructed
+#define NK_ASPACE_GET_READ(flags) ((flags & NK_ASPACE_READ) >> 0)
+#define NK_ASPACE_GET_WRITE(flags) ((flags & NK_ASPACE_WRITE) >> 1)
+#define NK_ASPACE_GET_EXEC(flags) ((flags & NK_ASPACE_EXEC) >> 2)
+#define NK_ASPACE_GET_PIN(flags) ((flags & NK_ASPACE_PIN) >> 3)
+#define NK_ASPACE_GET_KERN(flags) ((flags & NK_ASPACE_KERN) >> 4)
+#define NK_ASPACE_GET_SWAP(flags) ((flags & NK_ASPACE_SWAP) >> 5)
+#define NK_ASPACE_GET_EAGER(flags) ((flags & NK_ASPACE_EAGER) >> 6)
 } nk_aspace_protection_t;
 
 
@@ -72,6 +80,7 @@ typedef struct nk_aspace_region {
     void       *pa_start;
     uint64_t    len_bytes;
     nk_aspace_protection_t  protect;
+    int         requested_permissions; // 0 == no permissions requested, 1 == read, 2 == write, 3 == read and write
 } nk_aspace_region_t;
 
 
@@ -91,7 +100,15 @@ typedef struct nk_aspace_interface {
     
     int    (*protect_region)(void *state, nk_aspace_region_t *region, nk_aspace_protection_t *prot);
     int    (*move_region)(void *state, nk_aspace_region_t *cur_region, nk_aspace_region_t *new_region);
-    
+    // region is both an input and and output
+    int    (*resize_region)(void *state, nk_aspace_region_t *region, uint64_t new_size, int by_force, uint64_t * actual_size);
+    // region is both an input and an output
+    // *free_space_start tells us where the free space beings in the region
+    int    (*defragment_region)(void *state, nk_aspace_region_t *region, uint64_t new_size, void **free_space_start);
+
+    int    (*protection_check)(void * state, nk_aspace_region_t * region);
+ 
+    int (*request_permission)(void * state, void * address, int is_write);
     // do the work needed to install the address space on the CPU
     // this is invoked on a context switch to a thread that is in a different
     // address space
@@ -143,6 +160,8 @@ int          nk_aspace_query(char *impl_name, nk_aspace_characteristics_t *chars
 nk_aspace_t *nk_aspace_create(char *impl_name, char *name, nk_aspace_characteristics_t *chars);
 int          nk_aspace_destroy(nk_aspace_t *aspace);
 
+int nk_aspace_rename(nk_aspace_t *aspace, char *name);
+
 nk_aspace_t *nk_aspace_find(char *name);
 
 // move the current thread to a different address space
@@ -150,20 +169,34 @@ int          nk_aspace_move_thread(nk_aspace_t *aspace);
 
 int          nk_aspace_add_region(nk_aspace_t *aspace, nk_aspace_region_t *region);
 int          nk_aspace_remove_region(nk_aspace_t *aspace, nk_aspace_region_t *region);
+int          nk_aspace_resize_region(nk_aspace_t *aspace, nk_aspace_region_t *region, uint64_t new_size, int by_force, uint64_t * actual_size);
 
+/**
+     *  Defragmentation illustration
+     *  xxx means allocated chunks in the region
+     *  -- means unallocated chunks in the region
+     * 
+     *      xxxx--xxxx--xx----xx 
+     *  =>
+     *      xxxxxxxxxxxx--------
+     *      ^               ^
+     * new_region_start   free_space_start
+     *  return 0 when everything is fineOA. Otherwise -1
+     * */
+int          nk_aspace_defrag_region(nk_aspace_t *aspace, nk_aspace_region_t *region, uint64_t newlen, void **free_space_start);
 // change protections for a region
-int          nk_aspace_protect(nk_aspace_t *aspace, nk_aspace_region_t *region, nk_aspace_protection_t *prot);
+int          nk_aspace_protect_region(nk_aspace_t *aspace, nk_aspace_region_t *region, nk_aspace_protection_t *prot);
 
 int          nk_aspace_move_region(nk_aspace_t *aspace, nk_aspace_region_t *cur_region, nk_aspace_region_t *new_region);
 
+int          nk_aspace_protection_check(nk_aspace_t *aspace, nk_aspace_region_t * region);  
 
+int          nk_aspace_request_permission(nk_aspace_t *aspace, void * address, int is_write);
 
 // call on BSP after percpu and kmem are available
 int          nk_aspace_init();
 // call on APs 
 int          nk_aspace_init_ap();
-
-
 
 // functions that may be used by aspace implementations to avoid shared burdens
 

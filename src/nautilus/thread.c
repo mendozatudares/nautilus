@@ -63,6 +63,8 @@ extern void nk_thread_entry(void *);
 static struct nk_tls tls_keys[TLS_MAX_KEYS];
 
 static void * nk_thread_set_tls(int placement_cpu);
+
+
 /****** SEE BELOW FOR EXTERNAL THREAD INTERFACE ********/
 
 
@@ -431,6 +433,19 @@ nk_thread_create (nk_thread_fun_t fun,
     if (hwtls_config_kernel_tls(t)) {
         THREAD_ERROR("Could not clone kernel tls\n");
         goto out_err;
+    t->signal_state = 0;
+    }
+#endif
+
+#ifdef NAUT_CONFIG_PROCESSES
+    // a thread will not belong to a process by default
+    t->process = NULL;
+#endif
+
+#ifdef NAUT_CONFIG_ENABLE_SIGNALS
+    if (nk_signal_init_task_state(&t->signal_state, t)) {
+        THREAD_ERROR("Failed to initialize signal state :(\n");
+        return -1;
     }
 #endif
 

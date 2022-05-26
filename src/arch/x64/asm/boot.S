@@ -125,14 +125,14 @@ paging_longmode_setup:
     movl %eax, (%ebx)
    
     //set first 4 entry of PDPT 4GB total
-    movl $2, %ecx
+    movl $4, %ecx
     movl $pd, %edx
     movl $0x83, %eax // set PS bit also (PDE -> 2MB page)
 
 .write_pdpe:
     push %ecx
 
-    // Identity map the first GB
+    // Identity map one GB
     movl $512, %ecx
 .write_pde:
     movl %eax, (%edx)

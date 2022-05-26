@@ -33,6 +33,9 @@
 
 #include "../common/npb-C.h"
 #include "../math/nas_math.h"
+
+#include "../paging_benchmark.h"
+
 #include <nautilus/nautilus.h>
 #include <nautilus/shell.h>
 /* global variables */
@@ -66,17 +69,17 @@ static void z_solve(void);
        program SP
 c-------------------------------------------------------------------*/
 static int program_SP(char *_buf, void* _priv);
-int program_SP_profile(char *_, void *__);
+static int program_SP_profile(char *_, void *__);
 
 static struct shell_cmd_impl nas_sp_impl = {
     .cmd      = "nas-sp",
     .help_str = "NAS parallel benchmark SP",
-    .handler  = program_SP_profile,
+    .handler  = program_SP,
 };
 nk_register_shell_cmd(nas_sp_impl);
 
 
-int program_SP_profile(char *_, void *__){
+static int program_SP_profile(char *_, void *__){
    
 #ifdef NAUT_CONFIG_PROFILE
       nk_instrument_clear();
@@ -91,7 +94,22 @@ return 0;
 }
 
 
-int program_SP(char* _buf, void * _priv) {
+#ifdef NAUT_CONFIG_ASPACE_PAGING
+
+int program_SP_paging(char * _buf, void *_priv){
+    return paging_wrapper(_buf, _priv, &program_SP);
+}
+
+static struct shell_cmd_impl nas_is_paging_impl = {
+    .cmd      = "nas-sp-paging",
+    .help_str = "NAS parallel benchmark SP with paging",
+    .handler  = program_SP_paging,
+};
+nk_register_shell_cmd(nas_is_paging_impl);
+
+#endif
+
+static int program_SP(char* _buf, void * _priv) {
     
   int niter, step;
   double mflops, tmax;
@@ -195,6 +213,8 @@ c-------------------------------------------------------------------*/
 		  tmax, mflops, "          floating point", 
 		  verified, NPBVERSION, COMPILETIME, CS1, CS2, CS3, CS4, CS5, 
 		  CS6, "(none)");
+  
+  return 0;
 }
 
 /*--------------------------------------------------------------------

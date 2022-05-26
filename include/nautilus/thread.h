@@ -36,7 +36,18 @@ extern "C" {
 
 // Always included so we get the necessary type
 #include <nautilus/cachepart.h>
+
+#ifdef NAUT_CONFIG_PROCESSES
+#include <nautilus/process.h>
+#else
 #include <nautilus/aspace.h>
+#endif
+
+#ifdef NAUT_CONFIG_LINUX_SYSCALLS
+#include <nautilus/syscalls/proc.h>
+#endif
+
+#include <nautilus/alloc.h>
 
 typedef uint64_t nk_stack_size_t;
     
@@ -182,11 +193,29 @@ struct nk_thread {
     uint16_t fpu_state_offset;   /* +16 SHOULD NOT CHANGE POSITION */
     nk_cache_part_thread_state_t /* +18 SHOULD NOT CHANGE POSITION */
              cache_part_state;   /* Always included to reserve this "slot" for asm code */
-    nk_aspace_t      *aspace;    /* +24 SHOULD NOT CHANGE POSITION */
+    struct nk_aspace *aspace;    /* +24 SHOULD NOT CHANGE POSITION */
                                  /* Always included to reserve this "slot" for asm code */
     void             *hwtls;     /* +32 SHOULD NOT CHANGE POSITION */
                                  /* Always included to reserve this "slot" for asm code */
                                  /* even if TLS is off; this is the FSBASE for the thread */
+    struct nk_signal_task_state  
+	     *signal_state;      /* +40 SHOULD NOT CHANGE POSITION */
+
+#ifdef NAUT_CONFIG_PROCESSES
+    struct nk_process *process;       /* Initialized if part of a process */
+#endif
+
+#ifdef NAUT_CONFIG_LINUX_SYSCALLS
+    struct nk_thread_linux_syscall_state syscall_state;
+    // TODO: move below into syscall_state
+    uint32_t* set_child_tid; /* May not be needed -ARN */
+    void* sysret_addr; /* Address set on entry to a syscall */
+    uint32_t* clear_child_tid;
+    void* thread_start_addr;
+    uint64_t fake_affinity; /* Simulated affinity of the thread */
+#endif
+
+    nk_alloc_t       *alloc;     /* custom allocator - NULL means use system allocator */
 
     nk_stack_size_t stack_size;
     unsigned long tid;
@@ -274,6 +303,14 @@ static inline void
 put_cur_thread (nk_thread_t * t) 
 {
     per_cpu_put(cur_thread, t);
+}
+
+__attribute__((used))
+static inline nk_thread_t *get_cur_thread_fast(void)
+{
+    uint64_t thread;
+    asm("movq %%gs:0, %0" : "=a" (thread));    
+    return ((nk_thread_t *) thread);
 }
 
 

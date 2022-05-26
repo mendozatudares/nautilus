@@ -36,12 +36,6 @@
 #define DEBUG(fmt, args...) DEBUG_PRINT("loader: " fmt, ##args)
 #define INFO(fmt, args...) INFO_PRINT("loader: " fmt, ##args)
 
-struct nk_exec {
-    void      *blob;          // where we loaded it
-    uint64_t   blob_size;     // extent in memory
-    uint64_t   entry_offset;  // where to start executing in it
-};
-
 
 /******************************************************************
      Data contained in the ELF file we will attempt to load
@@ -82,6 +76,12 @@ typedef struct mb_addr {
     u_virt   load_addr;
     u_virt   load_end_addr;
     u_virt   bss_end_addr;
+#ifdef NAUT_CONFIG_LOADER_SIGNATURE
+    // Maybe this should be in another mb tag?
+    u_virt   sign_begin;
+    u_virt   sign_end;
+    u_virt   signature_addr;
+#endif
 } __attribute__((packed)) mb_addr_t;
 
 #define MB_TAG_ENTRY 3
@@ -272,6 +272,11 @@ parse_multiboot_header (void *data, uint64_t size, mb_data_t *mb)
 		DEBUG("  load_addr       =  0x%x\n", mb_addr->load_addr);
 		DEBUG("  load_end_addr   =  0x%x\n", mb_addr->load_end_addr);
 		DEBUG("  bss_end_addr    =  0x%x\n", mb_addr->bss_end_addr);
+#ifdef NAUT_CONFIG_LOADER_SIGNATURE
+        DEBUG("  sign_begin      =  0x%x\n", mb_addr->sign_begin);
+        DEBUG("  sign_end        =  0x%x\n", mb_addr->sign_end);
+        DEBUG("  signature_addr  =  0x%x\n", mb_addr->signature_addr);
+#endif
 	    }
 		break;
 
@@ -351,6 +356,24 @@ parse_multiboot_header (void *data, uint64_t size, mb_data_t *mb)
     return 0;
 }
 
+#ifdef NAUT_CONFIG_LOADER_SIGNATURE
+#include <nautilus/crypto.h>
+// Return 0 if the signature is correct
+int verify_signature(const void *file_signature,
+                     const void *sign_begin,
+                     const void *sign_end) {
+    // For now, just check MD5 hash as proof of concept
+    char calculated_signature[MD5_DIGEST_LENGTH];
+    if (MD5(sign_begin, (unsigned long)(sign_end - sign_begin), (char*)&calculated_signature) == NULL) {
+        ERROR("MD5 function failed\n");
+        return -1;
+    }
+    DEBUG("Calculated signature = MD5 %lx%lx\n", *(uint64_t*)(&calculated_signature), *(uint64_t*)(&calculated_signature[8]));
+    DEBUG("Actual signature     = MD5 %lx%lx\n", *(uint64_t*)(file_signature), *(uint64_t*)(file_signature + 8));
+    return memcmp(file_signature, &calculated_signature, MD5_DIGEST_LENGTH);
+}
+#endif
+
 
 #define MB_LOAD (2*PAGE_SIZE_4KB)
 
@@ -417,6 +440,8 @@ struct nk_exec *nk_load_exec(char *path)
 
     blob_size = ALIGN_UP(bss_end - load_start + 1);
 
+    blob_size += MB_LOAD;
+
     DEBUG("Load continuing... start=0x%lx, end=0x%lx, bss_end=0x%lx, blob_size=0x%lx\n",
 	  load_start, load_end, bss_end, blob_size);
     
@@ -437,23 +462,40 @@ struct nk_exec *nk_load_exec(char *path)
         goto out_bad;
     }
     
+    DEBUG("Loading new process to memory starting at 0x%p\n", e->blob);
+
+    memcpy(e->blob, page, MB_LOAD);
+    
     e->blob_size = blob_size;
-    e->entry_offset = m.entry->entry_addr - PAGE_SIZE_4KB; 
+    e->entry_offset = m.entry->entry_addr - PAGE_SIZE_4KB + MB_LOAD; // Double check
     
     // now copy it to memory
     ssize_t n;
     
     
-    if ((n = nk_fs_read(fd,e->blob,e->blob_size))<0) {
+    if ((n = nk_fs_read(fd,e->blob+MB_LOAD,e->blob_size-MB_LOAD))<0) {
         ERROR("Unable to read blob from %s\n", path);
         goto out_bad;
     }
 
-    DEBUG("Tried to read 0x%lx byte blob, got 0x%lx bytes\n", e->blob_size, n);
+    DEBUG("Tried to read 0x%lx byte blob, got 0x%lx bytes\n", e->blob_size-MB_LOAD, n);
     
     DEBUG("Successfully loaded executable %s\n",path);
 
-    memset(e->blob+(load_end-load_start),0,bss_end-load_end);
+#ifdef NAUT_CONFIG_LOADER_SIGNATURE
+    uint64_t sign_begin_offset = m.addr->sign_begin;
+    uint64_t sign_end_offset = m.addr->sign_end;
+    uint64_t signature_offset = m.addr->signature_addr;
+    if (verify_signature(e->blob+signature_offset,
+                         e->blob+sign_begin_offset,
+                         e->blob+sign_end_offset)) {
+        DEBUG("Signature verification failed\n");
+        goto out_bad;
+    }
+    DEBUG("Signature verified\n");
+#endif
+
+    memset(e->blob+MB_LOAD+(load_end-load_start),0,bss_end-load_end);
 
     DEBUG("Cleared BSS\n");
 
@@ -472,13 +514,30 @@ struct nk_exec *nk_load_exec(char *path)
     return 0;
 }
 
+#include <aspace/runtime_tables.h>
+
 // run executable's entry point - this is a blocking call on the current thread
 // user I/O is via the current VC
 
 static void * (*__nk_func_table[])() = {
     [NK_VC_PRINTF] = (void * (*)()) nk_vc_printf,
+    [NK_CARAT_INSTRUMENT_GLOBAL] = (void * (*)()) nk_carat_instrument_global,
+    [NK_CARAT_INSTRUMENT_MALLOC] = (void * (*)()) nk_carat_instrument_malloc,
+    [NK_CARAT_INSTRUMENT_CALLOC] = (void * (*)()) nk_carat_instrument_calloc,
+    [NK_CARAT_INSTRUMENT_REALLOC] = (void * (*)()) nk_carat_instrument_realloc,
+    [NK_CARAT_INSTRUMENT_FREE] = (void * (*)()) nk_carat_instrument_free,
+    [NK_CARAT_INSTRUMENT_ESCAPE] = (void * (*)()) nk_carat_instrument_escapes,
+    [NK_CARAT_GENERIC_PROTECT] = (void * (*)()) nk_carat_guard_address,
+    [NK_CARAT_STACK_PROTECT] = (void * (*)()) nk_carat_guard_callee_stack,
+    [NK_CARAT_PIN_DIRECT] = (void * (*)()) nk_carat_pin_pointer,
+    [NK_CARAT_PIN_ESCAPE] = (void * (*)()) nk_carat_pin_escaped_pointer,
+    [NK_MALLOC] = (void * (*)()) kmem_malloc,
+    [NK_FREE] = (void * (*)()) kmem_free,
+    [NK_REALLOC] = (void * (*)()) kmem_realloc,
+#if USER_REGION_CHECK
+    [NK_ASPACE_PTR] = NULL,
+#endif
 };
-
 
 int 
 nk_start_exec (struct nk_exec *exec, void *in, void **out)
@@ -504,13 +563,35 @@ nk_start_exec (struct nk_exec *exec, void *in, void **out)
 
     DEBUG("Starting executable %p loaded at address %p with entry address %p and arguments %p and %p\n", exec, exec->blob, start, in, out);
 
+#if USER_REGION_CHECK
+    __nk_func_table[NK_ASPACE_PTR] = (void *) get_cur_thread()->aspace;
+#endif
+
+#ifdef NAUT_CONFIG_CARAT_PROFILE
+    start_carat_profiles = 1;
+    ERROR("Turned on CARAT profiles.\n");
+#endif
+
+    // TODO: move this to anywhere else
+    const uint64_t new_stack_size = 0x10000000;
+    nk_process_t* p = nk_process_current();
+
+    void* new_stack_top = p->giga_blob + new_stack_size - 0x10;
+
+    asm("movq %0, %%rsp" :: "r" (new_stack_top) : "rsp");
+
+    DEBUG("Now running on the new stack with rsp=%p\n", new_stack_top);
+    
+    get_cur_thread()->stack = p->giga_blob;
+    get_cur_thread()->stack_size = new_stack_size;
+
     int rc =  start(in, out, __nk_func_table);
 
     DEBUG("Executable %p has returned with rc=%d and *out=%p\n", exec, rc, out ? *out : 0);
     
+
     return rc;
 }
-
 
 int 
 nk_unload_exec (struct nk_exec *exec)

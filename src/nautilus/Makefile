@@ -11,6 +11,7 @@ obj-y += \
 	naut_string.o \
 	msr.o \
 	cpuid.o \
+	crypto.o \
 	mtrr.o \
 	fpu.o \
 	spinlock.o \
@@ -56,7 +57,8 @@ obj-y += \
 	linker.o \
 	prog.o \
 	getopt.o \
-	cmdline.o
+	cmdline.o \
+	lru_cache.o
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o
@@ -79,8 +81,15 @@ obj-$(NAUT_CONFIG_FIBER_ENABLE) += fiber.o
 
 obj-$(NAUT_CONFIG_ASPACES) +=  aspace.o 
 
+obj-$(NAUT_CONFIG_ALLOCS) +=  alloc.o 
+
 obj-$(NAUT_CONFIG_PARTITION_SUPPORT) += partition.o
 
 obj-$(NAUT_CONFIG_PROVENANCE) += provenance.o
+
+obj-$(NAUT_CONFIG_PROCESSES) += process.o \
+								signal.o
+
+obj-$(NAUT_CONFIG_LINUX_SYSCALLS) += syscalls/
 
 obj-$(NAUT_CONFIG_USE_IST) += gdt.o

@@ -42,6 +42,7 @@
 #define BUDDY_DEBUG(fmt, args...) DEBUG_PRINT("BUDDY: " fmt, ##args)
 #define BUDDY_PRINT(fmt, args...) printk("BUDDY: " fmt, ##args)
 #define BUDDY_WARN(fmt, args...)  WARN_PRINT("BUDDY: " fmt, ##args)
+#define BUDDY_ERROR(fmt, args...)  ERROR_PRINT("BUDDY: " fmt, ##args)
 
 
 
@@ -261,23 +262,26 @@ buddy_init (ulong_t base_addr,
 }
 
 
+
 /**
  * Allocates a block of memory of the requested size (2^order bytes).
  *
  * Arguments:
  *       [IN] mp:    Buddy system memory allocator object.
  *       [IN] order: Block size to allocate (2^order bytes).
- *
+ *       [IN] lb:    Lower bound of allowed block
+ *       [IN] ub:    Lower bound of allowed block
  * Returns:
  *       Success: Pointer to the start of the allocated memory block.
  *       Failure: NULL
  */
 void *
-buddy_alloc (struct buddy_mempool *mp, ulong_t order)
+buddy_alloc (struct buddy_mempool *mp, ulong_t order, addr_t lb, addr_t ub)
 {
     ulong_t j;
     struct list_head *list;
-    struct block *block;
+    struct block *search_block=0;
+    struct block *block=0;
     struct block *buddy_block;
 
     ASSERT(mp);
@@ -305,7 +309,28 @@ buddy_alloc (struct buddy_mempool *mp, ulong_t order)
             continue;
         }
 
-        block = list_first_entry(list, struct block, link);
+	// now search for a block in which [lb,ub) fits
+	// note that if [lb,ub) = [0,-1) then this will always find the first
+	// block
+	block = 0;
+	list_for_each_entry(search_block,list,link) {
+        addr_t block_start = (addr_t) search_block;
+        addr_t block_end = (addr_t)search_block + (1ULL<<(order));
+        BUDDY_DEBUG("Considering block [%p,%p) for match against [%p,%p)\n",
+                block_start, block_end, lb,ub);
+        if (block_start>=lb && block_end<=ub) {
+            BUDDY_DEBUG("Matched\n");
+            block = search_block;
+            break;
+        }
+	}
+
+	if (!block) {
+	  // no block found given [lb,ub)
+	  BUDDY_DEBUG("NOT MATCHED\n");
+	  continue;
+	}
+	
         list_del_init(&block->link);
         mark_allocated(mp, block);
 
@@ -331,6 +356,249 @@ buddy_alloc (struct buddy_mempool *mp, ulong_t order)
     BUDDY_DEBUG("FAILED TO ALLOCATE from %p - RETURNING  NULL\n", mp);
 
     return NULL;
+}
+
+
+
+/**
+ * Resizes an allocated block from old_order to new_order, if possible
+ * New space is not initialized
+ *
+ * Arguments:
+ *       [IN] mp:         Buddy system memory allocator object.
+ *       [IN] block:      Block to expand or contract
+ *       [IN] old_order:  indicate previous size
+ *       [IN] aligned_order:  order to which block is aligned 
+ *       [IN] new_order:  Target order
+ *       [IN] resulting_new_order:  opder that current block aligns to. Will be different if expansion happens for block on the right child.
+ * Returns:
+ *       Success: returns 0
+ *       Failure: returns negative
+ */
+int buddy_resize(
+    struct buddy_mempool *mp, 
+    addr_t block, 
+    ulong_t old_order, 
+    ulong_t aligned_order,
+    ulong_t new_order, 
+    ulong_t *resulting_new_order
+){
+    ulong_t j;
+    struct list_head *list;
+    struct block *search_block;
+    struct block *target_block;
+
+    ASSERT(mp);
+    
+    BUDDY_DEBUG("BUDDY RESIZE on mempool : %p old_order: %lu new_order %lu mempool_order: %lu\n", mp, old_order, new_order, mp->pool_order);
+    ;
+    
+    if (new_order == old_order) {
+      BUDDY_DEBUG("Ignoring simple request\n");
+      return 0;
+    }
+    
+    if (new_order < old_order) {
+      BUDDY_ERROR("Cannot currently shrink blocks\n");
+      return -1;
+    }
+    
+    if (new_order > mp->pool_order) {
+      BUDDY_DEBUG("order is too big\n");
+      return -1;
+    }
+    
+    if (new_order != (old_order + 1)) {
+        /**
+         *  Iteratively expand the block
+         * */
+        for (j=old_order;j<new_order;j++) {
+            if (buddy_resize(mp, block, j, aligned_order,  j+1, resulting_new_order)) {
+                BUDDY_ERROR("iterative expansion failed at order %lu (target %lu)\n", j+1, *resulting_new_order);
+                return -1;
+            }
+        }
+
+        return 0;
+    }
+    
+    // here in case of future support for shrinking
+    if (new_order < mp->min_order) {
+      new_order = mp->min_order;
+      BUDDY_DEBUG("order expanded to %lu\n",new_order);
+    }
+
+    // now we are at the case where we simply want to double the size of the block
+    // we will only handle the case in which this is true:
+    //
+    // | CUR BLOCK | NEXT BLOCK |    are buddy blocks
+    // 
+    // this will only work if NEXT BLOCK is free
+    
+    addr_t zone_start = mp->base_addr;  // probably not needed
+    addr_t target = block + (1ULL<<old_order);
+    addr_t target_offset = target - zone_start;
+    addr_t block_offset = block - zone_start;
+    
+
+    // if (!(target_offset % (1ULL << new_order))) {
+    if (block_offset % (1ULL << new_order)) {
+        /**
+         *  block is the right child of its parent. For now we can't support this case
+         * */
+        BUDDY_WARN("impossible target (block_offset=%llx new_order=%lu)\n",block_offset,new_order);
+        BUDDY_WARN("impossible target (zone_start = %llx block=%llx target=%llx old_order=%lu)\n", zone_start, block ,target,old_order);
+        
+        addr_t expanded_end = block + (1ULL << new_order);
+        uint64_t cur_allowed_order = old_order;
+
+        while (target < expanded_end)
+        {
+            /* round down distance to the integer power of 2 */
+            uint64_t distance = expanded_end - target;
+            cur_allowed_order = ilog2(distance);
+
+            BUDDY_DEBUG("target = %lx expanded_end = %lx\n",target, expanded_end);
+
+            for (j = aligned_order; j <= mp->pool_order; j++) {
+                list = &mp->avail[j];
+
+                if (list_empty(list)) {
+                    BUDDY_DEBUG("Skipping order %lu as the list is empty\n",j);
+                    continue;
+                }
+
+                target_block = 0;
+                list_for_each_entry(search_block,list,link) {
+                    if ((addr_t)search_block==target) {
+                        target_block = search_block;
+                        break;
+                    }
+                }
+
+                if (!target_block) {
+                    BUDDY_DEBUG("NOT MATCHED order = %d\n", j);
+                    continue;
+                }
+
+                list_del_init(&target_block->link);
+                mark_allocated(mp, target_block);
+
+                BUDDY_DEBUG("Found block %p at order %lu\n",target_block,j);
+
+                struct block *buddy_block = NULL;
+
+                /* Trim if a higher order block than necessary was allocated */
+                while (j > cur_allowed_order) {
+                    --j;
+                    buddy_block = (struct block *)((ulong_t)target_block + (1UL << j));
+                    buddy_block->order = j;
+                    mark_available(mp, buddy_block);
+                    BUDDY_DEBUG("Inserted buddy block %p into order %lu\n",buddy_block,j);
+                    list_add(&buddy_block->link, &mp->avail[j]);
+                }
+
+                target_block->order = j;
+
+                break;
+            }
+
+            if (j > mp->pool_order) {
+                /* exhuast all order but didn't find any available block*/
+                BUDDY_ERROR("exhuast all order but didn't find any available block!\n");
+                return -1;
+            }
+
+            target = target + (1UL << j);
+        }
+        
+        *resulting_new_order = aligned_order;
+
+        return 0;
+
+    }
+    
+    list = &mp->avail[old_order];
+    
+    if (list_empty(list)) {
+      BUDDY_ERROR("no blocks available at old_order\n");
+      return -1;
+    }
+    
+    target_block = 0;
+    list_for_each_entry(search_block,list,link) {
+      if ((addr_t)search_block==target) {
+        target_block = search_block;
+        break;
+      }
+    }
+
+    if ((addr_t)target_block != target) {
+      BUDDY_ERROR("Cannot find expansion block\n");
+      return -1;
+    }
+
+    BUDDY_DEBUG("Found expansion block %p at order %lu\n",target_block,old_order);
+    
+    list_del_init(&target_block->link);
+    mark_allocated(mp, target_block);
+
+
+    BUDDY_DEBUG("Expanded block %p which is in memory pool %p-%p from [%p,%p) to [%p,%p)\n",block,mp->base_addr,mp->base_addr+(1ULL << mp->pool_order), block, block+(1ULL<<old_order), block+(1ULL<<new_order));
+		
+    *resulting_new_order = new_order;
+      
+    return 0;
+}
+
+void unaligned_buddy_free(
+    //!    Buddy system memory allocator object.
+    struct buddy_mempool *  mp,
+    //!  Address of memory block to free.
+    void *        addr,
+    //! Size of the memory block (2^order bytes).
+    ulong_t order,
+    //! Order to which addr is aligned to 
+    ulong_t aligned_order
+) {
+    addr_t addrToFree = (addr_t) addr; 
+    addr_t addrEnd = addrToFree + (1UL << order);
+    addr_t zone_start = mp->base_addr;
+    /**
+     *  most naive approach
+     * */
+    // while( addrToFree < addrEnd ) {
+    //     buddy_free(mp, (void *) addrToFree, aligned_order);
+    //     addrToFree += (1UL << aligned_order);
+    // }
+
+    while( addrToFree < addrEnd ) {
+        uint64_t orderToFree = aligned_order;
+        uint64_t start_offset = addrToFree - zone_start;
+
+        int correct_aligned = 0;
+        int can_expand = 0;
+        
+        do
+        {
+            correct_aligned = !(start_offset % (1UL << (orderToFree + 1)));
+            can_expand = (addrToFree + (1UL << orderToFree)) < addrEnd;
+            
+            BUDDY_DEBUG("correct_aligned = %d, can_expand = %d\n", correct_aligned,can_expand);
+
+            if (correct_aligned && can_expand) {
+                orderToFree++;
+            } else {
+                break;
+            }
+        } while (1);
+        
+
+        BUDDY_DEBUG("addrToFree =%p orderToFree = %d\n", addrToFree, orderToFree);
+
+        buddy_free(mp, (void *) addrToFree, orderToFree);
+        addrToFree += (1UL << orderToFree);
+    }
 }
 
 

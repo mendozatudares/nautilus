@@ -71,8 +71,16 @@
 #include <nautilus/cmdline.h>
 #include <test/test.h>
 
+#ifdef NAUT_CONFIG_ALLOCS
+#include <nautilus/alloc.h>
+#endif
+
 #ifdef NAUT_CONFIG_ASPACES
 #include <nautilus/aspace.h>
+#endif
+
+#ifdef NAUT_CONFIG_ASPACE_CARAT
+#include <aspace/patching.h>
 #endif
 
 #ifdef NAUT_CONFIG_WATCHDOG
@@ -91,6 +99,10 @@
 
 #ifdef NAUT_CONFIG_NET_COLLECTIVE_ETHERNET
 #include <net/collective/ethernet/ethernet_collective.h>
+#endif
+
+#ifdef NAUT_CONFIG_LINUX_SYSCALLS
+#include <nautilus/syscalls/kernel.h>
 #endif
 
 #include <dev/apic.h>
@@ -289,6 +301,19 @@ static int launch_vmm_environment()
 
 extern struct naut_info * smp_ap_stack_switch(uint64_t, uint64_t, struct naut_info*);
 
+/*
+  You can add a script here that the shell will run at startup
+  
+char *script[] = { "meminfo",
+                   "allocator_test_trace dumb 0 2",
+                   "\0",
+                   0 };
+
+char *script[] = { "sigtest",
+                    "\0",
+                    0 };
+*/
+
 void
 init (unsigned long mbd,
       unsigned long magic)
@@ -372,6 +397,10 @@ init (unsigned long mbd,
      * allocated in the boot mem allocator are kept reserved */
     mm_boot_kmem_init();
 
+#ifdef NAUT_CONFIG_ALLOCS
+    nk_alloc_init();
+#endif
+
 #ifdef NAUT_CONFIG_ASPACES
     nk_aspace_init();
 #endif
@@ -437,7 +466,6 @@ init (unsigned long mbd,
 
     mm_boot_kmem_cleanup();
 
-
     smp_setup_xcall_bsp(naut->sys.cpus[0]);
 
     nk_cpu_topo_discover(naut->sys.cpus[0]); 
@@ -459,6 +487,13 @@ init (unsigned long mbd,
 #endif
 
     smp_bringup_aps(naut);
+
+#ifdef NAUT_CONFIG_ASPACE_CARAT
+    // carat requires global initialization
+    // because the compiler-transformed kernel
+    // needs to start talking to it very early
+    nk_carat_init();
+#endif
 
 #ifdef NAUT_CONFIG_ENABLE_MONITOR
     nk_monitor_init();
@@ -504,7 +539,6 @@ init (unsigned long mbd,
     nk_vc_start_chardev_console(NAUT_CONFIG_VIRTUAL_CONSOLE_CHARDEV_CONSOLE_NAME);
 #endif
 
-
 #ifdef NAUT_CONFIG_PARTITION_SUPPORT
     nk_partition_init(naut);
 #endif
@@ -547,13 +581,13 @@ init (unsigned long mbd,
 
 #ifdef NAUT_CONFIG_EXT2_FILESYSTEM_DRIVER
 #ifdef NAUT_CONFIG_RAMDISK_EMBED
-    nk_fs_ext2_attach("ramdisk0","rootfs", 1);
+    nk_fs_ext2_attach("ramdisk0","rootfs", 0);
 #endif
 #endif
 
 #ifdef NAUT_CONFIG_FAT32_FILESYSTEM_DRIVER
 #ifdef NAUT_CONFIG_RAMDISK_EMBED
-    nk_fs_fat32_attach("ramdisk0","rootfs", 1);
+    nk_fs_fat32_attach("ramdisk0","rootfs", 0);
 #endif
 #endif
 
@@ -579,6 +613,13 @@ init (unsigned long mbd,
     nk_watchdog_init(NAUT_CONFIG_WATCHDOG_DEFAULT_TIME_MS * 1000000UL);
 #endif
     
+#ifdef NAUT_CONFIG_LINUX_SYSCALLS
+    // Initialize inux system call interface
+    nk_syscall_init();
+    init_syscall_table();
+#endif
+    
+    // nk_launch_shell("root-shell",0,script,0);
     nk_launch_shell("root-shell",0,0,0);
 
     runtime_init();

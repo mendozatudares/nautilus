@@ -8,15 +8,25 @@ obj-y += futures.o
 obj-y += bsp.o
 obj-y += net_udp_echo.o
 obj-y += test.o
+obj-y += lru_cache_test.o
+
+obj-$(NAUT_CONFIG_ASPACE_CARAT) += skiplist_test.o \
+                                   map_test.o
 
 obj-$(NAUT_CONFIG_PROVENANCE) += provenance.o
 
 obj-$(NAUT_CONFIG_TEST_FIBERS) += fibers.o \
 								   fibers_random.o
 
+obj-$(NAUT_CONFIG_PROCESSES) += process.o \
+								signal.o
+
 obj-$(NAUT_CONFIG_TEST_CACHEPART) += cachepart.o
 
-obj-$(NAUT_CONFIG_OPENMP_RT_TESTS)  += openmp/
+#obj-$(NAUT_CONFIG_OPENMP_RT_TESTS)  += openmp/
+# KARAT TESTING
+#obj-y += openmp/
+
 obj-$(NAUT_CONFIG_NDPC_RT_TESTS) += ndpc/
 obj-$(NAUT_CONFIG_NESL_RT_TESTS) += nesl/
 
@@ -42,3 +52,8 @@ obj-$(NAUT_CONFIG_LEGION_RT) += test_legion.o \
 								# global_vars.o \
 								# index_tasks.o \
 								# tasks_and_futures.o	\
+
+obj-$(NAUT_CONFIG_ALLOC_TEST) += alloc/
+
+obj-$(NAUT_CONFIG_TEST_ALLOC_IMPLICIT) += allocator_test.o
+obj-$(NAUT_CONFIG_TEST_TRACE_ALLOC_IMPLICIT) += allocator_test_trace.o

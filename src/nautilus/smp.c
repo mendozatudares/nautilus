@@ -40,6 +40,10 @@
 #include <dev/ioapic.h>
 #include <dev/apic.h>
 
+#ifdef NAUT_CONFIG_ALLOCS
+#include <nautilus/alloc.h>
+#endif
+
 #ifdef NAUT_CONFIG_ASPACES
 #include <nautilus/aspace.h>
 #endif
@@ -54,6 +58,10 @@
 
 #ifdef NAUT_CONFIG_CACHEPART
 #include <nautilus/cachepart.h>
+#endif
+
+#ifdef NAUT_CONFIG_LINUX_SYSCALLS
+#include <nautilus/syscalls/kernel.h>
 #endif
 
 
@@ -330,6 +338,12 @@ smp_ap_setup (struct cpu * core)
     }
 #endif
 
+#ifdef NAUT_CONFIG_ALLOCS
+    if (nk_alloc_init_ap()) { 
+	ERROR_PRINT("Could not set up allocators for core %u\n",core->id);
+    }
+#endif
+
 #ifdef NAUT_CONFIG_USE_IST
     nk_gdt_init_ap(core);
 #endif
@@ -400,6 +414,10 @@ smp_ap_finish (struct cpu * core)
     if (nk_cache_part_start_ap() != 0) {
         ERROR_PRINT("Could not start cache partitioning for core %u\n", core->id);
     }
+#endif
+
+#ifdef NAUT_CONFIG_LINUX_SYSCALLS
+    nk_syscall_init_ap();
 #endif
 
     SMP_DEBUG("Core %u ready - enabling interrupts\n", core->id);

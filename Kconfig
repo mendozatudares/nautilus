@@ -28,7 +28,6 @@ menu "Platform"
 	       that Gem5 gets timers right, but given how slow it is,
 	       it can feel ridiculous in real-time, especially
 	       when used interactively.
-
 	       DO NOT SET THIS IF YOU WANT ACCURATE SIMULATED TIME
 
         config GEM5_APIC_BUS_FREQ_HZ
@@ -174,7 +173,7 @@ menu "Build"
       prompt "Compiler and related toolchain to use"
       default USE_GCC
       help
-          Chose whether to use GCC or CLang to build Nautilus
+          Chose whether to use GCC or Clang to build Nautilus
           Currently, GCC is by far the most tested option
 	  No guarantees that Clang will be able to build everything
 	  Clang/WLLVM will generate a bitcode file for the entire kernel
@@ -185,6 +184,13 @@ menu "Build"
      config USE_WLLVM
        bool "Clang/WLLVM (generates top level bitcode file)" 
     endchoice
+    config USE_NOELLE 
+       bool "Enable Noelle"
+       default false
+       depends on USE_WLLVM
+       help
+	   Enables Noelle for compiler analyses (only applies to KARAT) 
+           USAGE: make noelle_download ; make ; make bitcode ; make noelle_karat ; make final ; make isoimage
     config USE_WLLVM_WHOLE_OPT
        bool "Whole kernel optimization"
        default false
@@ -261,6 +267,13 @@ config USE_IST
     default n
     help
       Enable IST (separate interrupt stacks)
+
+config ENABLE_SIGNALS
+   bool "Enable Signals"
+   default n
+   help
+      Enable signal delivery (to kernel threads)
+      Delivery to user threads also depends on this
 
 config VIRTUAL_CONSOLE_DISPLAY_NAME
    bool "Display name of current virtual console"
@@ -1191,7 +1204,14 @@ menu Debugging
       help
         Turn on debug prints for threads
 
-    config DEBUG_FIBERS
+    config DEBUG_SIGNALS
+      bool "Debug Signals"
+      default n
+      help
+      Debug signals
+
+
+   config DEBUG_FIBERS
       bool "Debug Fibers"
       depends on DEBUG_PRINTS && FIBER_ENABLE
       default n
@@ -1212,7 +1232,6 @@ menu Debugging
       help
         Turn on debug prints for wait queues
 	YOU PROBABLY DO NOT WANT TO DO THIS - SEE COMMENTS
-
 
 config DEBUG_FUTURES
       bool "Debug Futures"
@@ -1362,6 +1381,8 @@ config DEBUG_PMC
         help
                 Turn on debug prints for the performance counter (PMC) subsystem
 
+
+
 endmenu
 
 menu "Address Spaces"
@@ -1406,6 +1427,67 @@ menu "Address Spaces"
 	     It does lazy build of identity-mapped page tables, plus
 	     it allows creation of non-identity-mapped addresses
 
+	  choice
+      	  	depends on ASPACE_PAGING
+          	prompt "Paging region data structure"
+          	default ASPACE_PAGING_REGION_RB_TREE
+
+          	config ASPACE_PAGING_REGION_RB_TREE
+           	  bool "Red Black Tree"
+
+          	config ASPACE_PAGING_REGION_SPLAY_TREE
+              	  bool "Splay Tree"
+
+          	config ASPACE_PAGING_REGION_LINKED_LIST
+              	  bool "Linked List"
+
+                config ASPACE_PAGING_REGION_SKIP_LIST
+                  bool "Skip List"
+          endchoice
+
+
+	  config ASPACE_PAGING_1GB
+            bool "Huge Page 1GB "
+            depends on ASPACE_PAGING
+            default y
+            help
+              Enable 1GB Huge Page for region aligned with 1GB and length as multiple of 1GB
+
+       config ASPACE_PAGING_2MB
+         bool "Large Page 2MB"
+         depends on ASPACE_PAGING
+         default y
+         help
+           Enable 2MB Large Page for region aligned with 2MB and length as multiple of 2MB
+
+       config ASPACE_PAGING_REGION_STRUCT_TEST
+         bool "Test region tracking data structures"
+         depends on ASPACE_PAGING
+         default n
+         help
+          Test red black tree, splay tree, and linked list against each other
+
+       config ASPACE_PAGING_PCID
+      	bool "PCID for Paging"
+      	depends on ASPACE_PAGING
+      	default y
+      	help
+        Enable PCID support for paging address aspace
+
+      	choice
+          depends on ASPACE_PAGING_PCID
+            prompt "PCID implementation"
+            default ASPACE_PAGING_PCID_QUEUE
+
+            config ASPACE_PAGING_PCID_QUEUE
+                bool "Queue"
+
+            config ASPACE_PAGING_PCID_BITMAP
+                bool "Bitmap"
+
+    	  endchoice
+
+
 	config DEBUG_ASPACE_PAGING
 	  bool "Debug the paging address space abstraction"
 	  depends on ASPACE_PAGING
@@ -1427,6 +1509,172 @@ menu "Address Spaces"
 	  help
 	     Turn on debugging prints for the CARAT address space abstraction
 
+	choice
+            depends on ASPACE_CARAT
+            prompt "CARAT Region data structure"
+            default ASPACE_CARAT_REGION_RB_TREE
+
+            config ASPACE_CARAT_REGION_RB_TREE
+               bool "Red Black Tree"
+
+            config ASPACE_CARAT_REGION_SPLAY_TREE
+               bool "Splay Tree"
+
+            config ASPACE_CARAT_REGION_LINKED_LIST
+               bool "Linked List"
+
+            config ASPACE_CARAT_REGION_SKIP_LIST
+               bool "Skip List"
+         endchoice
+
+  config CARAT_PROFILE
+    bool "Enable profiling for CARAT aspace"
+    depends on ASPACE_CARAT
+    default n
+    help
+      Turns on profiling for CARAT Aspace
+
+  config DEBUG_ASPACE_REGION_TRACKING
+    bool "Debug the selected region tracking data structure (RBTree/SplayTree/..)"
+	  depends on ASPACES
+	  default y
+	  help
+	     Turn on debugging prints for selected region tracking data structure
+endmenu
+
+menu "Allocators"
+        config ALLOCS
+	  bool "Enable Allocators"
+	  default n
+	  depends on X86_64_HOST
+	  select ALLOC_BASE
+	  help
+	     Enable allocator abstractions
+	     
+	config DEBUG_ALLOCS
+	  bool "Debug allocators core"
+	  depends on ALLOCS
+	  default n
+	  help
+	     Turn on debugging prints for the allocator core
+
+	config ALLOC_BASE
+	  bool "Base allocator"
+	  depends on ALLOCS
+	  default y
+	  help
+	     This is the base allocator, just a wrapper on the system allocator
+
+        config DEBUG_ALLOC_BASE
+	  bool "Debug the base allocator"
+	  depends on ALLOC_BASE
+	  default n
+	  help
+	     Turn on debugging prints for the base allocator
+
+        config ALLOC_BUMP
+	  bool "Bump allocator"
+	  depends on ALLOCS
+	  default n
+	  help
+	     This allocator never deallocates, but allocates in constant time
+
+        config DEBUG_ALLOC_BUMP
+	  bool "Debug the bump allocator"
+	  depends on ALLOC_BUMP
+	  default n
+	  help
+	     Turn on debugging prints for the dumb allocator
+
+        config ALLOC_IMPLICIT
+	  bool "Implicit free list allocator"
+	  depends on ALLOCS
+	  default n
+	  help
+	     Implicit Free list implementation
+
+        config DEBUG_ALLOC_IMPLICIT
+	  bool "Debug the implicit free list allocator"
+	  depends on ALLOC_IMPLICIT
+	  default n
+	  help
+	     Turn on debugging prints for the cs213 allocator
+
+        config TEST_ALLOC_IMPLICIT
+	  bool "Test the implicit free list allocator"
+	  depends on ALLOC_IMPLICIT
+	  default n
+	  help
+	     Allocator test program
+	     
+       config TEST_TRACE_ALLOC_IMPLICIT
+	  bool "Test the implicit free list allocator using a trace"
+	  depends on ALLOC_IMPLICIT
+	  default n
+	  help
+	     Allocator test program w/trace
+
+    config ALLOC_TEST
+	  bool "Allocator Test"
+	  depends on ALLOCS
+	  default n
+	  help
+	     test framework for allocator.
+
+        config DEBUG_ALLOC_TEST
+	  bool "Debug allocator test"
+	  depends on ALLOC_TEST
+	  default n
+	  help
+	     Turn on debugging prints for the allocator test
+endmenu
+
+
+menu "Processes"
+
+config PROCESSES
+    bool "Enable support for processes"
+    depends on ASPACES
+    select USE_IST
+    default n
+    help
+      Enable processes
+
+
+config DEBUG_PROCESSES
+      bool "Debug processes"
+      depends on DEBUG_PRINTS && PROCESSES
+      default n
+      help
+        Turn on debug prints for processes
+
+config LINUX_SYSCALLS
+    bool "Enable support for Linux syscall emulation"
+    depends on PROCESSES
+    default y
+    help
+      Enable Linux syscall interface
+
+config DEBUG_LINUX_SYSCALLS
+      bool "Debug Linux Syscalls"
+      depends on DEBUG_PRINTS && LINUX_SYSCALLS
+      default n
+      help
+        Turn on debug prints for Linux Syscall emulation
+
+config LOADER_SIGNATURE
+    bool "Use signature verification of loaded user processes"
+    depends on PROCESSES
+    default n
+    help
+      Use signature verification when loading user processes
+
+config CARAT_PROCESS
+    bool "Implement processes with CARAT"
+    depends on PROCESSES && ASPACE_CARAT
+    default n
+    help
+      Use CARAT for processes
 endmenu
 
 
@@ -1522,7 +1770,7 @@ menu "Runtimes"
               Debugging output for the OpenMP RT
 
         config OPENMP_RT_TESTS
-            bool "Include tests/benchmarks for OpenMP RT";
+            bool "Include tests/benchmarks for OpenMP RT"
 	    default n
             depends on OPENMP_RT
             help 
@@ -1553,10 +1801,18 @@ menu "Runtimes"
 	      Debugging output from the Virgil run-time
 
        config RACKET_RT
-            bool "Racket RT (via Multiverse)";
+            bool "Racket RT (via Multiverse)"
 	    default y
             help 
               Racket support (via Multiverse only - no special code)
+
+        config CARAT_RT
+            bool "CARAT RT"
+	    default n 
+            help 
+              CARAT support in Nautilus --- useless without compiling the
+			  kernel without the CARAT transforms 
+
 
 endmenu
 

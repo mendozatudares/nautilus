@@ -88,6 +88,7 @@ GLOBAL(early_irq_common)
     movq %rdi, %rbx            // Callee-saved
     movq %rsp, %rsi            // Source for memcpy
     movq $176, %rdx            // Size for memcpy
+    // TODO Add thing to check if going past page boundary
     callq nk_low_level_memcpy  // Copy this interrupt frame and saved registers to this place on the stack
     movq %rbx, %rsp            // Move our current rsp to the bottom of the copied stack
 #endif
@@ -191,10 +192,55 @@ skip_cat_entry:
     // do we need to switch to someone else?
     callq nk_sched_need_resched
     testq %rax, %rax
-    jz thr_return
+    jz EE_check_pending_signals
     movq %rax, %rdi
      // on a context switch, this will handle cache partition changes for the new thread	
     jmp nk_thread_switch_intr_entry    
+
+EE_check_pending_signals:    
+
+#ifdef NAUT_CONFIG_SIGNALS
+
+    /* Processes/signals enabled. Do we have pending signals? */
+    /* TODO MAC: Should we enable interrupts? */
+    pushq %rdi
+    pushq %rsi
+    pushq %rax 
+    
+    /* Check if signal state is initialized */
+    movq %gs:0x0, %rax
+    movq 40(%rax), %rsi   // must match offset in struct thread
+    testq %rsi, %rsi 
+    jz EE_skip_signal_delivery /* signals aren't ready, skip check */ 
+
+    /* Check if there are pending signals for curr thread */ 
+    movq 0x0(%rsi), %rdi
+    testq %rdi, %rdi
+    jnz EE_deliver_pending_signals /* signals pending for curr thread; jmp to delivery */
+
+    /* Check if there are shared pending signals */
+    movq 0x8(%rsi), %rsi
+    movq 0x0(%rsi), %rdi
+    testq %rdi, %rdi
+    jz EE_skip_signal_delivery /* No work to do, just return */
+
+    /* There are pending signals, Put num_sigs into 2nd arg register */
+EE_deliver_pending_signals:
+    movq %rdi, %rsi
+    
+    /* put saved stack pointer into 1st arg register */
+    movq 0x0(%rax), %rdi
+    
+    /* jump into C code, will return here later */
+    callq do_notify_resume 
+
+    /* TODO MAC: Disable Interrupts? jump back to is_pending_work? */
+
+EE_skip_signal_delivery:
+    popq %rax
+    popq %rsi
+    popq %rdi 
+#endif /* if not enabled, just fall through like usual */
 
 thr_return:
 #if GPIO_OUTPUT && defined(NAUT_CONFIG_GPIO)
@@ -221,6 +267,7 @@ thr_return:
     // we are now running with the old partition
 
 skip_cat_exit:
+
 
 #endif
 

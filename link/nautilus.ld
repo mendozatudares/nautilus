@@ -15,7 +15,7 @@ SECTIONS
         pdpt = .;
         . += 0x1000;
         pd = .;
-        . += 0x1000; 
+        . += 0x4000; /* room to map 4 GB at PD level */
 
         boot_stack_start = .;
         . += 0x200000;  /* we start out with a 2M stack */
@@ -105,9 +105,14 @@ SECTIONS
         __stop_aspace_impls = .;
     }
     
-    
+    .alloc_impls ALIGN(0x1000) : AT(ADDR(.aspace_impls)+SIZEOF(.aspace_impls))
+    {
+        __start_alloc_impls = .;
+        *(.alloc_impls*);
+        __stop_alloc_impls = .;
+   }
 
-   .tdata  ALIGN(0x1000) : AT(ADDR(.aspace_impls)+SIZEOF(.aspace_impls))
+   .tdata  ALIGN(0x1000) : AT(ADDR(.alloc_impls)+SIZEOF(.alloc_impls))
    {
        _tdata_start = .;
 
@@ -115,7 +120,7 @@ SECTIONS
        . = ALIGN(0x1000);
        _tdata_end = .;
 
-   }
+
   
    _loadEnd = .;
    .tbss : AT(ADDR(.tdata)+SIZEOF(.tdata))

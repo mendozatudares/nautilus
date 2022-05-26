@@ -8,7 +8,7 @@
  * led by Sandia National Laboratories that includes several national 
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
- * http://xtack.sandia.gov/hobbes
+ * http://xstack.sandia.gov/hobbes
  *
  * Copyright (c) 2015, Kyle C. Hale <kh@u.northwestern.edu>
  * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org> 
@@ -52,11 +52,11 @@ ENTRY(nk_thread_switch)
     movq 8(%rsp), %rax   /* save return address */
     movq %rax, -24(%rsp) /* move ret addr down (past intr state holder) */
     leaq 16(%rsp), %rsp  /* we don't want to modify RFLAGS inadvertenly, hence the lea */
+    movq -16(%rsp), %rax  /* restore rax */
     movq %rsp, -16(%rsp) /* save RSP */
     pushq $KERNEL_SS     /* save SS */
     leaq -8(%rsp), %rsp
     pushfq               /* save RFLAGS */
-    movq -8(%rsp), %rax  /* restore rax */
     pushq $KERNEL_CS     /* push CS seg sel */
     subq $16, %rsp        /* point rsp at ret addr */
 
@@ -142,9 +142,14 @@ continue_context_switch:
 #endif
 
 #ifdef NAUT_CONFIG_ASPACES
+    // This is a hack to fix a strange issue where sometimes the stack is aligned differently (8 vs 16 byte).
+    // Notably, this is likely masking a bug somewhere else (possibly in the above assembly)
     push %rax
     movq 24(%rax), %rdi
+    mov %rsp, %r14
+    andq $0xFFFFFFFFFFFFFFF0, %rsp
     call nk_aspace_switch
+    mov %r14, %rsp
     pop %rax
 #endif
 
@@ -166,6 +171,47 @@ continue_context_switch:
 	
     movq %rax, %gs:0x0  /* make it the new current thread */
     movq (%rax), %rsp   /* load its stack pointer */
+
+#ifdef NAUT_CONFIG_SIGNALS
+TL_check_pending_signals:
+    /* TODO MAC: Should we enable interrupts? */
+    pushq %rdi
+    pushq %rsi
+    pushq %rax
+
+    /* Check if signal state is initialized */
+    movq 32(%rax), %rsi
+    testq %rsi, %rsi 
+    jz TL_skip_signal_delivery /* signals aren't ready, skip check */ 
+
+    /* Check if there are pending signals for curr thread */ 
+    movq 0x0(%rsi), %rdi
+    testq %rdi, %rdi
+    jnz TL_deliver_pending_signals /* signals pending for curr thread; jmp to delivery */
+
+    /* Check if there are *shared* pending signals */
+    movq 0x8(%rsi), %rsi
+    movq 0x0(%rsi), %rdi
+    testq %rdi, %rdi
+    jz TL_skip_signal_delivery /* No work to do, just return */
+
+    /* There are pending signals, Put num_sigs into 2nd arg register */
+    TL_deliver_pending_signals:
+    movq %rdi, %rsi
+
+    /* put saved stack pointer into 1st arg register */
+    movq 0x0(%rax), %rdi
+
+    /* Jump into C code, will return here later */
+    callq do_notify_resume
+
+    /* TODO MAC: Disable Interrupts? jump back to is_pending_work? */
+
+TL_skip_signal_delivery:
+    popq %rax
+    popq %rsi
+    popq %rdi
+#endif /* if not enabled, just fall through like usual */
 
 #ifdef NAUT_CONFIG_FPU_SAVE
     /* Restore the FPRs */
@@ -207,6 +253,9 @@ ENTRY(nk_thread_switch_exit_helper)
 
 	// We now mark ourselves as toast for the reaper
 	movl %edx, (%rsi)
+	
+    // Need to align the stack pointer to the same as other thread_switch entrypoints congruent to 16 bytes
+    subq $8, %rsp
 	
 	// At this point, we are racing with the reaper on a different core,
 	// which might take away our stack.  However, we have interrupts

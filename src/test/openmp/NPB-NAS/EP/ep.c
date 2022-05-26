@@ -35,6 +35,8 @@
 #include "../common/npb-C.h"
 #include "npbparams.h"
 #include "../math/nas_math.h"
+#include "../paging_benchmark.h"
+
 /* parameters */
 #include<nautilus/nautilus.h>
 #include<nautilus/shell.h>
@@ -70,12 +72,12 @@ c   not affect the results.
 */
 
 static int program_EP(char *buf, void* priv);
-int program_EP_profile(char *_, void *__);
+static int program_EP_profile(char *_, void *__);
 
 static struct shell_cmd_impl nas_ep_impl = {
     .cmd      = "nas-ep",
     .help_str = "NAS parallel benchmark EP",
-    .handler  = program_EP_profile,
+    .handler  = program_EP,
 };
 nk_register_shell_cmd(nas_ep_impl);
 
@@ -93,6 +95,19 @@ int program_EP_profile(char *_, void *__){
 #endif
 return 0;
 }
+
+#ifdef NAUT_CONFIG_ASPACE_PAGING
+int program_EP_paging(char * _buf, void *_priv){
+    return paging_wrapper(_buf, _priv, &program_EP);
+}
+
+static struct shell_cmd_impl nas_ep_paging_impl = {
+    .cmd      = "nas-ep-paging",
+    .help_str = "NAS parallel benchmark EP with paging",
+    .handler  = program_EP_paging,
+};
+nk_register_shell_cmd(nas_ep_paging_impl);
+#endif
 
 int program_EP(char *buf, void* priv) {
 
@@ -303,4 +318,6 @@ c       vectorizable.
 	printf("Gaussian pairs: %f", timer_read(2));
 	printf("Random numbers: %f", timer_read(3));
     }
+
+    return 0;
 }

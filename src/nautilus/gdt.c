@@ -35,9 +35,11 @@ void set_tss_descriptor(struct tss64_descriptor* entry, void* base,
 
 void setup_tss(struct tss64* tss) {
   memset(tss, 0, sizeof(struct tss64));
-  void* stack = kmem_malloc(IST_SIZE);
+  void* stack = kmem_sys_malloc_specific(IST_SIZE, 0, 0);
   if (!stack) {
     panic("Failed to allocate a stack for TSS\n");
+  } else if (stack > (void*)0x100000000UL) {
+    panic("Allocated interrupt stack outside of lower 4G\n");
   }
   tss->ist1 = (uint64_t)stack + IST_SIZE; // Must offset
   tss->iopb_offset = 0x68;                // Size does not include offset itself

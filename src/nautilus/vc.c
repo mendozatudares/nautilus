@@ -658,7 +658,8 @@ int nk_vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t y)
 
 // display scrolling or explicitly on screen at a given location
 #define INTERRUPT __attribute__((target("no-sse")))
-INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t c) {
+INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t c) 
+{
   if (!vc) { 
     return 0;
   }
@@ -719,7 +720,8 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
 
 // display scrolling or explicitly on screen at a given location
 #define INTERRUPT __attribute__((target("no-sse")))
-INTERRUPT static int _vc_putchar(uint8_t c) {
+INTERRUPT static int _vc_putchar(uint8_t c) 
+{
   struct nk_virtual_console *vc;
   struct nk_thread *t = get_cur_thread();
 
@@ -770,7 +772,8 @@ int nk_vc_putchar(uint8_t c)
 }
 
 #define INTERRUPT __attribute__((target("no-sse")))
-INTERRUPT static int _vc_print_specific(struct nk_virtual_console *vc, char *s) {
+INTERRUPT static int _vc_print_specific(struct nk_virtual_console *vc, char *s) 
+{
   if (!vc) { 
     return 0;
   }

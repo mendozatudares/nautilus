@@ -9,10 +9,13 @@ ISO_NAME:=nautilus.iso
 BIN_NAME:=nautilus.bin
 SYM_NAME:=nautilus.syms
 SEC_NAME:=nautilus.secs
+
+# LLVM IR sources
 BC_NAME:=nautilus.bc
 LL_NAME:=nautilus.ll
-
-
+LL_SIMPLIFY_NAME:=nautilus_simplify.ll
+OPT_LL_NAME:=nautilus_opt.ll
+STRIP_LL_NAME:=nautilus_strip.ll
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -814,12 +817,43 @@ nautilus.asm: $(BIN_NAME)
 	$(OBJDUMP) --disassemble $< > $@
 
 ifdef NAUT_CONFIG_USE_WLLVM
+
 bitcode: $(BIN_NAME)
-	extract-bc $(BIN_NAME) -o $(BC_NAME)
+	# Set up whole kernel bitcode via WLLVM
+	extract-bc $(BIN_NAME) 
+	mv $(BIN_NAME).bc $(BC_NAME) 
 	llvm-dis $(BC_NAME) -o $(LL_NAME)
 
+# KARAT
+karat: ~/CAT/lib/KARAT.so $(LL_NAME) $(BIN_NAME)
+	# Run select loop simplification passes
+	opt -loop-simplify -lcssa -S $(LL_NAME) -o $(LL_SIMPLIFY_NAME)
+	# Run KARAT pass	
+	opt -load $< -karat -fno-restrictions -S $(LL_SIMPLIFY_NAME) -o $(OPT_LL_NAME) > karat.out 2>&1 
+
+ifdef NAUT_CONFIG_USE_NOELLE
+noelle_download:  
+	./scripts/noelle_download.sh "/project/parallelizing_compiler/repositories/noelle" 
+
+karat_noelle: ~/CAT/lib/KARAT.so noelle $(LL_NAME) $(BIN_NAME)
+	# Run Noelle normalization passes 
+	noelle-norm -S $(LL_NAME) -o $(LL_SIMPLIFY_NAME)
+	# Run KARAT pass with Noelle
+	noelle-load -load $< -karat -fno-protections -fno-restrictions -S $(LL_SIMPLIFY_NAME) -o $(OPT_LL_NAME) > karat.out 2>&1 
+endif
+
+final: $(OPT_LL_NAME)
+	# Recompile (with full opt levels) new object files, binaries
+	clang $(CFLAGS) -c $(OPT_LL_NAME) -o .nautilus.o
+	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $(BIN_NAME) -T $(LD_SCRIPT) .nautilus.o `scripts/findasm.pl`
+	rm .nautilus.o
+
+strip: $(OPT_LL_NAME)
+	# Strip debug info from instrumented whole kernel bitcode
+	opt --strip-debug -S $(OPT_LL_NAME) -o $(STRIP_LL_NAME)
+
 ifdef NAUT_CONFIG_USE_WLLVM_WHOLE_OPT
-whole_opt: $(BIN_NAME)  
+whole_opt: $(BIN_NAME) # FIX --- should be deprecated 
 	extract-bc $(BIN_NAME) -o $(BC_NAME)
 	opt -strip-debug $(BC_NAME)
 	clang $(CFLAGS) -c $(BC_NAME) -o .nautilus.o

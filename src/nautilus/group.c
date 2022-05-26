@@ -436,7 +436,13 @@ nk_thread_group_leave(nk_thread_group_t *group) {
 
   spin_unlock(&group->group_lock);
 
-  FREE(leaving_member);
+  /* TODO MAC: Taken out to avoid freeing state we didn't allocate.
+   * Will need to fix later. Basic idea: we alloc in base addr space
+   * and then attempt to free in Carat/Process aspace. Should try to
+   * allocate in carat aspace instead (or free all at once in base
+   * aspace).
+   */
+  //FREE(leaving_member);
 
   thread_group_barrier_leave(&group->group_barrier);
 
@@ -557,4 +563,23 @@ nk_thread_group_broadcast_terminate(nk_thread_group_t *group) {
 uint64_t
 nk_thread_group_get_size(nk_thread_group_t *group) {
   return group->group_size;
+}
+
+// maps a function to all threads within a group
+int
+nk_thread_group_map(nk_thread_group_t *g, int (*cond_function)(struct nk_thread *t, void *s), void *state, uint64_t flags) 
+{
+    struct list_head *l;
+    group_member_t *member;
+    for (int i = 0; i < MAX_CPU_NUM; i++) {
+        l = &g->group_member_array[i];
+        list_for_each_entry(member, l, group_member_node) {
+            DEBUG("find_next(): testing thread %p.\n", member->thread);            
+            if (cond_function(member->thread, state) && (flags & GROUP_MAP_EARLY_RET)) {
+                DEBUG("find_next(): returning early.\n");            
+                return 0;
+            }
+        }
+    }
+    return 0;
 }

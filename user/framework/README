@@ -33,3 +33,9 @@ The code is built similarly to a dark shadow capsule, except
 that stack and heap are managed by Nautilus.   The code must
 be statically linked and position independent. 
 
+
+How to get nld working on your machine:
+1) Change nld-noelle-ubuntu variables to match your machine
+    CRTGEN_DIR= DIRECTORY CONTAINING "crti.o"
+    CRTBE_DIR = DIRECTORY CONTAINING "crtbeginS.o" 
+
