@@ -1,18 +1,18 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xstack.sandia.gov/hobbes
  *
  * Copyright (c) 2015, Kyle C. Hale <kh@u.northwestern.edu>
  * Copyright (c) 2017, Peter A. Dinda <pdinda@northwestern.edu>
- * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org> 
+ * Copyright (c) 2015, The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
@@ -90,14 +90,14 @@ thread_detach (nk_thread_t * t)
     --t->refcount;
 
     // conditional reaping is done by the scheduler when threads are created
-    // this makes the join+exit path much faster in the common case and 
+    // this makes the join+exit path much faster in the common case and
     // bulks reaping events together
     // the user can also explictly reap when needed
-    // plus the autoreaper thread can be enabled 
+    // plus the autoreaper thread can be enabled
     // the following code can be enabled if you want to reap immediately once
     // a thread's refcount drops to zero
-    // 
-    //if (t->refcount==0) { 
+    //
+    //if (t->refcount==0) {
     //   nk_thread_destroy(t);
     //}
 
@@ -109,8 +109,8 @@ thread_detach (nk_thread_t * t)
 
 
 
-static void 
-tls_exit (void) 
+static void
+tls_exit (void)
 {
     nk_thread_t * t = get_cur_thread();
     unsigned i, j;
@@ -118,7 +118,7 @@ tls_exit (void)
 
     for (i = 0; i < MIN_DESTRUCT_ITER; i++) {
         for (j = 0 ; j < TLS_MAX_KEYS; j++) {
-            void * val = (void*)t->tls[j]; 
+            void * val = (void*)t->tls[j];
             if (val && tls_keys[j].destructor) {
                 called = 1;
                 t->tls[j] = NULL;
@@ -136,10 +136,10 @@ tls_exit (void)
 
 
 int
-_nk_thread_init (nk_thread_t * t, 
-		 void * stack, 
-		 uint8_t is_detached, 
-		 int bound_cpu, 
+_nk_thread_init (nk_thread_t * t,
+		 void * stack,
+		 uint8_t is_detached,
+		 int bound_cpu,
 		 int placement_cpu,
 		 nk_thread_t * parent)
 {
@@ -174,7 +174,7 @@ _nk_thread_init (nk_thread_t * t,
     }
 
     // scheduler will handle reanimated thread correctly here
-    if (!(t->sched_state = nk_sched_thread_state_init(t,0))) { 
+    if (!(t->sched_state = nk_sched_thread_state_init(t,0))) {
 	THREAD_ERROR("Could not create scheduler state for thread\n");
 	return -EINVAL;
     }
@@ -187,7 +187,7 @@ _nk_thread_init (nk_thread_t * t,
 #endif
 
     // skip wait queue allocation for a reanimated thread
-    
+
     if (!t->waitq) {
 	t->waitq = nk_wait_queue_create(0);
 	if (!t->waitq) {
@@ -205,8 +205,8 @@ _nk_thread_init (nk_thread_t * t,
     if (t->timer) {
 	snprintf(t->timer->name,NK_TIMER_NAME_LEN,"thread-%lu-timer",t->tid);
     }
-	
-    
+
+
     return 0;
 }
 
@@ -221,7 +221,7 @@ thread_cleanup (void)
 
 /*
  * utility function for setting up
- * a thread's stack 
+ * a thread's stack
  */
 static inline void
 thread_push (nk_thread_t * t, uint64_t x)
@@ -235,6 +235,19 @@ static void
 thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
 {
 
+
+#ifdef NAUT_CONFIG_ARCH_RISCV
+#define GPR_SAVE_SIZE      31*8
+#define GPR_RDI_OFFSET     176
+    if (fun) {
+        thread_push(t, (uint64_t)&thread_cleanup);
+        thread_push(t, (uint64_t)fun);
+        thread_push(t, (uint64_t)0);
+        *(uint64_t*)(t->rsp-GPR_RDI_OFFSET) = (uint64_t)arg;
+        *(uint64_t*)(t->rsp-GPR_SAVE_SIZE)  = (uint64_t)nk_thread_entry;
+    }
+
+#else
 #define RSP_STACK_OFFSET   8
 #define GPR_RDI_OFFSET     48
 #define GPR_RAX_OFFSET     8
@@ -260,14 +273,14 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
     thread_push(t, 0);                                   // intr no
 
     /*
-     * if we have a function, it needs an input argument 
+     * if we have a function, it needs an input argument
      * so we overwrite its RDI
-     */  
+     */
     if (fun) {
-        *(uint64_t*)(t->rsp-GPR_RDI_OFFSET) = (uint64_t)arg; 
+        *(uint64_t*)(t->rsp-GPR_RDI_OFFSET) = (uint64_t)arg;
     }
 
-    /* 
+    /*
      * if this is a thread fork, we return 0 to the child
      * via RAX - note that _fork_return will not restore RAX
      */
@@ -275,6 +288,7 @@ thread_setup_init_stack (nk_thread_t * t, nk_thread_fun_t fun, void * arg)
         *(uint64_t*)(t->rsp-GPR_RAX_OFFSET) = 0;
     }
 
+#endif
     t->rsp -= GPR_SAVE_SIZE;                             // account for the GPRS;
 }
 
@@ -346,11 +360,11 @@ static int hwtls_config_kernel_tls(nk_thread_t *t)
 
 
 
-/* 
+/*
  * nk_thread_create
  *
- * creates a thread. 
- * its stack wil not be initialized with any intial data, 
+ * creates a thread.
+ * its stack wil not be initialized with any intial data,
  * and it will go on the thread list, but it wont be runnable
  *
  * @fun: the function to run
@@ -366,7 +380,7 @@ static int hwtls_config_kernel_tls(nk_thread_t *t)
  *
  */
 int
-nk_thread_create (nk_thread_fun_t fun, 
+nk_thread_create (nk_thread_fun_t fun,
                   void * input,
                   void ** output,
                   uint8_t is_detached,
@@ -387,12 +401,12 @@ nk_thread_create (nk_thread_fun_t fun,
 	// nk_thread_destroy() would otherwise have done
 	nk_thread_brain_wipe(t);
 
-	
+
     } else {
 
 	// failed to reanimate existing dead thread, so we need to
 	// make our own
-    
+
 	t = malloc_specific(sizeof(nk_thread_t),placement_cpu);
 
 	if (!t) {
@@ -412,12 +426,12 @@ nk_thread_create (nk_thread_fun_t fun,
 	    free(t);
 	    return -EINVAL;
 	}
-	
+
     }
-    
+
     // from this point, if we are using a reanimated thread, and
     // we fail, we can safely free the thread the same as we
-    // would if we were newly allocating it.  
+    // would if we were newly allocating it.
 
     if (_nk_thread_init(t, t->stack, is_detached, bound_cpu, placement_cpu, get_cur_thread()) < 0) {
         THREAD_ERROR("Could not initialize thread\n");
@@ -426,7 +440,7 @@ nk_thread_create (nk_thread_fun_t fun,
 
     t->status = NK_THR_INIT;
 
-    // a thread joins its creator's address space 
+    // a thread joins its creator's address space
     t->aspace = get_cur_thread()->aspace;
 
 #ifdef NAUT_CONFIG_HARDWARE_TLS
@@ -452,8 +466,8 @@ nk_thread_create (nk_thread_fun_t fun,
     t->fun = fun;
     t->input = input;
     t->output_loc = output;
-    t->output = 0;    
-    
+    t->output = 0;
+
     // scheduler will handle reanimated thread correctly
     if (nk_sched_thread_post_create(t)) {
 	THREAD_ERROR("Scheduler does not accept thread creation\n");
@@ -472,10 +486,10 @@ out_err:
     if (t->timer) {
 	nk_timer_destroy(t->timer);
     }
-    if (t->waitq) { 
+    if (t->waitq) {
 	nk_wait_queue_destroy(t->waitq);
     }
-    if (t->sched_state) { 
+    if (t->sched_state) {
 	nk_sched_thread_state_deinit(t);
     }
 
@@ -487,7 +501,7 @@ out_err:
 
     // note that VC is not assigned on thread creation
     // so we do not need to clean it up
-    
+
     free(t->stack);
     free(t);
 
@@ -495,10 +509,10 @@ out_err:
 }
 
 
-/* 
+/*
  * nk_thread_start
  *
- * creates a thread and puts it on the specified cpu's run 
+ * creates a thread and puts it on the specified cpu's run
  * queue
  *
  * @fun: the function to run
@@ -508,13 +522,13 @@ out_err:
  *               die immediately when it exits)
  * @stack_size: size of the thread's stack. 0 => let us decide
  * @tid: the opaque pointer passed to the user (output variable)
- * @bound_cpu: cpu on which to bind the thread. CPU_ANY means any CPU 
+ * @bound_cpu: cpu on which to bind the thread. CPU_ANY means any CPU
  *
  *
  * on error, returns -EINVAL, otherwise 0
  */
 int
-nk_thread_start (nk_thread_fun_t fun, 
+nk_thread_start (nk_thread_fun_t fun,
                  void * input,
                  void ** output,
                  uint8_t is_detached,
@@ -547,13 +561,13 @@ int nk_thread_run(nk_thread_id_t t)
   nk_thread_t * newthread = (nk_thread_t*)t;
 
   THREAD_DEBUG("Trying to execute thread %p (tid %lu)", newthread,newthread->tid);
-  
+
   THREAD_DEBUG("RUN: Function: %llu\n", newthread->fun);
   THREAD_DEBUG("RUN: Bound_CPU: %llu\n", newthread->bound_cpu);
   THREAD_DEBUG("RUN: Current_CPU: %llu\n", newthread->current_cpu);
-  
+
   thread_setup_init_stack(newthread, newthread->fun, newthread->input);
-  
+
 
   THREAD_DEBUG("Run thread initialized: %p (tid=%lu) stack=%p size=%lu rsp=%p\n",newthread,newthread->tid,newthread->stack,newthread->stack_size,newthread->rsp);
 
@@ -563,7 +577,7 @@ int nk_thread_run(nk_thread_id_t t)
     nk_fp_save(newthread->fpu_state);
 #endif
 
-  if (nk_sched_make_runnable(newthread, newthread->current_cpu,1)) { 
+  if (nk_sched_make_runnable(newthread, newthread->current_cpu,1)) {
       THREAD_ERROR("Scheduler failed to run thread (%p, tid=%u) on cpu %u\n",
 		  newthread, newthread->tid, newthread->current_cpu);
       return -1;
@@ -571,9 +585,9 @@ int nk_thread_run(nk_thread_id_t t)
 
 #ifdef NAUT_CONFIG_DEBUG_THREADS
   if (newthread->bound_cpu == CPU_ANY) {
-      THREAD_DEBUG("Running thread (%p, tid=%u) on [ANY CPU] current_cpu=%d\n", newthread, newthread->tid,newthread->current_cpu); 
+      THREAD_DEBUG("Running thread (%p, tid=%u) on [ANY CPU] current_cpu=%d\n", newthread, newthread->tid,newthread->current_cpu);
   } else {
-      THREAD_DEBUG("Running thread (%p, tid=%u) on bound cpu %u\n", newthread, newthread->tid, newthread->current_cpu); 
+      THREAD_DEBUG("Running thread (%p, tid=%u) on bound cpu %u\n", newthread, newthread->tid, newthread->current_cpu);
   }
 #endif
  
@@ -603,7 +617,7 @@ int nk_thread_name(nk_thread_id_t tid, char *name)
  * wake all threads that are waiting on me
  *
  */
-void 
+void
 nk_wake_waiters (void)
 {
     nk_thread_t * me  = get_cur_thread();
@@ -628,12 +642,12 @@ void nk_yield()
  *
  * @retval: the value to return to the parent
  *
- * If there is someone waiting on this thread, this 
+ * If there is someone waiting on this thread, this
  * function will wake them up. This will also call
  * any destructors for thread local storage
  *
  */
-void nk_thread_exit (void * retval) 
+void nk_thread_exit (void * retval)
 {
     nk_thread_t * me = get_cur_thread();
     nk_wait_queue_t * wq = me->waitq;
@@ -665,17 +679,17 @@ void nk_thread_exit (void * retval)
 
     // we must not overwrite a previous setting of the output value
     // for example from a fork...
-    if (!me->output) { 
+    if (!me->output) {
 	me->output      = retval;
 	if (me->output_loc) {
 	    *me->output_loc = retval;
 	}
     }
-    
+
     me->status      = NK_THR_EXITED;
 
     // force arch and compiler to do above writes now
-    __asm__ __volatile__ ("mfence" : : : "memory"); 
+    mbarrier();
 
     THREAD_DEBUG("State update complete\n");
 
@@ -686,7 +700,7 @@ void nk_thread_exit (void * retval)
     if (me->timer) {
 	nk_timer_cancel(me->timer);
     }
-    
+
     THREAD_DEBUG("Waiting wakeup complete\n");
 
     me->refcount--;
@@ -709,7 +723,7 @@ void nk_thread_exit (void * retval)
  * @t: the thread to destroy
  *
  */
-void 
+void
 nk_thread_destroy (nk_thread_id_t t)
 {
     nk_thread_t * thethread = (nk_thread_t*)t;
@@ -726,7 +740,7 @@ nk_thread_destroy (nk_thread_id_t t)
 		     thethread, thethread->tid, thethread->name, thethread->num_wait);
     }
 
-    /* remove its own wait queue 
+    /* remove its own wait queue
      * (waiters should already have been notified */
     nk_wait_queue_destroy(thethread->waitq);
 
@@ -734,7 +748,7 @@ nk_thread_destroy (nk_thread_id_t t)
 	// cancel + destroy the timer if it exists
 	nk_timer_destroy(thethread->timer);
     }
-    
+
     nk_sched_thread_state_deinit(thethread);
 
 #ifdef NAUT_CONFIG_ENABLE_BDWGC
@@ -759,7 +773,7 @@ nk_thread_destroy (nk_thread_id_t t)
  * "destroys" a thread without deallocating it so that
  * it can be reused.  This needs to mirror nk_thread_destroy
  *
- * Only threads returned from nk_sched_reanimate() should be 
+ * Only threads returned from nk_sched_reanimate() should be
  * be brain-wiped.   The caller also needs to initialize
  * the thread as normal, except no allocations
  *
@@ -789,13 +803,13 @@ static void nk_thread_brain_wipe(nk_thread_t *t)
     if (t->timer) {
 	nk_timer_cancel(t->timer);
     }
-    
+
     // We do not deinit its scheduler state, since since
     // the scheduler will reuse the state in
     // nk_sched_thread_state_init()
 
     // GC handling must happen - only relevant for
-    // Boehm at this point 
+    // Boehm at this point
 #ifdef NAUT_CONFIG_ENABLE_BDWGC
     nk_gc_bdwgc_thread_state_deinit(thethread);
 #endif
@@ -816,11 +830,11 @@ static void nk_thread_brain_wipe(nk_thread_t *t)
 static int exit_check(void *state)
 {
     volatile nk_thread_t *thethread = (nk_thread_t *)state;
-    
+
     THREAD_DEBUG("exit_check: thread (%lu %s) status is %u\n",thethread->tid,thethread->name,thethread->status);
     return thethread->status==NK_THR_EXITED;
 }
-    
+
 
 /*
  * nk_join
@@ -828,7 +842,7 @@ static int exit_check(void *state)
  * join (wait) on the given thread
  *
  * t: the thread to wait on
- * retval: where the waited-on thread should 
+ * retval: where the waited-on thread should
  *         put its output
  *
  * returns  -EINVAL on error, 0 on success
@@ -856,29 +870,29 @@ nk_join (nk_thread_id_t t, void ** retval)
     thread_detach(thethread);
 
     THREAD_DEBUG("Join completed for thread %lu \"%s\"\n", thethread->tid, thethread->name);
-    
+
     return 0;
 }
-    
 
 
 
 
-/* 
+
+/*
  * nk_join_all_children
  *
  * Join all threads that the current thread
  * has either forked or spawned
  *
- * @func: this function will be called with each 
+ * @func: this function will be called with each
  *        output value generated by this threads
  *        children
  *
  *  returns -EINVAL on error, 0 on success
  *
  */
-int 
-nk_join_all_children (int (*func)(void * res)) 
+int
+nk_join_all_children (int (*func)(void * res))
 {
     nk_thread_t * elm = NULL;
     nk_thread_t * tmp = NULL;
@@ -910,7 +924,7 @@ nk_join_all_children (int (*func)(void * res))
 
 
 
-/* 
+/*
  * nk_set_thread_output
  *
  * @result: the output to set
@@ -923,7 +937,7 @@ nk_set_thread_output (void * result)
     // output written exactly once
     if (!t->output) {
 	t->output = result;
-	if (t->output_loc) { 
+	if (t->output_loc) {
 	    *t->output_loc = result;
 	}
     }
@@ -938,7 +952,7 @@ int nk_thread_change_hw_tls(nk_thread_id_t tid, void *hwtls)
 }
 
 
-/* 
+/*
  * nk_tls_key_create
  *
  * create thread local storage
@@ -981,7 +995,7 @@ nk_tls_key_create (nk_tls_key_t * key, void (*destructor)(void*))
  * returns -EINVAL on error, 0 on success
  *
  */
-int 
+int
 nk_tls_key_delete (nk_tls_key_t key)
 {
     if (likely(key < TLS_MAX_KEYS)) {
@@ -997,7 +1011,7 @@ nk_tls_key_delete (nk_tls_key_t key)
 }
 
 
-/* 
+/*
  * nk_tls_get
  *
  * get the value stored for this key for this
@@ -1009,7 +1023,7 @@ nk_tls_key_delete (nk_tls_key_t key)
  *
  */
 void*
-nk_tls_get (nk_tls_key_t key) 
+nk_tls_get (nk_tls_key_t key)
 {
     nk_thread_t * t;
 
@@ -1022,7 +1036,7 @@ nk_tls_get (nk_tls_key_t key)
 }
 
 
-/* 
+/*
  * nk_tls_set
  *
  * @key: the key to use for index lookup
@@ -1031,13 +1045,13 @@ nk_tls_get (nk_tls_key_t key)
  * returns -EINVAL on error, 0 on success
  *
  */
-int 
+int
 nk_tls_set (nk_tls_key_t key, const void * val)
 {
     nk_thread_t * t;
     unsigned sn;
 
-    if (key >= TLS_MAX_KEYS || 
+    if (key >= TLS_MAX_KEYS ||
         TLS_KEY_AVAIL((sn = tls_keys[key].seq_num))) {
         return -EINVAL;
     }
@@ -1056,21 +1070,21 @@ nk_tls_set (nk_tls_key_t key, const void * val)
  *
  */
 nk_thread_id_t
-nk_get_tid (void) 
+nk_get_tid (void)
 {
     nk_thread_t * t = (nk_thread_t*)get_cur_thread();
     return (nk_thread_id_t)t;
 }
 
 
-/* 
+/*
  * nk_get_parent_tid
  *
  * get this thread's parent tid
  *
  */
 nk_thread_id_t
-nk_get_parent_tid (void) 
+nk_get_parent_tid (void)
 {
     nk_thread_t * t = (nk_thread_t*)get_cur_thread();
     if (t && t->parent) {
@@ -1100,14 +1114,14 @@ nk_get_parent_tid (void)
 // frame is cloned
 #define STACK_CLONE_DEPTH 2
 
-/* 
+/*
  * note that this isn't called directly. It is vectored
  * into from an assembly stub
  *
  * On success, parent gets child's tid, child gets 0
  * On failure, parent gets NK_BAD_THREAD_ID
  */
-nk_thread_id_t 
+nk_thread_id_t
 __thread_fork (void)
 {
     nk_thread_t *parent = get_cur_thread();
@@ -1120,12 +1134,14 @@ __thread_fork (void)
     void         *child_stack;
     uint64_t     rsp;
 
-    __asm__ __volatile__ ( "movq %%rsp, %0" : "=r"(rsp) : : "memory");
+    rsp = (uint64_t) arch_read_sp();
+
+    printk("thread fork rsp = %p\n", rsp);
 
 #ifdef NAUT_CONFIG_ENABLE_STACK_CHECK
-    // now check again after update to see if we didn't overrun/underrun the stack in the parent... 
+    // now check again after update to see if we didn't overrun/underrun the stack in the parent...
     if ((uint64_t)rsp <= (uint64_t)parent->stack ||
-	(uint64_t)rsp >= (uint64_t)(parent->stack + parent->stack_size)) { 
+	(uint64_t)rsp >= (uint64_t)(parent->stack + parent->stack_size)) {
 	THREAD_ERROR("Parent's top of stack (%p) exceeds boundaries of stack (%p-%p)\n",
 		     rsp, parent->stack, parent->stack+parent->stack_size);
 	panic("Detected stack out of bounds in parent during fork\n");
@@ -1135,7 +1151,7 @@ __thread_fork (void)
 
     THREAD_DEBUG("Forking thread from parent=%p tid=%lu stack=%p-%p rsp=%p\n", parent, parent->tid,parent->stack,parent->stack+parent->stack_size,rsp);
 
-#ifdef NAUT_CONFIG_THREAD_OPTIMIZE 
+#ifdef NAUT_CONFIG_THREAD_OPTIMIZE
     THREAD_WARN("Thread fork may function incorrectly with aggressive threading optimizations\n");
 #endif
 
@@ -1146,22 +1162,22 @@ __thread_fork (void)
     // this is the address at which the fork wrapper (nk_thread_fork) stashed
     // the current value of rbp - this must conform to the REG_SAVE model
     // in thread_low_level.S
-    void *rbp_stash_addr = ret0_addr + 10*8; 
+    void *rbp_stash_addr = ret0_addr + 10*8;
 
     // we're being called with a stack not as deep as STACK_CLONE_DEPTH...
     // fail back to a single frame...
     if ((uint64_t)rbp_tos <= (uint64_t)parent->stack ||
-	(uint64_t)rbp_tos >= (uint64_t)(parent->stack + parent->stack_size)) { 
+	(uint64_t)rbp_tos >= (uint64_t)(parent->stack + parent->stack_size)) {
 	THREAD_DEBUG("Cannot resolve %lu stack frames on fork, using just one\n", STACK_CLONE_DEPTH);
         rbp_tos = rbp1;
     }
 
 
-    // from last byte of tos_rbp to the last byte of the stack on return from this function 
+    // from last byte of tos_rbp to the last byte of the stack on return from this function
     // (return address of wrapper)
     // the "launch pad" is added so that in the case where there is no stack frame above the caller
     // we still have the space to fake one.
-    size = (rbp_tos + 8) - ret0_addr + LAUNCHPAD;   
+    size = (rbp_tos + 8) - ret0_addr + LAUNCHPAD;
 
     //THREAD_DEBUG("rbp0=%p rbp1=%p rbp_tos=%p, ret0_addr=%p\n", rbp0, rbp1, rbp_tos, ret0_addr);
 
@@ -1217,8 +1233,8 @@ __thread_fork (void)
 
     THREAD_DEBUG("Fork: parent stashed rbp=%p, rsp=%p child stashed &rbp=%p rbp=%p, rsp=%p\n",
 		 rbp0, rsp, rbp_stash_ptr, *rbp_stash_ptr, t->rsp);
-    
-    
+
+
     // rbp2 we don't care about since we will not not
     // return from the caller in the child, but rather go into the thread cleanup
     *rbp2_ptr = 0x0ULL;
@@ -1229,14 +1245,14 @@ __thread_fork (void)
 
     // now we need to setup the interrupt stack etc.
     // we provide null for thread func to indicate this is a fork
-    thread_setup_init_stack(t, NULL, NULL); 
+    thread_setup_init_stack(t, NULL, NULL);
 
     THREAD_DEBUG("Forked thread initialized: %p (tid=%lu) stack=%p size=%lu rsp=%p\n",t,t->tid,t->stack,t->stack_size,t->rsp);
 
 #ifdef NAUT_CONFIG_ENABLE_STACK_CHECK
     // now check the child before we attempt to run it
     if ((uint64_t)t->rsp <= (uint64_t)t->stack ||
-	(uint64_t)t->rsp >= (uint64_t)(t->stack + t->stack_size)) { 
+	(uint64_t)t->rsp >= (uint64_t)(t->stack + t->stack_size)) {
 	THREAD_ERROR("Child's rsp (%p) exceeds boundaries of stack (%p-%p)\n",
 		     t->rsp, t->stack, t->stack+t->stack_size);
 	panic("Detected stack out of bounds in child during fork\n");
@@ -1250,7 +1266,7 @@ __thread_fork (void)
     nk_fp_save(t->fpu_state);
 #endif
 
-    if (nk_sched_make_runnable(t,t->current_cpu,1)) { 
+    if (nk_sched_make_runnable(t,t->current_cpu,1)) {
 	THREAD_ERROR("Scheduler failed to run thread (%p, tid=%u) on cpu %u\n",
 		    t, t->tid, t->current_cpu);
 	return NK_BAD_THREAD_ID;
@@ -1267,7 +1283,7 @@ __thread_fork (void)
 
 
 
-static void 
+static void
 tls_dummy (void * in, void ** out)
 {
     unsigned i;
@@ -1309,7 +1325,7 @@ tls_dummy (void * in, void ** out)
         THREAD_ERROR("2nd key create failed\n");
         goto out_err;
     }
-    
+
     if (nk_tls_key_delete(keys[0]) != 0) {
         THREAD_ERROR("2nd key delete failed\n");
         goto out_err;
@@ -1322,7 +1338,7 @@ out_err:
 }
 
 
-void 
+void
 nk_tls_test (void)
 {
     nk_thread_start(tls_dummy, NULL, NULL, 1, TSTACK_DEFAULT, NULL, 1);

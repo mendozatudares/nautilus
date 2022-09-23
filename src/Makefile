@@ -1,15 +1,19 @@
-obj-y += \
+obj-$(NAUT_CONFIG_ARCH_X86) += \
 	nautilus/ \
 	arch/ \
-	asm/ \
 	dev/ \
-        fs/  \
-        gc/  \
+	fs/  \
+	gc/  \
 	rt/ \
-        net/ \
+	net/ \
 	acpi/ \
         compat/ \
 	test/ 
+
+obj-$(NAUT_CONFIG_ARCH_RISCV) += \
+	nautilus/ \
+	arch/ \
+	dev/
 
 obj-$(NAUT_CONFIG_CXX_SUPPORT) += cxx/
 obj-$(NAUT_CONFIG_LEGION_RT) += legion_runtime/

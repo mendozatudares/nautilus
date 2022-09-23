@@ -158,6 +158,7 @@ void panic(const char *, ...) __attribute__((noreturn));
 #include <nautilus/barrier.h>
 #include <nautilus/list.h>
 #include <nautilus/numa.h>
+#include <nautilus/devicetree.h>
 
 
 struct ioapic;
@@ -214,6 +215,8 @@ struct sys_info {
 
     struct nk_prog_info * prog_info;
 
+    struct dtb_fdt_header * dtb; /* Device tree binary */
+
 };
 
 struct cmdline_state;
@@ -237,6 +240,9 @@ nk_get_nautilus_info (void)
     return &nautilus_info;
 }
 
+
+
+#include <nautilus/arch.h>
 #ifdef NAUT_CONFIG_XEON_PHI
 #include <arch/k1om/main.h>
 #elif defined NAUT_CONFIG_HVM_HRT
@@ -245,6 +251,8 @@ nk_get_nautilus_info (void)
 #include <arch/x64/main.h>
 #elif defined NAUT_CONFIG_GEM5
 #include <arch/gem5/main.h>
+#elif defined NAUT_CONFIG_RISCV_HOST
+#include <arch/riscv/main.h>
 #else
 #error "Unsupported architecture"
 #endif

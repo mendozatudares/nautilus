@@ -50,6 +50,7 @@
 */
 
 #include <nautilus/nautilus.h>
+#include <nautilus/arch.h>
 #include <nautilus/thread.h>
 #include <nautilus/waitqueue.h>
 #include <nautilus/task.h>
@@ -368,10 +369,10 @@ typedef struct nk_sched_percpu_state {
 } rt_scheduler;
 
 #if INSTRUMENT
-#define INST_SCHED_IN(WHAT)  uint64_t _inst_start = rdtsc()
+#define INST_SCHED_IN(WHAT)  uint64_t _inst_start = arch_read_timestamp()
 #define INST_SCHED_OUT(WHAT)						\
 {									\
-	uint64_t inst_diff = rdtsc() - _inst_start;			\
+	uint64_t inst_diff = arch_read_timestamp() - _inst_start;			\
 	scheduler->WHAT ## _num++;					\
 	scheduler->WHAT##_sum+=inst_diff;				\
 	scheduler->WHAT##_sum2+=inst_diff*inst_diff;			\
@@ -1966,7 +1967,6 @@ static void rt_thread_dump(rt_thread *thread, char *pre)
 static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
 {
     struct sys_info *sys = per_cpu_get(system);
-    struct apic_dev *apic = sys->cpus[my_cpu_id()]->apic;
 
     uint64_t next_arrival = -1; //big num
     uint64_t next_preempt = -1; //big num
@@ -2008,8 +2008,7 @@ static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
     // which is the start of the scheduling pass.   We need to set
     // the cycle counter delay based on the set time relative 
     // to the *current time*
-    uint32_t ticks = apic_realtime_to_ticks(apic,  
-					    scheduler->tsc.set_time - cur_time() + scheduler->slack);
+    uint32_t ticks = arch_realtime_to_ticks(scheduler->tsc.set_time - cur_time() + scheduler->slack);
 
     
     if (cur_time() >= scheduler->tsc.set_time) {
@@ -2023,11 +2022,9 @@ static void set_timer(rt_scheduler *scheduler, rt_thread *thread, uint64_t now)
     }
 
     //    DEBUG("Setting timer to at most %llu ns (%llu ticks)\n",scheduler->tsc.set_time - now + scheduler->slack,
-    //	  apic_realtime_to_ticks(apic, scheduler->tsc.set_time - now + scheduler->slack));
+    //	  arch_realtime_to_ticks(arch, scheduler->tsc.set_time - now + scheduler->slack));
 
-    apic_update_oneshot_timer(apic, 
-			      ticks,
-			      IF_EARLIER);
+    arch_update_timer(ticks, IF_EARLIER);
 			      
 
 }
@@ -2047,7 +2044,7 @@ static inline void set_interrupt_priority(rt_thread *t)
 #else
     // if we are not using the interrupt thread model, then use the 
     // interrupt priority class selected by the thread itself
-    write_cr8((uint64_t)t->constraints.interrupt_priority_class);
+    // write_cr8((uint64_t)t->constraints.interrupt_priority_class);
 #endif
 }
 
@@ -2196,7 +2193,7 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
 	    // everyone's now restarted
 	    // if we got here due to the world stopper's kick
 	    // we should avoid running the scheduler
-	    if (!force_resched && !per_cpu_get(system)->cpus[my_cpu_id()]->apic->in_timer_interrupt) {
+	    if (!force_resched && !get_cpu()->in_timer_interrupt) {
 		DEBUG("Resuming from world stop without scheduling pass\n");
 		NK_GPIO_OUTPUT_MASK(~0x4,GPIO_AND);
 		return 0;
@@ -2211,19 +2208,19 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
 	if (force_resched) {
 	    DEBUG("Forced reschedule with preemption off\n");
 	} else {
-	    struct apic_dev *a = per_cpu_get(system)->cpus[my_cpu_id()]->apic;
+			struct cpu *c = get_cpu();
 	    DEBUG("Preemption disabled, avoiding rescheduling pass and staying with current thread\n");
 
-	    if (a->in_timer_interrupt || a->in_kick_interrupt) {
+	    if (c->in_timer_interrupt || c->in_kick_interrupt) {
 		// We are about to lose a timer interrupt
 		// and we need to reinject it so that it shows up again
 		DEBUG("Reinjecting timer: in_timer=%d, in_kick=%d\n", 
-		      a->in_timer_interrupt, a->in_kick_interrupt);
+		      c->in_timer_interrupt, c->in_kick_interrupt);
 		//BACKTRACE(DEBUG,3);
-		apic_update_oneshot_timer(a, 
-					  apic_realtime_to_ticks(a, NAUT_CONFIG_INTERRUPT_REINJECTION_DELAY_NS),
-					  IF_EARLIER);
-		per_cpu_get(system)->cpus[my_cpu_id()]->sched_state->reinject_count++;
+        arch_update_timer(
+                      arch_realtime_to_ticks(NAUT_CONFIG_INTERRUPT_REINJECTION_DELAY_NS), 
+                      IF_EARLIER);
+		c->sched_state->reinject_count++;
 	    }
 	    // do not context switch
 	    NK_GPIO_OUTPUT_MASK(~0x4,GPIO_AND);
@@ -2262,8 +2259,8 @@ INTERRUPT struct nk_thread *_sched_need_resched(int have_lock, int force_resched
     int yielding = rt_c->status==YIELDING;
     int idle = rt_c->thread->is_idle;
     int timed_out = scheduler->tsc.set_time < now;  
-    int apic_timer = apic->in_timer_interrupt;
-    int apic_kick = apic->in_kick_interrupt;
+    int apic_timer = get_cpu()->in_timer_interrupt;
+    int apic_kick = get_cpu()->in_kick_interrupt;
 
     // "SPECIAL" means the current task is not to be enqueued
 #define CUR_IS_SPECIAL (going_to_sleep || going_to_exit || changing)
@@ -3419,10 +3416,8 @@ static inline void rt_thread_update_aperiodic(rt_thread *t, rt_scheduler *schedu
 // in nanoseconds
 static uint64_t cur_time()
 {
-    struct sys_info *sys = per_cpu_get(system);
-    struct apic_dev *apic = sys->cpus[my_cpu_id()]->apic;
-    uint64_t c = rdtsc();
-    uint64_t t = apic_cycles_to_realtime(apic, c);
+    uint64_t c = arch_read_timestamp();
+    uint64_t t = arch_cycles_to_realtime(c);
     return t;
 }
 
@@ -4346,7 +4341,7 @@ static void interrupt(void *in, void **out)
 	DEBUG("Interrupt thread halting\n");
 	// we will be woken from this halt at least by the 
 	// timer interrupt at the end of our current slice
-	__asm__ __volatile__ ("hlt");
+    arch_halt();
 	DEBUG("Interrupt thread awoke from halt (interrupt occurred)\n");
     }
 }
@@ -4524,7 +4519,7 @@ static int shared_init(struct cpu *my_cpu, struct nk_sched_config *cfg)
 #endif
 
     // reset local cycle count - this will be synchronized later
-    msr_write(IA32_TIME_STAMP_COUNTER,0);
+    // msr_write(IA32_TIME_STAMP_COUNTER,0);
 
     irq_enable_restore(flags);
 
@@ -4646,12 +4641,15 @@ void nk_sched_start()
 
     DEBUG("Scheduler startup - %s\n", my_cpu->is_bsp ? "bsp" : "ap");
 
+    // TODO: multicore scheduling for RISC-V port
+#ifndef NAUT_CONFIG_ARCH_RISCV
     // barrier for all the schedulers
     __sync_fetch_and_add(&sync_count,1);
     while (sync_count < num_cpus) {
 	// spin
     }
-    cur_cycles = rdtsc();
+#endif
+    cur_cycles = arch_read_timestamp();
     if (my_cpu->is_bsp) { 
 	// everyone has started their local tsc at 0
 	// we will now use the BSP tsc, which has advanced
@@ -4664,13 +4662,13 @@ void nk_sched_start()
 	}
     }
 
-    msr_write(IA32_TIME_STAMP_COUNTER,tsc_start);
+    // msr_write(IA32_TIME_STAMP_COUNTER,tsc_start);
 
-    cur_cycles = rdtsc();
+    cur_cycles = arch_read_timestamp();
 
     my_cpu->sched_state->tsc.sync_time_cycles = cur_cycles;
 
-    my_cpu->sched_state->tsc.sync_time = apic_cycles_to_realtime(apic,cur_cycles);
+    my_cpu->sched_state->tsc.sync_time = arch_cycles_to_realtime(cur_cycles);
 
     DEBUG("Time restarted at %lu cycles (currently %lu cycles / %lu ns)\n", tsc_start, cur_cycles, my_cpu->sched_state->tsc.sync_time);
 
@@ -4751,7 +4749,7 @@ nk_sched_init(struct nk_sched_config *cfg)
 
     //timing_test(1000000,1000000,1);
     //INFO("Hanging\n");
-    //while (1) { asm("hlt"); }
+    //while (1) { arch_halt(); }
 
     if (init_global_state()) { 
 	ERROR("Could not initialize global scheduler state\n");
@@ -4786,18 +4784,18 @@ static void timing_test(uint64_t N, uint64_t M, int print)
     INFO("Beginning timing test (%lu calls to loop of %lu iterations)\n",M,N);
   }
 
-  begin = rdtsc();
+  begin = arch_read_timestamp();
   for (i=0;i<M;i++) { 
     //    INFO("Loop %lu\n", i);
-    start = rdtsc();
+    start = arch_read_timestamp();
     nk_simple_timing_loop(N);
-    dur = rdtsc() - start;
+    dur = arch_read_timestamp() - start;
     if (dur>max) { max=dur; }
     if (dur<min) { min=dur; }
     sum += dur;
     sum2 += dur*dur;
   }
-  totaldur = rdtsc()-begin;
+  totaldur = arch_read_timestamp()-begin;
 
   if (print) {
     INFO("Timing test done - stats follow\n");

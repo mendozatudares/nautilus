@@ -29,6 +29,9 @@ The concept of CARAT CAKE is to replace paging with a system that can operate us
 - [Building](#building)
 - [Using QEMU](#using-qemu)
 - [Using BOCHS](#using-bochs)
+- [Using Gem5](#using-gem5)
+- [Rapid Development](#rapid-development)
+- [RISC-V Development](#risc-v-development)
 - [Resources](#resources)
 - [Maintainers](#maintainers)
 - [License](#license)
@@ -203,6 +206,140 @@ com1: enabled=1, mode=file, dev=serial.out
 cpu: count=2
 cpuid: level=6, mmx=1, level=6, x86_64=1, 1g_pages=1
 megs: 2048
+```
+
+## Using Gem5
+
+You can configure and build Nautilus for execution in the [Gem5
+architectural simulator](http://gem5.org).  Note that Gem5 is very
+slow.  Simulated time is 2-3 orders of magnitude slower than
+real-time.  If you care about interaction, and not simulation
+accuracy, configure Nautilus to override the APIC timing calibration
+results, a suboption under the Gem5 target architecture.  Once you
+have built the kernel for the Gem5 target architecture, you can copy
+`nautilus.bin` to `~gem5/binaries`, and run it using Gem5's example full
+system configuration (`~gem5/configs/example/fs.py`), like this (for two
+cpus):
+
+```Shell
+$> cd ~gem5
+$> build/X86/gem5.opt -d run.out configs/example/fs.py -n 2
+```
+
+Nautilus on Gem5 follows Gem5's boot model for Linux.  If you don't
+want to change anything, just symlink `binaries/nautilus.bin` as the
+linux kernel executable the example config expects.  Alternatively,
+you can modify the config like this, or do something similar in your
+own config:
+
+```
+     test_sys = makeLinuxX86System(...)
++++  test_sys.kernel = binary('nautilus.bin')
+```
+
+Once Gem5 is running, you can debug Nautilus in the following
+Gem5-standard ways:
+
+```Shell
+$> telnet localhost 3456  # access serial0 / com1
+```
+
+```GDB
+gdb binaries/nautilus.bin
+(gdb) target remote localhost:7000 # attach debugger to cpu 0
+(gdb) set architecture i386:x86-64
+(gdb) ...
+```
+
+Note that if you want to interact with Nautilus running on Gem5, you
+will need to use the virtual console on a char device (`serial0`) to
+do so.   If you don't want to interact, please see the `autoexec.bat`
+startup script feature in `src/arch/gem5/init.c`.
+
+## Rapid Development
+
+If you'd like to get started quickly with development, a good way is to use 
+[Vagrant](https://www.vagrantup.com/). We've provided a `Vagrantfile` in
+the top-level Nautilus directory for provisioning a Vagrant VM which has
+pretty much everything you need to develop and run Nautilus. This setup
+currently only works for VMWare Fusion/Desktop (which requires the paid Vagrant
+VMWare provider). We hope to get this working for VirtualBox, and perhaps AWS
+soon. If you already have Vagrant installed, to get started you can do the
+following from the top-level Nautilus directory:
+
+```Shell
+$> vagrant up
+```
+
+This will run for several minutes and provision a VM with all the required
+packages. It will automatically clone the latest version of Nautilus and build
+it. To connect to the VM, you can ssh into it, and immediately start running
+Nautilus. There is a demo put in the VM's nautilus directory which will boot
+Nautilus in QEMU with a virtual console on a serial port and the QEMU monitor in
+another `tmux` pane:
+
+```Shell
+$> vagrant ssh
+[vagrant@localhost] cd nautilus
+[vagrant@localhost] . ./demo
+```
+
+## RISC-V Development
+
+If you'd like to check out building and running Nautilus in an emulated RISC-V
+environment using QEMU, we've provided some steps below you may follow to get
+started. Note that this is an experimental and incomplete port from x86_64 to
+RISC-V.
+
+The first step would be to install a compatiable version of QEMU to emulate the
+RISC-V machine. We've tested this port on version 5.0.0:
+
+```Shell
+$> git clone https://github.com/qemu/qemu
+$> cd qemu
+$> git checkout v5.0.0
+$> ./configure --target-list=riscv64-softmmu
+$> make -j $(nproc)
+$> sudo make install
+```
+
+This will install a custom version of QEMU that you should then be able to call
+using `qemu-system-riscv64`. Next, you'll need to install the [RISC-V GNU
+Compiler Toolchain](https://github.com/riscv/riscv-gnu-toolchain). We've used
+the Newlib cross-compiler:
+
+```Shell
+$> sudo mkdir -p /opt/riscv
+$> git clone https://github.com/riscv/riscv-gnu-toolchain
+$> cd riscv-gnu-toolchain
+$> ./configure --prefix=/opt/riscv
+$> make
+```
+
+This will run for several minutes and build the entire RISC-V Newlib cross-compiler.
+Once complete, add `/opt/riscv/bin` to your `PATH` and you should
+now be able to call `riscv64-unknown-elf-gcc` and its cousins.
+
+Next, you'll need to configure with `make menuconfig`. Under Platform and Target
+Selection, choose `RISC-V 64-bit Host` and under Build, set Toolchain Root to
+`/opt/riscv/riscv64-unknown-elf/bin`. There is also an example config that you
+may use with the following command:
+
+```Shell
+$> cp configs/cs446-s21-riscv-config .config
+```
+
+You should then be able to build and run Nautilus for RISC-V. Try this:
+
+```Shell
+$> ARCH=riscv CROSS_COMPILE=riscv64-unknown-elf- make -j
+$> qemu-system-riscv64 -kernel nautilus.bin \
+                       -m 256M \
+                       -smp 1 \
+                       -machine virt \
+                       -bios none \
+                       -nographic \
+                       -gdb tcp::1234 \
 ```
 
 ## Resources

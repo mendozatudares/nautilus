@@ -1,11 +1,11 @@
-/* 
+/*
  * This file is part of the Nautilus AeroKernel developed
- * by the Hobbes and V3VEE Projects with funding from the 
- * United States National  Science Foundation and the Department of Energy.  
+ * by the Hobbes and V3VEE Projects with funding from the
+ * United States National  Science Foundation and the Department of Energy.
  *
  * The V3VEE Project is a joint project between Northwestern University
  * and the University of New Mexico.  The Hobbes Project is a collaboration
- * led by Sandia National Laboratories that includes several national 
+ * led by Sandia National Laboratories that includes several national
  * laboratories and universities. You can find out more at:
  * http://www.v3vee.org  and
  * http://xstack.sandia.gov/hobbes
@@ -13,7 +13,7 @@
  * Copyright (c) 2016, Peter Dinda
  * Copyright (c) 2016, Yang Wu, Fei Luo and Yuanhui Yang
  * Copyright (c) 2017, Kyle C. Hale
- * Copyright (c) 2016, The V3VEE Project  <http://www.v3vee.org> 
+ * Copyright (c) 2016, The V3VEE Project  <http://www.v3vee.org>
  *                     The Hobbes Project <http://xstack.sandia.gov/hobbes>
  * All rights reserved.
  *
@@ -49,7 +49,7 @@
 
 #ifndef NAUT_CONFIG_DEBUG_VIRTUAL_CONSOLE
 #undef DEBUG_PRINT
-#define DEBUG_PRINT(fmt, args...) 
+#define DEBUG_PRINT(fmt, args...)
 #endif
 
 #define ERROR(fmt, args...) ERROR_PRINT("vc: " fmt, ##args)
@@ -81,7 +81,7 @@ static struct nk_virtual_console *cur_vc = NULL;
 // Typically used VCs
 static struct nk_virtual_console *default_vc = NULL;
 static struct nk_virtual_console *log_vc = NULL;
-static struct nk_virtual_console *list_vc = NULL; 
+static struct nk_virtual_console *list_vc = NULL;
 
 // We can have any number of chardev consoles
 // each of which has a current vc
@@ -141,7 +141,7 @@ struct nk_virtual_console * nk_get_cur_vc()
     return cur_vc;
 }
 
-static inline void copy_display_to_vc(struct nk_virtual_console *vc) 
+static inline void copy_display_to_vc(struct nk_virtual_console *vc)
 {
 #ifdef NAUT_CONFIG_X86_64_HOST
   vga_copy_out((void *)vc->BUF,sizeof(vc->BUF));
@@ -154,8 +154,8 @@ static inline void copy_display_to_vc(struct nk_virtual_console *vc)
 #endif
 }
 
-static inline void copy_vc_to_display(struct nk_virtual_console *vc) 
-{ 
+static inline void copy_vc_to_display(struct nk_virtual_console *vc)
+{
 #ifdef NAUT_CONFIG_X86_64_HOST
   vga_copy_in((void*)vc->BUF,sizeof(vc->BUF));
 #endif
@@ -181,15 +181,15 @@ static void vc_timer_callback(void *state)
     nk_timer_reset(vc->timer, VC_TIMER_NS);
     nk_timer_start(vc->timer);
 }
-    
+
 #endif
 
 
-struct nk_virtual_console *nk_create_vc (char *name, 
-					 enum nk_vc_type new_vc_type, 
-					 uint8_t attr, 
+struct nk_virtual_console *nk_create_vc (char *name,
+					 enum nk_vc_type new_vc_type,
+					 uint8_t attr,
 					 struct nk_vc_ops *ops,
-					 void *priv_data) 
+					 void *priv_data)
 {
   STATE_LOCK_CONF;
   int i;
@@ -218,7 +218,7 @@ struct nk_virtual_console *nk_create_vc (char *name,
   snprintf(buf,NK_TIMER_NAME_LEN,"vc-%s-timer",name);
   new_vc->timer = nk_timer_create(buf);
 #endif
-  
+
   // clear to new attr
   for (i = 0; i < VGA_HEIGHT*VGA_WIDTH; i++) {
     new_vc->BUF[i] = vga_make_entry(' ', new_vc->cur_attr);
@@ -229,7 +229,7 @@ struct nk_virtual_console *nk_create_vc (char *name,
   nk_timer_set(new_vc->timer,VC_TIMER_NS,NK_TIMER_CALLBACK,vc_timer_callback,new_vc,0);
   nk_timer_start(new_vc->timer);
 #endif
-  
+
   STATE_LOCK();
   list_add_tail(&new_vc->vc_node, &vc_list);
   STATE_UNLOCK();
@@ -238,12 +238,12 @@ struct nk_virtual_console *nk_create_vc (char *name,
 }
 
 
-static int _switch_to_vc(struct nk_virtual_console *vc) 
+static int _switch_to_vc(struct nk_virtual_console *vc)
 {
   if (!vc) {
     return 0;
   }
-  if (vc!=cur_vc) { 
+  if (vc!=cur_vc) {
     copy_display_to_vc(cur_vc);
     cur_vc = vc;
     copy_vc_to_display(cur_vc);
@@ -258,16 +258,16 @@ static int _switch_to_vc(struct nk_virtual_console *vc)
 
 // destroy the vc, acquiring/releasing  if needed
 // if the lock is already held, release it and restore irq state
-static int _destroy_vc(struct nk_virtual_console *vc, int havelock, uint8_t flags) 
+static int _destroy_vc(struct nk_virtual_console *vc, int havelock, uint8_t flags)
 {
   STATE_LOCK_CONF;
 
-  if (vc->num_threads || !nk_wait_queue_empty(vc->waiting_threads)) { 
+  if (vc->num_threads || !nk_wait_queue_empty(vc->waiting_threads)) {
     ERROR("Cannot destroy virtual console that has threads\n");
     return -1;
   }
 
-  if (vc==cur_vc) { 
+  if (vc==cur_vc) {
     _switch_to_vc(list_vc);
   }
 
@@ -289,7 +289,7 @@ static int _destroy_vc(struct nk_virtual_console *vc, int havelock, uint8_t flag
   return 0;
 }
 
-int nk_destroy_vc(struct nk_virtual_console *vc) 
+int nk_destroy_vc(struct nk_virtual_console *vc)
 {
   return _destroy_vc(vc,0,0);
 }
@@ -298,7 +298,7 @@ int nk_destroy_vc(struct nk_virtual_console *vc)
 int nk_bind_vc(nk_thread_t *thread, struct nk_virtual_console * cons)
 {
   STATE_LOCK_CONF;
-  if (!cons) { 
+  if (!cons) {
     return -1;
   }
   STATE_LOCK();
@@ -310,11 +310,11 @@ int nk_bind_vc(nk_thread_t *thread, struct nk_virtual_console * cons)
 
 //release will destroy vc once the number of binders drops to zero
 //except that the default vc is never destroyed
-int nk_release_vc(nk_thread_t *thread) 
+int nk_release_vc(nk_thread_t *thread)
 {
   STATE_LOCK_CONF;
 
-  if (!thread || !thread->vc) { 
+  if (!thread || !thread->vc) {
     return 0;
   }
 
@@ -336,7 +336,7 @@ int nk_release_vc(nk_thread_t *thread)
   return 0;
 }
 
-int nk_switch_to_vc(struct nk_virtual_console *vc) 
+int nk_switch_to_vc(struct nk_virtual_console *vc)
 {
   int rc;
   STATE_LOCK_CONF;
@@ -344,7 +344,7 @@ int nk_switch_to_vc(struct nk_virtual_console *vc)
   STATE_LOCK();
   rc = _switch_to_vc(vc);
   STATE_UNLOCK();
-  
+
   return rc;
 }
 
@@ -352,7 +352,7 @@ int nk_switch_to_prev_vc()
 {
   struct list_head *cur_node = &cur_vc->vc_node;
   struct nk_virtual_console *target;
-  
+
   if(cur_node->prev == &vc_list) {
     return 0;
   }
@@ -392,7 +392,7 @@ INTERRUPT static int _vc_scrollup_specific(struct nk_virtual_console *vc)
   }
 
   for (i = VGA_WIDTH*(VGA_HEIGHT-1);
-       i < VGA_WIDTH*VGA_HEIGHT; 
+       i < VGA_WIDTH*VGA_HEIGHT;
        i++) {
     vc->BUF[i] = vga_make_entry(' ', vc->fill_attr);
   }
@@ -407,11 +407,11 @@ INTERRUPT static int _vc_scrollup_specific(struct nk_virtual_console *vc)
   return 0;
 }
 
-int nk_vc_scrollup_specific(struct nk_virtual_console *vc) 
+int nk_vc_scrollup_specific(struct nk_virtual_console *vc)
 {
   BUF_LOCK_CONF;
   int rc;
-  if (!vc) { 
+  if (!vc) {
     return 0;
   }
   BUF_LOCK(vc);
@@ -425,10 +425,10 @@ int nk_vc_scrollup()
   int rc=0;
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     rc = _vc_scrollup_specific(vc);
@@ -438,9 +438,9 @@ int nk_vc_scrollup()
   return rc;
 }
 
-static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, uint8_t attr, uint8_t x, uint8_t y) 
+static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, uint8_t attr, uint8_t x, uint8_t y)
 {
-  if (!vc) { 
+  if (!vc) {
     return 0;
   }
 
@@ -465,13 +465,13 @@ static int _vc_display_char_specific(struct nk_virtual_console *vc, uint8_t c, u
   return 0;
 }
 
-static int _vc_display_char(uint8_t c, uint8_t attr, uint8_t x, uint8_t y) 
+static int _vc_display_char(uint8_t c, uint8_t attr, uint8_t x, uint8_t y)
 {
-  struct nk_virtual_console *thread_vc = get_cur_thread()->vc; 
-  if (!thread_vc) { 
+  struct nk_virtual_console *thread_vc = get_cur_thread()->vc;
+  if (!thread_vc) {
     thread_vc = default_vc;
   }
-  if (!thread_vc) { 
+  if (!thread_vc) {
     return 0;
   } else {
     return _vc_display_char_specific(thread_vc,c,attr,x,y);
@@ -483,7 +483,7 @@ int nk_vc_display_char_specific(struct nk_virtual_console *vc,
 {
   int rc = -1;
 
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     rc = _vc_display_char_specific(vc, c, attr, x, y);
@@ -492,15 +492,15 @@ int nk_vc_display_char_specific(struct nk_virtual_console *vc,
   return rc;
 }
 
-int nk_vc_display_char(uint8_t c, uint8_t attr, uint8_t x, uint8_t y) 
+int nk_vc_display_char(uint8_t c, uint8_t attr, uint8_t x, uint8_t y)
 {
   int rc=0;
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     rc = _vc_display_char(c,attr,x,y);
@@ -509,7 +509,7 @@ int nk_vc_display_char(uint8_t c, uint8_t attr, uint8_t x, uint8_t y)
 
   return rc;
 }
-  
+
 
 int nk_vc_display_str_specific(struct nk_virtual_console *vc,
 			       uint8_t *c, uint8_t n, uint8_t attr, uint8_t x, uint8_t y)
@@ -518,7 +518,7 @@ int nk_vc_display_str_specific(struct nk_virtual_console *vc,
   uint16_t i;
   uint16_t limit = (x+(uint16_t)n) > VGA_WIDTH ? VGA_WIDTH : x+(uint16_t)n;
 
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     for (i=0;i<limit;i++) {
@@ -529,17 +529,17 @@ int nk_vc_display_str_specific(struct nk_virtual_console *vc,
   return rc;
 }
 
-int nk_vc_display_str(uint8_t *c, uint8_t n, uint8_t attr, uint8_t x, uint8_t y) 
+int nk_vc_display_str(uint8_t *c, uint8_t n, uint8_t attr, uint8_t x, uint8_t y)
 {
   int rc=0;
   uint16_t i;
   uint16_t limit = (x+(uint16_t)n) > VGA_WIDTH ? VGA_WIDTH : x+(uint16_t)n;
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     for (i=0;i<limit;i++) {
@@ -550,22 +550,22 @@ int nk_vc_display_str(uint8_t *c, uint8_t n, uint8_t attr, uint8_t x, uint8_t y)
 
   return rc;
 }
-  
 
 
-static int _vc_setpos(uint8_t x, uint8_t y) 
+
+static int _vc_setpos(uint8_t x, uint8_t y)
 {
   int rc=0;
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     vc->cur_x = x;
     vc->cur_y = y;
 #ifdef NAUT_CONFIG_X86_64_HOST
-    if (vc==cur_vc) { 
+    if (vc==cur_vc) {
       vga_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
     }
 #endif
@@ -577,26 +577,26 @@ static void _vc_getpos(uint8_t * x, uint8_t * y)
 {
     struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-    if (!vc) { 
+    if (!vc) {
         vc = default_vc;
     }
 
-    if (vc) { 
+    if (vc) {
         if (x) *x = vc->cur_x;
         if (y) *y = vc->cur_y;
     }
 }
 
 
-int nk_vc_setpos(uint8_t x, uint8_t y) 
+int nk_vc_setpos(uint8_t x, uint8_t y)
 {
   int rc=0;
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     rc = _vc_setpos(x,y);
@@ -611,10 +611,10 @@ void nk_vc_getpos(uint8_t * x, uint8_t * y)
 {
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     _vc_getpos(x,y);
@@ -623,15 +623,15 @@ void nk_vc_getpos(uint8_t * x, uint8_t * y)
 }
 
 
-static int _vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t y) 
+static int _vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t y)
 {
   int rc=0;
 
-  if (vc) { 
+  if (vc) {
     vc->cur_x = x;
     vc->cur_y = y;
 #ifdef NAUT_CONFIG_X86_64_HOST
-    if (vc==cur_vc) { 
+    if (vc==cur_vc) {
       vga_set_cursor(cur_vc->cur_x, cur_vc->cur_y);
     }
 #endif
@@ -641,11 +641,11 @@ static int _vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t
 }
 
 
-int nk_vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t y) 
+int nk_vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t y)
 {
   int rc=0;
 
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     rc = _vc_setpos_specific(vc,x,y);
@@ -660,7 +660,7 @@ int nk_vc_setpos_specific(struct nk_virtual_console *vc, uint8_t x, uint8_t y)
 #define INTERRUPT __attribute__((target("no-sse")))
 INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t c) 
 {
-  if (!vc) { 
+  if (!vc) {
     return 0;
   }
 
@@ -669,11 +669,11 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
 	  _vc_display_char_specific(vc, ' ', vc->fill_attr, vc->cur_x, vc->cur_y);
 	  return 0;
   }
-	
+
   if (c == '\n') {
     vc->cur_x = 0;
 #ifdef NAUT_CONFIG_XEON_PHI
-    if (vc==cur_vc) { 
+    if (vc==cur_vc) {
       phi_cons_notify_line_draw(vc->cur_y);
     }
 #endif
@@ -690,9 +690,9 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
 #endif
     }
     return 0;
-  } 
-	
-	
+  }
+
+
   _vc_display_char_specific(vc, c, vc->cur_attr, vc->cur_x, vc->cur_y);
   vc->cur_x++;
   if (vc->cur_x == VGA_WIDTH) {
@@ -708,7 +708,7 @@ INTERRUPT static int _vc_putchar_specific(struct nk_virtual_console *vc, uint8_t
       vc->cur_y--;
     }
   }
-  if (vc==cur_vc) { 
+  if (vc==cur_vc) {
 #ifdef NAUT_CONFIG_X86_64_HOST
     vga_set_cursor(vc->cur_x, vc->cur_y);
 #elif NAUT_CONFIG_XEON_PHI
@@ -729,20 +729,20 @@ INTERRUPT static int _vc_putchar(uint8_t c)
     vc = default_vc;
   }
 
-  if (!vc) { 
+  if (!vc) {
     return 0;
   } else {
     return _vc_putchar_specific(vc,c);
   }
 }
 
-int nk_vc_putchar(uint8_t c) 
+int nk_vc_putchar(uint8_t c)
 {
-  if (nk_vc_is_active()) { 
+  if (nk_vc_is_active()) {
     struct nk_virtual_console *vc;
     struct nk_thread *t = get_cur_thread();
-    
-    if (!t || !(vc = t->vc)) { 
+
+    if (!t || !(vc = t->vc)) {
       vc = default_vc;
     }
     if (vc) {
@@ -774,7 +774,7 @@ int nk_vc_putchar(uint8_t c)
 #define INTERRUPT __attribute__((target("no-sse")))
 INTERRUPT static int _vc_print_specific(struct nk_virtual_console *vc, char *s) 
 {
-  if (!vc) { 
+  if (!vc) {
     return 0;
   }
   while(*s) {
@@ -803,11 +803,11 @@ static int vc_print_specific(struct nk_virtual_console *vc, char *s)
 
 int nk_vc_print(char *s)
 {
-  if (nk_vc_is_active()) { 
+  if (nk_vc_is_active()) {
     struct nk_virtual_console *vc;
     struct nk_thread * t = get_cur_thread();
-    
-    if (!t || !(vc = t->vc)) { 
+
+    if (!t || !(vc = t->vc)) {
       vc = default_vc;
     }
     if (vc) {
@@ -879,12 +879,12 @@ int nk_vc_log(char *fmt, ...)
 
   va_list args;
   int i;
-  
+
   va_start(args, fmt);
   i=vsnprintf(buf,PRINT_MAX,fmt,args);
   va_end(args);
-  
-  if (!log_vc) { 
+
+  if (!log_vc) {
     // no output to screen possible yet
   } else {
     BUF_LOCK_CONF;
@@ -896,20 +896,20 @@ int nk_vc_log(char *fmt, ...)
 #ifdef NAUT_CONFIG_VIRTUAL_CONSOLE_SERIAL_MIRROR
   serial_write(buf);
 #endif
-  
+
   return i;
 }
 
 static int _vc_setattr_specific(struct nk_virtual_console *vc, uint8_t attr)
 {
-  vc->cur_attr = attr; 
+  vc->cur_attr = attr;
   return 0;
 }
 
 
 int nk_vc_setattr_specific(struct nk_virtual_console *vc, uint8_t attr)
 {
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     _vc_setattr_specific(vc,attr);
@@ -924,10 +924,10 @@ int nk_vc_setattr(uint8_t attr)
   struct nk_virtual_console *vc;
   struct nk_thread *t = get_cur_thread();
 
-  if (!t || !(vc = t->vc)) { 
+  if (!t || !(vc = t->vc)) {
     vc = default_vc;
   }
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     _vc_setattr_specific(vc,attr);
@@ -943,18 +943,18 @@ static int _vc_clear_specific(struct nk_virtual_console *vc, uint8_t attr)
 
   vc->cur_attr = attr;
   vc->fill_attr = attr;
-    
+
   for (i = 0; i < VGA_HEIGHT*VGA_WIDTH; i++) {
     vc->BUF[i] = val;
   }
-  
-  if (vc==cur_vc) { 
+
+  if (vc==cur_vc) {
     copy_vc_to_display(vc);
 #ifdef NAUT_CONFIG_XEON_PHI
     phi_cons_notify_redraw();
 #endif
   }
-  
+
   vc->cur_x=0;
   vc->cur_y=0;
   return 0;
@@ -963,7 +963,7 @@ static int _vc_clear_specific(struct nk_virtual_console *vc, uint8_t attr)
 
 int nk_vc_clear_specific(struct nk_virtual_console *vc, uint8_t attr)
 {
-  if (vc) { 
+  if (vc) {
     BUF_LOCK_CONF;
     BUF_LOCK(vc);
     _vc_clear_specific(vc,attr);
@@ -978,14 +978,14 @@ int nk_vc_clear(uint8_t attr)
   struct nk_thread *t = get_cur_thread();
   struct nk_virtual_console *vc;
 
-  if (!t || !(vc = t->vc)) { 
+  if (!t || !(vc = t->vc)) {
     vc = default_vc;
   }
 
-  if (!vc) { 
+  if (!vc) {
     return 0;
   }
-     
+
   BUF_LOCK(vc);
   _vc_clear_specific(vc,attr);
   BUF_UNLOCK(vc);
@@ -995,7 +995,7 @@ int nk_vc_clear(uint8_t attr)
 
 
 // called assuming lock is held
-static inline int next_index_on_queue(enum nk_vc_type type, int index) 
+static inline int next_index_on_queue(enum nk_vc_type type, int index)
 {
   if (type == RAW) {
     return (index + 1) % Scancode_QUEUE_SIZE;
@@ -1008,19 +1008,19 @@ static inline int next_index_on_queue(enum nk_vc_type type, int index)
 }
 
 // called assuming lock is held
-static inline int is_queue_empty(struct nk_virtual_console *vc) 
+static inline int is_queue_empty(struct nk_virtual_console *vc)
 {
   return vc->head == vc->tail;
 }
 
 // called assuming lock is held
-static inline int is_queue_full(struct nk_virtual_console *vc) 
+static inline int is_queue_full(struct nk_virtual_console *vc)
 {
   return next_index_on_queue(vc->type, vc->tail) == vc->head;
 }
 
 // called without lock
-int nk_enqueue_scancode(struct nk_virtual_console *vc, nk_scancode_t scan) 
+int nk_enqueue_scancode(struct nk_virtual_console *vc, nk_scancode_t scan)
 {
   QUEUE_LOCK_CONF;
 
@@ -1039,7 +1039,7 @@ int nk_enqueue_scancode(struct nk_virtual_console *vc, nk_scancode_t scan)
   }
 }
 
-int nk_enqueue_keycode(struct nk_virtual_console *vc, nk_keycode_t key) 
+int nk_enqueue_keycode(struct nk_virtual_console *vc, nk_keycode_t key)
 {
   QUEUE_LOCK_CONF;
 
@@ -1058,7 +1058,7 @@ int nk_enqueue_keycode(struct nk_virtual_console *vc, nk_keycode_t key)
   }
 }
 
-nk_scancode_t nk_dequeue_scancode(struct nk_virtual_console *vc) 
+nk_scancode_t nk_dequeue_scancode(struct nk_virtual_console *vc)
 {
   QUEUE_LOCK_CONF;
 
@@ -1077,7 +1077,7 @@ nk_scancode_t nk_dequeue_scancode(struct nk_virtual_console *vc)
   }
 }
 
-nk_keycode_t nk_dequeue_keycode(struct nk_virtual_console *vc) 
+nk_keycode_t nk_dequeue_keycode(struct nk_virtual_console *vc)
 {
   QUEUE_LOCK_CONF;
 
@@ -1102,7 +1102,7 @@ static int check(void *state)
 
     // this check is done without a lock since user of nk_vc_wait() will
     // do a final check anyway
-    
+
     return !is_queue_empty(vc);
 }
 
@@ -1110,7 +1110,7 @@ void nk_vc_wait()
 {
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
 
@@ -1118,11 +1118,11 @@ void nk_vc_wait()
 }
 
 
-nk_keycode_t nk_vc_get_keycode(int wait) 
+nk_keycode_t nk_vc_get_keycode(int wait)
 {
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
 
@@ -1131,13 +1131,13 @@ nk_keycode_t nk_vc_get_keycode(int wait)
     return NO_KEY;
   }
 
-  while (1) { 
+  while (1) {
     nk_keycode_t k = nk_dequeue_keycode(vc);
-    if (k!=NO_KEY) { 
+    if (k!=NO_KEY) {
       DEBUG("Returning keycode 0x%x\n",k);
       return k;
-    } 
-    if (wait) { 
+    }
+    if (wait) {
       nk_vc_wait();
     } else {
       return NO_KEY;
@@ -1149,10 +1149,10 @@ int nk_vc_getchar_extended(int wait)
 {
   nk_keycode_t key;
 
-  while (1) { 
+  while (1) {
     key = nk_vc_get_keycode(wait);
-    
-    switch (key) { 
+
+    switch (key) {
     case KEY_UNKNOWN:
     case KEY_LCTRL:
     case KEY_RCTRL:
@@ -1194,7 +1194,7 @@ int nk_vc_getchar_extended(int wait)
       break;
     default: {
       int c = key&0xff;
-      if (c=='\r') { 
+      if (c=='\r') {
 	c='\n';
       }
       DEBUG("Regular key 0x%x ('%c')\n", c, c);
@@ -1226,7 +1226,7 @@ start:
 
             if (i < 0) {
                 goto start;
-            } 
+            }
 
             buf[i--] = 0; // kill the prev char
 
@@ -1243,7 +1243,7 @@ start:
             continue;
         }
 
-        if (display) { 
+        if (display) {
             nk_vc_putchar(buf[i]);
             if (notifier && buf[i] != '\n') {
                 notifier(buf, priv, i);
@@ -1267,7 +1267,7 @@ nk_scancode_t nk_vc_get_scancode(int wait)
 {
   struct nk_virtual_console *vc = get_cur_thread()->vc;
 
-  if (!vc) { 
+  if (!vc) {
     vc = default_vc;
   }
 
@@ -1281,7 +1281,7 @@ nk_scancode_t nk_vc_get_scancode(int wait)
     if (s!=NO_SCANCODE) {
       return s;
     }
-    if (wait) { 
+    if (wait) {
       nk_vc_wait();
     } else {
       return NO_SCANCODE;
@@ -1291,20 +1291,24 @@ nk_scancode_t nk_vc_get_scancode(int wait)
 
 static int enqueue_scancode_as_keycode(struct nk_virtual_console *__cur_vc, uint8_t scan)
 {
+#ifdef NAUT_CONFIG_ARCH_RISCV
+  nk_keycode_t key = scan;
+#else
   nk_keycode_t key = kbd_translate(scan);
+#endif
   if(key != NO_KEY) {
     nk_enqueue_keycode(__cur_vc, key);
   }
   return 0;
 }
 
-int nk_vc_handle_keyboard(nk_scancode_t scan) 
+int nk_vc_handle_keyboard(nk_scancode_t scan)
 {
   if (!up) {
     return 0;
   }
   DEBUG("Input: %x\n",scan);
-  switch (cur_vc->type) { 
+  switch (cur_vc->type) {
   case RAW_NOQUEUE:
     DEBUG("Delivering event to console %s via callback\n",cur_vc->name);
     if (cur_vc->ops && cur_vc->ops->raw_noqueue) {
@@ -1325,7 +1329,7 @@ int nk_vc_handle_keyboard(nk_scancode_t scan)
   return 0;
 }
 
-int nk_vc_handle_mouse(nk_mouse_event_t *m) 
+int nk_vc_handle_mouse(nk_mouse_event_t *m)
 {
   if (!up) {
     return 0;
@@ -1359,27 +1363,27 @@ static void list(void *in, void **out)
   int i;
 
 
-  if (!list_vc) { 
+  if (!list_vc) {
     ERROR("No virtual console for list..\n");
     return;
   }
-  
-  if (nk_thread_name(get_cur_thread(),"vc-list")) {   
+
+  if (nk_thread_name(get_cur_thread(),"vc-list")) {
     ERROR_PRINT("Cannot name vc-list's thread\n");
     return;
   }
 
-  if (nk_bind_vc(get_cur_thread(), list_vc)) { 
+  if (nk_bind_vc(get_cur_thread(), list_vc)) {
     ERROR("Cannot bind virtual console for list\n");
     return;
   }
-  
+
   // declare we are up
   __sync_fetch_and_add(&vc_list_inited,1);
 
   while (1) {
     nk_vc_clear(0xf9);
-   
+
     nk_vc_print("List of VCs (space to regenerate, plus for new shell)\n\n");
 
     i=0;
@@ -1389,7 +1393,7 @@ static void list(void *in, void **out)
     }
 
     int c = nk_vc_getchar();
-    
+
     if (c=='+') {
 	new_shell();
 	continue;
@@ -1397,7 +1401,7 @@ static void list(void *in, void **out)
 
     i=0;
     list_for_each(cur,&vc_list) {
-      if (c == (i+'a')) { 
+      if (c == (i+'a')) {
 	nk_switch_to_vc(list_entry(cur,struct nk_virtual_console, vc_node));
 	break;
       }
@@ -1415,11 +1419,22 @@ int nk_switch_to_vc_list()
 static int start_list()
 {
 
-  if (nk_thread_start(list, 0, 0, 1, PAGE_SIZE_4KB, &list_tid, 0)) {
+  if (nk_thread_start(list,
+                      0,
+                      0,
+                      1,
+                      PAGE_SIZE_4KB,
+                      &list_tid,
+#ifdef NAUT_CONFIG_ARCH_RISCV
+                      my_cpu_id()
+#else
+                      0
+#endif
+      )) {
     ERROR("Failed to launch VC list\n");
     return -1;
   }
-  
+
   while (!__sync_fetch_and_add(&vc_list_inited,0)) {
       // wait for vc list to be up
       nk_yield();
@@ -1431,9 +1446,9 @@ static int start_list()
 }
 
 
-static int char_dev_write_all(struct nk_char_dev *dev, 
+static int char_dev_write_all(struct nk_char_dev *dev,
 			      uint64_t count,
-			      uint8_t *src, 
+			      uint8_t *src,
 			      nk_dev_request_type_t type)
 
 {
@@ -1449,16 +1464,16 @@ static int char_dev_write_all(struct nk_char_dev *dev,
 	    left-=cur;
 	}
     }
-    
+
     return 0;
 }
-    
+
 #define MAX_MATCHING_CHARDEV_CONSOLES 64
 
 static void _chardev_consoles_print(struct nk_virtual_console *vc, char *data, uint64_t len)
 {
     struct list_head *cur=0;
-    struct chardev_console *c;    
+    struct chardev_console *c;
     struct chardev_console *matching_cdc[MAX_MATCHING_CHARDEV_CONSOLES];
     int match_count = 0;
     int match_cur;
@@ -1467,7 +1482,7 @@ static void _chardev_consoles_print(struct nk_virtual_console *vc, char *data, u
 
     // search for matching consoles with the global lock held
     // DOING NO OUTPUT AS WE DO SO TO AVOID POSSIBLE DEADLOCK
-    
+
     STATE_LOCK();
 
     list_for_each(cur,&chardev_console_list) {
@@ -1479,12 +1494,12 @@ static void _chardev_consoles_print(struct nk_virtual_console *vc, char *data, u
 	    }
 	}
     }
-    
+
     STATE_UNLOCK();
 
     // now demux the print without the lock held
     // so that recursive invocations (e.g. DEBUG statements) will work
-    
+
     for (match_cur=0;match_cur<match_count;match_cur++) {
 	c = matching_cdc[match_cur];
 
@@ -1494,7 +1509,7 @@ static void _chardev_consoles_print(struct nk_virtual_console *vc, char *data, u
 	    // lock held.   This is technically incorrect on the part
 	    // of the caller, but debugging and other kinds of output
 	    // are all over the place, and may be incrementally introduced
-	    // during debugging. 
+	    // during debugging.
 	    //
 	    // If this happens, a blocking write to a chardev may
 	    // cause a sleep, which would reenable interrupts,
@@ -1510,13 +1525,13 @@ static void _chardev_consoles_print(struct nk_virtual_console *vc, char *data, u
 	    //
 #define NONBLOCKING_OUTPUT_ON_INTERRUPTS_OFF 0
 
-#if NONBLOCKING_OUTPUT_ON_INTERRUPTS_OFF 
+#if NONBLOCKING_OUTPUT_ON_INTERRUPTS_OFF
 #define OUTPUT(cp) ({ if (irqs_enabled()) { char_dev_write_all(c->dev,1,cp,NK_DEV_REQ_BLOCKING); } else { nk_char_dev_write(c->dev,1,cp,NK_DEV_REQ_NONBLOCKING), 0; } })
 #else
 #define OUTPUT(cp) (char_dev_write_all(c->dev,1,cp,NK_DEV_REQ_BLOCKING))
 #endif
-	    
-	    if (data[i]=='\n') { 
+
+	    if (data[i]=='\n') {
 		// translate lf->crlf
 		OUTPUT("\r");
 	    }
@@ -1529,7 +1544,7 @@ static void chardev_consoles_print(struct nk_virtual_console *vc, char *data)
 {
     _chardev_consoles_print(vc,data,strlen(data));
 }
- 
+
 static void chardev_consoles_putchar(struct nk_virtual_console *vc, char data)
 {
     _chardev_consoles_print(vc,&data,1);
@@ -1552,14 +1567,14 @@ static int chardev_console_handle_input(struct chardev_console *c, uint8_t data)
 
 //
 // Commands:
-// 
+//
 //   ``1 = left
 //   ``2 = right
 //   ``3 = vc list
 static void chardev_console(void *in, void **out)
 {
     uint8_t data[3];
-    char myname[80]; 
+    char myname[80];
     uint8_t cur=0;
 
     struct chardev_console *c = (struct chardev_console *)in;
@@ -1569,34 +1584,34 @@ static void chardev_console(void *in, void **out)
     if (!c->dev) {
 	ERROR("Unable to open char device %s - no chardev console started\n",c->name);
 	return;
-    } 
+    }
 
     strcpy(myname,c->name);
     strcat(myname,"-console");
 
-    if (nk_thread_name(get_cur_thread(),myname)) {   
+    if (nk_thread_name(get_cur_thread(),myname)) {
         ERROR_PRINT("Cannot name chardev console's thread\n");
         return;
     }
 
     // declare we are up
     __sync_fetch_and_add(&c->inited,1);
-    
+
 
     char buf[80];
-		
+
     snprintf(buf,80,"\r\n*** Console %s // prev=``1 next=``2 list=``3 ***\r\n",myname);
 
     char_dev_write_all(c->dev,strlen(buf),buf,NK_DEV_REQ_BLOCKING);
 
     snprintf(buf,80,"\r\n*** %s ***\r\n",c->cur_vc->name);
     char_dev_write_all(c->dev,strlen(buf),buf,NK_DEV_REQ_BLOCKING);
-    
+
 
  top:
     cur = 0;
     while (__sync_fetch_and_add(&c->shutdown,0) == 0) {
-	if (nk_char_dev_read(c->dev,1,&data[cur],NK_DEV_REQ_BLOCKING)!=1) { 
+	if (nk_char_dev_read(c->dev,1,&data[cur],NK_DEV_REQ_BLOCKING)!=1) {
 	    cur = 0;
 	    // note that we could get kicked out here if we are being asked
 	    // to shut down, which will be detected once the loop iterates
@@ -1607,16 +1622,16 @@ static void chardev_console(void *in, void **out)
 
 
 	if (cur==0) {
-	    if (data[cur]!='`') { 
+	    if (data[cur]!='`') {
 		chardev_console_handle_input(c,data[0]);
 	    } else {
 		cur++;
 	    }
 	    continue;
-	} 
-	
-	if (cur==1) { 
-	    if (data[cur]!='`') { 
+	}
+
+	if (cur==1) {
+	    if (data[cur]!='`') {
 		chardev_console_handle_input(c,data[0]);
 		chardev_console_handle_input(c,data[1]);
 		cur=0;
@@ -1626,19 +1641,19 @@ static void chardev_console(void *in, void **out)
 	    continue;
 	}
 
-	if (cur==2) { 
+	if (cur==2) {
 	    struct list_head *cur_node = &c->cur_vc->vc_node;
 	    struct list_head *next_node = &c->cur_vc->vc_node;
 	    int do_data=0;
 
 
 	    switch (data[cur]) {
-	    case '1': 
+	    case '1':
                 if (cur_node->prev != &vc_list) {
 		    next_node = cur_node->prev;
                 }
 		break;
-	    case '2': 
+	    case '2':
                 if (cur_node->next != &vc_list) {
 		    next_node = cur_node->next;
                 }
@@ -1650,7 +1665,7 @@ static void chardev_console(void *in, void **out)
 		char which;
 		strcpy(buf,"\r\nList of VCs (+ = new shell)\r\n\r\n");
 		char_dev_write_all(c->dev,strlen(buf),buf,NK_DEV_REQ_BLOCKING);
-		// ideally this would be done with the state lock held... 
+		// ideally this would be done with the state lock held...
 		i=0;
 		list_for_each(cur_local_vc,&vc_list) {
 		    snprintf(buf,80,"%c : %s\r\n", 'a'+i, list_entry(cur_local_vc,struct nk_virtual_console, vc_node)->name);
@@ -1659,7 +1674,7 @@ static void chardev_console(void *in, void **out)
 		}
 		// get user input
 		while (1) {
-		    if (nk_char_dev_read(c->dev,1,&which,NK_DEV_REQ_BLOCKING)!=1) { 
+		    if (nk_char_dev_read(c->dev,1,&which,NK_DEV_REQ_BLOCKING)!=1) {
 			// a disconnect at this point should kick us back to the top
 			// to check for a shutdown
 			goto top;
@@ -1675,7 +1690,7 @@ static void chardev_console(void *in, void **out)
 		} else {
 		    i=0;
 		    list_for_each(cur_local_vc,&vc_list) {
-			if (which == (i+'a')) { 
+			if (which == (i+'a')) {
 			    next_node = cur_local_vc;
 			    break;
 			}
@@ -1703,7 +1718,7 @@ static void chardev_console(void *in, void **out)
 		char_dev_write_all(c->dev,strlen(buf),buf,NK_DEV_REQ_BLOCKING);
 
 	    }
-	    
+
 	    cur = 0;
 
 	    continue;
@@ -1719,8 +1734,8 @@ static void chardev_console(void *in, void **out)
 int nk_vc_start_chardev_console(char *chardev)
 {
     struct chardev_console *c = malloc(sizeof(*c));
-				       
-    if (!c) { 
+
+    if (!c) {
 	ERROR("Cannot allocate chardev console for %s\n",chardev);
 	return -1;
     }
@@ -1738,12 +1753,12 @@ int nk_vc_start_chardev_console(char *chardev)
 	free(c);
 	return -1;
     }
-    
+
     while (!__sync_fetch_and_add(&c->inited,0)) {
 	nk_yield();
 	// wait for console thread to start
     }
-    
+
     STATE_LOCK_CONF;
 
     STATE_LOCK();
@@ -1751,7 +1766,7 @@ int nk_vc_start_chardev_console(char *chardev)
     STATE_UNLOCK();
 
     INFO("chardev console %s launched\n",c->name);
-    
+
     return 0;
 }
 
@@ -1776,10 +1791,10 @@ int nk_vc_stop_chardev_console(char *chardev)
     if (found) {
 	list_del_init(&c->chardev_node);
     }
-    
+
     STATE_UNLOCK();
 
-    if (found) { 
+    if (found) {
 	__sync_fetch_and_or(&c->shutdown,1);
 	// kick it to make sure it sees the shutdown
 	nk_dev_signal((struct nk_dev *)(c->dev));
@@ -1791,10 +1806,10 @@ int nk_vc_stop_chardev_console(char *chardev)
 
     return 0;
 }
-				       
 
 
-int nk_vc_init() 
+
+int nk_vc_init()
 {
   INFO("init\n");
   spinlock_init(&state_lock);
@@ -1812,7 +1827,7 @@ int nk_vc_init()
     ERROR("Cannot create log console...\n");
     return -1;
   }
-  
+
 
   list_vc = nk_create_vc("vc-list", COOKED, 0xf9, 0, 0);
   if(!list_vc) {
@@ -1820,14 +1835,14 @@ int nk_vc_init()
     return -1;
   }
 
-  if (start_list()) { 
+  if (start_list()) {
     ERROR("Cannot create vc list thread\n");
     return -1;
   }
 
   cur_vc = default_vc;
   copy_display_to_vc(cur_vc);
-  
+
 #ifdef NAUT_CONFIG_X86_64_HOST
   vga_get_cursor(&(cur_vc->cur_x),&(cur_vc->cur_y));
   vga_init_screen();
@@ -1854,7 +1869,7 @@ int nk_vc_deinit()
   cur_vc = 0;
 
   list_for_each(cur,&vc_list) {
-    if (nk_destroy_vc(list_entry(cur,struct nk_virtual_console, vc_node))) { 
+    if (nk_destroy_vc(list_entry(cur,struct nk_virtual_console, vc_node))) {
       ERROR("Failed to destroy all VCs\n");
       return -1;
     }

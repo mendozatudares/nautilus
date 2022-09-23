@@ -626,7 +626,7 @@ void _doprnt (register const char * fmt,
 		    static char digits[] = "0123456789abcdef";
 		    char *prefix = 0;
 
-		    if (truncate) u = (long)((int)(u));
+		    if (truncate) u = (unsigned long)((unsigned int)(u));
 
             /* KCH: if we get passed 0 */
             if (!base) {

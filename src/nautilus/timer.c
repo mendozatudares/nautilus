@@ -285,7 +285,7 @@ int nk_timer_wait(nk_timer_t *t)
            DEBUG("going to sleep on wait queue timer %p %s waitqueue %p %s \n", t, t->name, t->waitq, t->waitq->name);
 	    nk_wait_queue_sleep_extended(t->waitq, check, t);
 	} else {
-	    asm volatile ("pause");
+           pause();
 	}
 	//DEBUG("try again\n");
     }
@@ -353,12 +353,12 @@ int nk_delay(uint64_t ns) { return _sleep(ns,1); }
 uint64_t nk_timer_handler (void)
 {
     uint32_t my_cpu = my_cpu_id();
-    
+#ifdef NAUT_CONFIG_ARCH_X86
     if (my_cpu!=0) {
 	//DEBUG("update: cpu %d - ignored/infinity\n",my_cpu);
 	return -1;  // infinitely far in the future
     }
-
+#endif
     ACTIVE_LOCK_CONF;
     nk_timer_t *cur, *temp;
     uint64_t now = nk_sched_get_realtime();
@@ -440,8 +440,11 @@ uint64_t nk_timer_handler (void)
     //DEBUG("update: earliest is %llu\n",earliest);
 
     now = nk_sched_get_realtime();
-    
+#ifdef NAUT_CONFIG_ARCH_RISCV
+    return earliest != -1 ? earliest > now ? earliest-now : 0 : 0;
+#else
     return earliest > now ? earliest-now : 0;
+#endif
 }
 
 

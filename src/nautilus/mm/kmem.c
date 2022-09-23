@@ -338,7 +338,7 @@ kmem_add_memory (struct mem_region * mem,
      * buddy_free() will coalesce these chunks as appropriate
      */
 
-    uint64_t max_chunk_size = base_addr ? 1ULL << __builtin_ctzl(base_addr) : size;
+    uint64_t max_chunk_size = base_addr ? 1ULL << ctz(base_addr) : size;
     uint64_t chunk_size = max_chunk_size < size ? max_chunk_size : size;
     uint64_t chunk_order = ilog2(chunk_size); // floor
     uint64_t num_chunks = size/chunk_size; // floor

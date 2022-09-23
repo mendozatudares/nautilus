@@ -3,21 +3,43 @@ mainmenu "Nautilus AeroKernel Configuration"
 
 menu "Platform"
 
+
+		config ARCH_X86
+			bool
+
+		config ARCH_RISCV
+			bool
+
+		config ARCH_ARM64
+			bool
+
     choice
-        prompt "Target Selection"
+        prompt "Platform Selection"
         default X86_64_HOST
 
         config X86_64_HOST
             bool "x86_64 Host (including Intel Xeon Phi KNL)"
+						select ARCH_X86
 
         config XEON_PHI
             bool "Intel Xeon Phi Accelerator (KNC)"
+						select ARCH_X86
     
         config HVM_HRT
             bool "Hybrid Runtime AeroKernel (HRT for HVM/Multiverse)"
+						select ARCH_X86
 
         config GEM5
             bool "GEM5-compatible x86_64 kernel"
+						select ARCH_X86
+
+        config RISCV_HOST
+            bool "Generic RISC-V 64-bit Host"
+						select ARCH_RISCV
+
+        config ARM64_GENERIC
+            bool "Generic ARM64 host (qemu-virt machine)"
+						select ARCH_ARM64
 
         config GEM5_FORCE_APIC_TIMER_CALIBRATION
 	    depends on GEM5

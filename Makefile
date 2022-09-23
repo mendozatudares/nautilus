@@ -179,8 +179,11 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/  )
 # Alternatively CROSS_COMPILE can be set in the environment.
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
-
 ARCH		?= $(SUBARCH)
+
+
+
+
 CROSS_COMPILE	?= 
 #CROSS_COMPILE	?= /home/kyle/opt/cross/bin/x86_64-elf-
 
@@ -283,12 +286,25 @@ include  $(srctree)/scripts/Kbuild.include
 
 # Make variables (CC, etc...)
 
+#
+# Include .config early so that we have access to the toolchain-related options
+#
+ifeq (,$(wildcard .config))
+   NAUT_CONFIG_USE_GCC=1
+   NAUT_CONFIG_USE_CLANG=0
+   NAUT_CONFIG_USE_WLLVM=0
+   NAUT_CONFIG_COMPILER_PREFIX=
+   NAUT_CONFIG_COMPILER_SUFFIX=
+else
+   include .config
+endif
 
-AR		= $(CROSS_COMPILE)ar
-NM		= $(CROSS_COMPILE)nm
-STRIP		= $(CROSS_COMPILE)strip
-OBJCOPY		= $(CROSS_COMPILE)objcopy
-OBJDUMP		= $(CROSS_COMPILE)objdump
+
+AR		=     $(CROSS_COMPILE)$(COMPILER_PREFIX)ar
+NM		=     $(CROSS_COMPILE)$(COMPILER_PREFIX)nm
+STRIP		=   $(CROSS_COMPILE)$(COMPILER_PREFIX)strip
+OBJCOPY		= $(CROSS_COMPILE)$(COMPILER_PREFIX)objcopy
+OBJDUMP		= $(CROSS_COMPILE)$(COMPILER_PREFIX)objdump
 
 CPP		= $(CC) -E
 GRUBMKRESCUE    = $(CROSS_COMPILE)grub-mkrescue
@@ -313,18 +329,17 @@ NAUT_INCLUDE      := -D__NAUTILUS__ -Iinclude \
 CPPFLAGS        := $(NAUT_INCLUDE) -D__NAUTILUS__
 
 
-#
-# Include .config early so that we have access to the toolchain-related options
-#
-ifeq (,$(wildcard .config))
-   NAUT_CONFIG_USE_GCC=1
-   NAUT_CONFIG_USE_CLANG=0
-   NAUT_CONFIG_USE_WLLVM=0
-   NAUT_CONFIG_COMPILER_PREFIX=
-   NAUT_CONFIG_COMPILER_SUFFIX=
-else
-   include .config
+
+
+ifdef NAUT_CONFIG_ARCH_X86
+SUBARCH = x86_64
 endif
+
+ifdef NAUT_CONFIG_ARCH_RISCV
+SUBARCH = riscv
+endif
+
+ARCH		?= $(SUBARCH)
 
 COMPILER_PREFIX := $(patsubst "%",%,$(NAUT_CONFIG_COMPILER_PREFIX))
 COMPILER_SUFFIX := $(patsubst "%",%,$(NAUT_CONFIG_COMPILER_SUFFIX))
@@ -335,21 +350,21 @@ COMPILER_SUFFIX := $(patsubst "%",%,$(NAUT_CONFIG_COMPILER_SUFFIX))
 #
 ifdef NAUT_CONFIG_USE_CLANG
   AS		= $(CROSS_COMPILE)$(COMPILER_PREFIX)llvm-as$(COMPILER_SUFFIX)
-  LD		= $(CROSS_COMPILE)ld
+  LD		= $(CROSS_COMPILE)$(COMPILER_PREFIX)ld
   CC		= $(CROSS_COMPILE)$(COMPILER_PREFIX)clang$(COMPILER_SUFFIX)
   CXX           = $(CROSS_COMPILE)$(COMPILER_PREFIX)clang++$(COMPILER_SUFFIX)
 endif
 
 ifdef NAUT_CONFIG_USE_WLLVM
   AS		= $(CROSS_COMPILE)$(COMPILER_PREFIX)llvm-as$(COMPILER_SUFFIX)
-  LD		= $(CROSS_COMPILE)ld
+  LD		= $(CROSS_COMPILE)$(COMPILER_PREFIX)ld
   CC		= $(CROSS_COMPILE)$(COMPILER_PREFIX)wllvm$(COMPILER_SUFFIX)
   CXX           = $(CROSS_COMPILE)$(COMPILER_PREFIX)wllvm++$(COMPILER_SUFFIX)
 endif
 
 ifdef NAUT_CONFIG_USE_GCC
   AS		= $(CROSS_COMPILE)$(COMPILER_PREFIX)as$(COMPILER_SUFFIX)
-  LD		= $(CROSS_COMPILE)ld
+  LD		= $(CROSS_COMPILE)$(COMPILER_PREFIX)ld
   CC		= $(CROSS_COMPILE)$(COMPILER_PREFIX)gcc$(COMPILER_SUFFIX)
   CXX           = $(CROSS_COMPILE)$(COMPILER_PREFIX)g++$(COMPILER_SUFFIX)
 endif
@@ -361,10 +376,15 @@ COMMON_FLAGS :=-fno-omit-frame-pointer \
 			   -fno-stack-protector \
 			   -fno-strict-aliasing \
                            -fno-strict-overflow \
-			   -mno-red-zone \
-			   -mcmodel=large
+
+ifdef NAUT_CONFIG_ARCH_RISCV
+  COMMON_FLAGS += -mcmodel=medany -march=rv64gc -mabi=lp64d
+endif
 
 
+ifdef NAUT_CONFIG_ARCH_X86
+  COMMON_FLAGS += -mcmodel=large -mno-red-zone
+endif
 
 ifdef NAUT_CONFIG_USE_GCC
   COMMON_FLAGS += -O2  -fno-delete-null-pointer-checks
@@ -394,9 +414,9 @@ endif
 #
 #                           -fno-isolate-erroneous-paths-attribute \
 #                           -fno-isolate-erroneous-paths-dereference \
-#			  
 #
-# 
+#
+#
 # For testing, optionally add -fsanitize=undefined
 #
 #
@@ -619,7 +639,11 @@ else
   libs-y += $(CROSS_COMPILE)/../lib64/libstdc++.a
 endif
 else
+ifdef NAUT_CONFIG_ARCH_RISCV
+  libs-y += $(NAUT_CONFIG_TOOLCHAIN_ROOT)/../lib/rv64imac/lp64/libstdc++.a
+else
   libs-y += $(NAUT_CONFIG_TOOLCHAIN_ROOT)/lib64/libstdc++.a
+endif
 endif
 endif # NAUT_CONFIG_CXX_SUPPORT
 
@@ -719,7 +743,11 @@ else
 ifdef NAUT_CONFIG_GEM5
 LD_SCRIPT:=link/nautilus.ld.gem5
 else
+ifdef NAUT_CONFIG_ARCH_RISCV
+LD_SCRIPT:=link/nautilus.ld.riscv
+else
 LD_SCRIPT:=link/nautilus.ld
+endif
 endif
 endif
 endif
@@ -746,7 +774,7 @@ quiet_cmd_nautilus_version = GEN     .version
         else						\
 	  mv .version .old_version;			\
 	  expr 0$$(cat .old_version) + 1 >.version;	\
-	fi;					
+	fi;
 
 
 # Link of nautilus 
@@ -781,6 +809,20 @@ $(SEC_NAME): $(BIN_NAME)
 	@scripts/gen_sec_file.sh $(BIN_NAME) tmp.sec
 
 nautilus: $(BIN_NAME) $(SYM_NAME) $(SEC_NAME)
+
+
+uImage: $(BIN_NAME)
+	$(OBJCOPY) -O binary $(BIN_NAME) Image
+	mkimage -A riscv -O linux -T kernel -C none \
+		-a 0x80100000 -e 0x80100000 -n "Nautilus" \
+		-d Image uImage
+	rm Image
+
+qemu: nautilus.bin
+ifdef NAUT_CONFIG_ARCH_RISCV
+	qemu-system-riscv64 -bios default -m 2G -M sifive_u -kernel nautilus.bin -serial mon:stdio -display none -gdb tcp::1234
+endif
+
 
 # New function to run a Python script which generates Lua test code,
 # addition of a separate flag (LUA_BUILD_FLAG) which is set to indicate

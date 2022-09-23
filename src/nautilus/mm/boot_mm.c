@@ -24,6 +24,7 @@
 #include <nautilus/naut_types.h>
 #include <nautilus/mm.h>
 #include <nautilus/paging.h>
+#include <nautilus/arch.h>
 #include <nautilus/mb_utils.h>
 #include <nautilus/multiboot2.h>
 #include <nautilus/macros.h>
@@ -51,6 +52,7 @@ char * mem_region_types[6] = {
 
 
 extern addr_t _loadStart;
+extern addr_t _loadEnd;
 extern addr_t _bssEnd;
 extern ulong_t pml4;
 extern ulong_t boot_stack_start;
@@ -171,13 +173,19 @@ int
 mm_boot_init (ulong_t mbd)
 {
     addr_t kern_start     = (addr_t)&_loadStart;
+#ifdef NAUT_CONFIG_ARCH_RISCV
+    addr_t kern_end       = (addr_t)&_loadEnd;
+#else
     addr_t kern_end       = multiboot_get_modules_end(mbd);
+#endif
     addr_t pm_start       = round_up(kern_end, PAGE_SIZE);
     boot_mem_info_t * mem = &bootmem;
     ulong_t npages;
     ulong_t pm_len;
 
     BMM_PRINT("Setting up boot memory allocator\n");
+
+		memset(&mm_info, 0, sizeof(mm_info));
 
     /* parse the multiboot2 memory map, filing in 
      * some global data that we will subsequently use here  */
@@ -187,7 +195,7 @@ mm_boot_init (ulong_t mbd)
     npages = mm_info.last_pfn + 1;
     pm_len = (npages/BITS_PER_LONG + !!(npages%BITS_PER_LONG)) * sizeof(long);
 
-    BMM_PRINT("Detected %llu.%llu MB (%lu pages) of usable System RAM\n", mm_info.usable_ram/(1024*1024), mm_info.usable_ram%(1024*1024), npages);
+    BMM_PRINT("Detected %llu bytes (%lu pages) of usable System RAM\n", mm_info.usable_ram, npages);
 
     mem->page_map = (ulong_t*)pm_start;
     mem->npages   = npages;
@@ -250,6 +258,8 @@ mm_boot_free_mem (addr_t start, ulong_t size)
     uint32_t start_page = PADDR_TO_PAGE(start);
     uint32_t npages     = (size+PAGE_SIZE-1) / PAGE_SIZE; // what if this is smaller than a page?
     boot_mem_info_t * bm = &bootmem;
+
+		// memset((void*)start, 0, size);
 
     if (unlikely(boot_mm_inactive)) {
         panic("Invalid attempt to use boot memory allocator\n");

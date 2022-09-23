@@ -105,6 +105,7 @@ init_ap_area (struct ap_init_area * ap_area,
     ap_area->stack   = boot_stack_ptr;
     ap_area->cpu_ptr = naut->sys.cpus[core_num];
 
+#ifdef NAUT_CONFIG_ARCH_X86
     /* protected mode temporary GDT */
     ap_area->gdt[2]      = 0x0000ffff;
     ap_area->gdt[3]      = 0x00cf9a00;
@@ -120,6 +121,7 @@ init_ap_area (struct ap_init_area * ap_area,
 
     /* pointer to BSP's PML4 */
     ap_area->cr3         = read_cr3();
+#endif
 
     /* pointer to our entry routine */
     ap_area->entry       = smp_ap_entry;
@@ -163,6 +165,7 @@ smp_bringup_aps (struct naut_info * naut)
         return 0;
     }
 
+    #ifdef NAUT_CONFIG_ARCH_X86
     maxlvt = apic_get_maxlvt(apic);
 
     SMP_DEBUG("Passing target page num %x to SIPI\n", target_vec);
@@ -172,6 +175,7 @@ smp_bringup_aps (struct naut_info * naut)
         apic_write(apic, APIC_REG_ESR, 0);
     }
     apic_read(apic, APIC_REG_ESR);
+    #endif
 
     SMP_DEBUG("Copying in page for SMP boot code at (%p)...\n", (void*)ap_trampoline);
     memcpy((void*)ap_trampoline, (void*)boot_target, smp_code_sz);
@@ -203,18 +207,21 @@ smp_bringup_aps (struct naut_info * naut)
         }
 
 
+        #ifdef NAUT_CONFIG_ARCH_X86
         /* Send the INIT sequence */
         SMP_DEBUG("sending INIT to remote APIC (0x%x)\n", naut->sys.cpus[i]->lapic_id);
         apic_send_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
         /* wait for status to update */
         status = apic_wait_for_send(apic);
+        #endif
 
         mbarrier();
 
         /* 10ms delay */
         udelay(10000);
 
+        #ifdef NAUT_CONFIG_ARCH_X86
         /* deassert INIT IPI (level-triggered) */
         apic_deinit_iipi(apic, naut->sys.cpus[i]->lapic_id);
 
@@ -247,6 +254,7 @@ smp_bringup_aps (struct naut_info * naut)
             }
 
         }
+        #endif
 
         if (status) {
             ERROR_PRINT("APIC wasn't delivered!\n");
@@ -298,10 +306,12 @@ smp_setup_xcall_bsp (struct cpu * core)
     SMP_PRINT("Setting up cross-core IPI event queue\n");
     smp_xcall_init_queue(core);
 
+#ifdef NAUT_CONFIG_ARCH_X86
     if (register_int_handler(IPI_VEC_XCALL, xcall_handler, NULL) != 0) {
         ERROR_PRINT("Could not assign interrupt handler for XCALL on core %u\n", core->id);
         return -1;
     }
+#endif
 
     return 0;
 }
@@ -309,6 +319,7 @@ smp_setup_xcall_bsp (struct cpu * core)
 static int
 smp_ap_setup (struct cpu * core)
 {
+#ifdef NAUT_CONFIG_ARCH_X86
     // Note that any use of SSE/AVX, for example produced by
     // clang/llvm optimation, that happens before fpu_init will
     // cause a panic.  Initialize FPU ASAP.
@@ -382,6 +393,7 @@ smp_ap_setup (struct cpu * core)
     }
 #endif
 
+#endif
     return 0;
 }
 
@@ -391,6 +403,7 @@ extern void nk_rand_init(struct cpu*);
 static void
 smp_ap_finish (struct cpu * core)
 {
+#ifdef NAUT_CONFIG_ARCH_X86
     nk_rand_init(core);
 
     nk_cpu_topo_discover(core);
@@ -426,6 +439,7 @@ smp_ap_finish (struct cpu * core)
 
 #ifdef NAUT_CONFIG_PROFILE
     nk_instrument_calibrate(INSTR_CAL_LOOPS);
+#endif
 #endif
 }
 
@@ -492,7 +506,7 @@ wait_xcall (struct nk_xcall * x)
 {
 
     while (atomic_cmpswap(x->xcall_done, 1, 0) != 1) {
-        asm volatile ("pause");
+        arch_relax();
     }
 }
 
@@ -568,6 +582,7 @@ smp_xcall (cpu_id_t cpu_id,
            void * arg,
            uint8_t wait)
 {
+#ifdef NAUT_CONFIG_ARCH_X86
     struct sys_info * sys = per_cpu_get(system);
     nk_queue_t * xcq  = NULL;
     struct nk_xcall x;
@@ -624,6 +639,7 @@ smp_xcall (cpu_id_t cpu_id,
         }
 
     }
+#endif
 
     return 0;
 }

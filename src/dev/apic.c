@@ -160,7 +160,7 @@ null_kick (excp_entry_t * excp, excp_vec_t v, void *state)
     // this communicates that we are in a kick to the scheduler
     // the scheduler will then set this to zero as a side-effect
     // of calling apic_update_oneshot_timer
-    apic->in_kick_interrupt = 1;
+    get_cpu()->in_kick_interrupt = 1;
 
     IRQ_HANDLER_END();
     return 0;
@@ -453,7 +453,7 @@ apic_bcast_sipi (struct apic_dev * apic, uint8_t target)
 }
 
 static void calibrate_apic_timer(struct apic_dev *apic);
-static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
+int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state);
 
 
 static void
@@ -780,6 +780,10 @@ apic_init (struct cpu * core)
     memset(apic, 0, sizeof(struct apic_dev));
     core->apic = apic;
 
+    printk("apic=%p\n", apic);
+    /* while(true) { */
+    /* } */
+
     if (!check_apic_avail()) {
         panic("No APIC found on core %u, dying\n", core->id);
     } 
@@ -991,9 +995,9 @@ void apic_update_oneshot_timer(struct apic_dev *apic, uint32_t ticks,
 	}
     }
     // note that this is set at the entry to apic_timer_handler
-    apic->in_timer_interrupt=0;
+    get_cpu()->in_timer_interrupt=0;
     // note that this is set at the entry to null_kick
-    apic->in_kick_interrupt=0;
+    get_cpu()->in_kick_interrupt=0;
 }
 	    
 
@@ -1346,7 +1350,7 @@ static void calibrate_apic_timer(struct apic_dev *apic)
 }
 
 
-static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
+int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 {
     NK_GPIO_OUTPUT_MASK(0x2,GPIO_OR);
 
@@ -1354,7 +1358,7 @@ static int apic_timer_handler(excp_entry_t * excp, excp_vec_t vec, void *state)
 
     uint64_t time_to_next_ns;
 
-    apic->in_timer_interrupt=1;
+    get_cpu()->in_timer_interrupt = 1;
 
     apic->timer_count++;
 

@@ -104,46 +104,11 @@ size_t strspn (const char * s, const char * accept);
 size_t strcspn (const char * s, const char * reject);
 char * strstr (const char * haystack, const char * needle);
 
-
-#define OP_T_THRES 8
-#define OPSIZ sizeof(unsigned long int)
-
-#define WORD_COPY_BWD(dst_ep, src_ep, nbytes_left, nbytes)            \
-  do                                          \
-    {                                         \
-      int __d0;                                   \
-      asm volatile(/* Set the direction flag, so copying goes backwards.  */  \
-           "std\n"                            \
-           /* Copy longwords.  */                     \
-           "rep\n"                            \
-           "movsl\n"                              \
-           /* Clear the dir flag.  Convention says it should be 0. */ \
-           "cld" :                            \
-           "=D" (dst_ep), "=S" (src_ep), "=c" (__d0) :            \
-           "0" (dst_ep - 4), "1" (src_ep - 4), "2" ((nbytes) / 4) :   \
-           "memory");                             \
-      dst_ep += 4;                                \
-      src_ep += 4;                                \
-      (nbytes_left) = (nbytes) % 4;                       \
-    } while (0)
-
-#define BYTE_COPY_BWD(dst_ep, src_ep, nbytes)                     \
-  do                                          \
-    {                                         \
-      int __d0;                                   \
-      asm volatile(/* Set the direction flag, so copying goes backwards.  */  \
-           "std\n"                            \
-           /* Copy bytes.  */                         \
-           "rep\n"                            \
-           "movsb\n"                              \
-           /* Clear the dir flag.  Convention says it should be 0. */ \
-           "cld" :                            \
-           "=D" (dst_ep), "=S" (src_ep), "=c" (__d0) :            \
-           "0" (dst_ep - 1), "1" (src_ep - 1), "2" (nbytes) :         \
-           "memory");                             \
-      dst_ep += 1;                                \
-      src_ep += 1;                                \
-    } while (0)
+#ifdef NAUT_CONFIG_ARCH_RISCV
+#include <arch/riscv/naut_string.h>
+#else
+#include <arch/x64/naut_string.h>
+#endif
 
 #else
 

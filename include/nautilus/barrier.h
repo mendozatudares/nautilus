@@ -88,16 +88,29 @@ static inline void nk_counting_barrier(volatile nk_counting_barrier_t *b)
         // I'm the last to the party
 	// We need to be sure that these operations occur in order 
 	// and are fully visible in order
+    #ifdef NAUT_CONFIG_ARCH_RISCV
+        *curp ^= 0x1;
+	__asm__ __volatile__ ("fence.i" : : : "memory");
+        *countp = 0;
+	__asm__ __volatile__ ("fence.i" : : : "memory");
+    #else
         *curp ^= 0x1;
 	__asm__ __volatile__ ("mfence" : : : "memory");
         *countp = 0;
 	__asm__ __volatile__ ("mfence" : : : "memory");
+    #endif
     } else {
         // k1om compiler does not know what "volatile" means
         // hence this hand-coding.
+    #ifdef NAUT_CONFIG_ARCH_RISCV
+	while ( ({ __asm__ __volatile__( "ld %0, %1" : "=r"(old) : "m"(*countp) : ); old; }) ) {
+	    __asm__ __volatile__ ("nop");
+	}
+    #else
 	while ( ({ __asm__ __volatile__( "movq %1, %0" : "=r"(old) : "m"(*countp) : ); old; }) ) {
 	    __asm__ __volatile__ ("pause");
 	}
+    #endif
     }
 }
 

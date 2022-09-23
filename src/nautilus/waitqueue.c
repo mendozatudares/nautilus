@@ -134,7 +134,7 @@ void nk_wait_queue_sleep_extended(nk_wait_queue_t *wq, int (*cond_check)(void *s
 	}
 	
 	// force arch and compiler to do above writes
-	__asm__ __volatile__ ("mfence" : : : "memory"); 
+        mbarrier();
 
 	// We now keep interrupts off across the context switch
 	// since we now allow an interrupt handler to do a wake
@@ -262,7 +262,7 @@ void nk_wait_queue_sleep_extended_multiple(int num_wq, nk_wait_queue_t **wq, int
 	}
 	
 	// force arch and compiler to do above writes
-	__asm__ __volatile__ ("mfence" : : : "memory"); 
+        mbarrier();
 
 	// We now keep interrupts off across the context switch
 	// since we now allow an interrupt handler to do a wake

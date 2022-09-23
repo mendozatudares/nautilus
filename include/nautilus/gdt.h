@@ -69,6 +69,10 @@ struct tss64 {
     uint16_t iopb_offset;
 } __packed;
 
+#ifdef NAUT_CONFIG_ARCH_RISCV
+static inline void lgdt32 (const struct gdt_desc32 * g) { }
+static inline void lgdt64 (const struct gdt_desc64 * g) { }
+#else
 static inline void
 lgdt32 (const struct gdt_desc32 * g)
 {
@@ -80,6 +84,7 @@ lgdt64 (const struct gdt_desc64 * g)
 {
     asm volatile ("lgdt %0" :: "m" (*g)); 
 }
+#endif
 
 void set_tss_descriptor(struct tss64_descriptor* entry, void* base,
                         uint32_t limit, uint8_t flags, uint8_t access);

@@ -37,8 +37,13 @@
 #include <nautilus/monitor.h>
 #endif
 
+#ifdef NAUT_CONFIG_ARCH_X86
 extern ulong_t idt_handler_table[NUM_IDT_ENTRIES];
 extern ulong_t idt_state_table[NUM_IDT_ENTRIES]; 
+#else
+ulong_t idt_handler_table[NUM_IDT_ENTRIES];
+ulong_t idt_state_table[NUM_IDT_ENTRIES]; 
+#endif
 
 struct gate_desc64 idt64[NUM_IDT_ENTRIES] __align(8);
 
@@ -121,9 +126,11 @@ null_excp_handler (excp_entry_t * excp,
 	       cpu_id);
     }
     
+#ifdef NAUT_CONFIG_ARCH_X86
     struct nk_regs * r = (struct nk_regs*)((char*)excp - 128);
     nk_print_regs(r);
     backtrace(r->rbp);
+#endif
 
     panic("+++ HALTING +++\n");
     
@@ -149,9 +156,11 @@ null_irq_handler (excp_entry_t * excp,
             (void*)excp->rip,
             my_cpu_id());
 
+#ifdef NAUT_CONFIG_ARCH_X86
     struct nk_regs * r = (struct nk_regs*)((char*)excp - 128);
     nk_print_regs(r);
     backtrace(r->rbp);
+#endif
 
     panic("+++ HALTING +++\n");
     
@@ -183,9 +192,11 @@ debug_excp_handler (excp_entry_t * excp,
 	   (void*)excp->rip, 
 	   cpu_id, tid);
     
+#ifdef NAUT_CONFIG_ARCH_X86
     struct nk_regs * r = (struct nk_regs*)((char*)excp - 128);
     nk_print_regs(r);
     backtrace(r->rbp);
+#endif
     
     panic("+++ HALTING +++\n");
     
@@ -343,9 +354,11 @@ int nmi_handler (excp_entry_t * excp,
 	   (void*)excp->rip, 
 	   cpu_id, tid);
 
+#ifdef NAUT_CONFIG_ARCH_X86
     struct nk_regs * r = (struct nk_regs*)((char*)excp - 128);
     nk_print_regs(r);
     backtrace(r->rbp);
+#endif
 
     panic("+++ HALTING +++\n");
 
@@ -431,6 +444,7 @@ int idt_find_and_reserve_range(ulong_t numentries, int aligned, ulong_t *first)
 }
 
 
+#ifdef NAUT_CONFIG_ARCH_X86
 extern void early_irq_handlers(void);
 extern void early_excp_handlers(void);
 
@@ -488,11 +502,11 @@ setup_idt (void)
         return -1;
     }
 #endif
-    
+
 
 
     lidt(&idt_descriptor);
 
     return 0;
 }
-
+#endif

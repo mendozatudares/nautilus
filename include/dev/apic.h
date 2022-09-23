@@ -238,8 +238,11 @@ struct apic_dev {
     uint8_t  timer_set;
     uint32_t current_ticks; // timeout currently being computed
     uint64_t timer_count;
-    int      in_timer_interrupt;
-    int      in_kick_interrupt;
+
+		// These fields are now located in `struct cpu` to aid in portability
+		// to new architectures
+    // int      in_timer_interrupt;
+    // int      in_kick_interrupt;
 };
 
 // included here for performance (all inlined)

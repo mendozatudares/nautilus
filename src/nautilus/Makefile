@@ -6,8 +6,6 @@ obj-y += \
 	idt.o \
 	queue.o \
 	irq.o \
-	mb_utils.o \
-	paging.o \
 	naut_string.o \
 	msr.o \
 	cpuid.o \
@@ -15,7 +13,6 @@ obj-y += \
 	mtrr.o \
 	fpu.o \
 	spinlock.o \
-	ticketlock.o \
 	rwlock.o \
 	condvar.o \
 	semaphore.o \
@@ -26,12 +23,12 @@ obj-y += \
 	smp.o \
 	idle.o \
 	thread.o \
-        task.o   \
-        future.o  \
+	task.o \
+	future.o \
 	waitqueue.o \
 	group.o \
-        timer.o \
-        scheduler.o \
+	timer.o \
+	scheduler.o \
 	group_sched.o \
 	barrier.o \
 	backtrace.o \
@@ -48,17 +45,33 @@ obj-y += \
 	blkdev.o \
 	netdev.o \
 	gpudev.o \
-        fs.o \
-        loader.o \
-        shell.o \
+	fs.o \
+	shell.o \
 	fprintk.o \
-        dtoa.o \
+	dtoa.o \
 	module.o \
 	linker.o \
 	prog.o \
 	getopt.o \
 	cmdline.o \
 	lru_cache.o
+
+obj-$(NAUT_CONFIG_ARCH_X86) += \
+	mb_utils.o \
+	paging.o \
+	msr.o \
+	cpuid.o \
+	mtrr.o \
+	ticketlock.o \
+	cpu.o \
+	acpi.o \
+	numa.o \
+	nemo.o \
+	pmc.o \
+	setjmp.o \
+	loader.o \
+
+obj-$(NAUT_CONFIG_ARCH_RISCV) += devicetree.o
 
 obj-$(NAUT_CONFIG_PROFILE) += instrument.o
 obj-$(NAUT_CONFIG_XEON_PHI) += sfi.o
