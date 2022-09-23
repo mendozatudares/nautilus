@@ -6,7 +6,7 @@
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/HExSA-Lab/nautilus.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/HExSA-Lab/nautilus/alerts/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Nautilus w/ CARAT CAKE
+# Nautilus
 Nautilus is an example of an Aerokernel, a very thin kernel-layer exposed
 (much like Unikernel) directly to a runtime system and/or application.
 An Aerokernel does not, by default, have a user-mode! There are several reasons for this,
